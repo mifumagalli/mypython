@@ -192,7 +192,7 @@ class Muse(object):
             if(p.is_alive()):
                 p.join()
 
-    
+        
         ########################################
         # compute offsets and re-project cubes #
         ########################################
@@ -223,9 +223,13 @@ class Muse(object):
             off.close()
             
         #now reproject cubes with offsets
-        rdx.make_cubes(xml_info,nproc=12,wcsoff=[ra_off,dec_off],refcube=currdir+'/'+refcube)
+        if(refcube):
+            print 'Using reference cube for wcs...'
+            rdx.make_cubes(xml_info,nproc=12,wcsoff=[ra_off,dec_off],refcube=currdir+'/'+refcube) 
+        else:
+            print 'Computing reference WCS on data themselves...'
+            rdx.make_cubes(xml_info,nproc=12,wcsoff=[ra_off,dec_off])  
             
-     
         ######################################################
         # run a second iter of cubex fix and sky             #
         # with realigned images  mostly to find sources for  #
@@ -248,30 +252,31 @@ class Muse(object):
             if(p.is_alive()):
                 p.join()
 
-
         ##########################################
         # run a third iter of cubex fix and sky  #
         # with better masking on sources         #
         ##########################################
-      
-        #run the loop
-        print 'Do third pass of cubex..'
-        #do it in parallel on exposures
-        workers=[]
-        for dd in range(nsci):
-            #reconstruct the name 
-            pixtab="PIXTABLE_REDUCED_EXP{0:d}_off.fits".format(dd+1)
-            cube="DATACUBE_FINAL_EXP{0:d}_off.fits".format(dd+1)
-            #now launch the task
-            p = multiprocessing.Process(target=cx.fixandsky_secondpass,args=(cube,pixtab,True,currdir+'/'+highsn))
-            workers.append(p)
-            p.start()
+        if(highsn):
+            #run the loop
+            print 'Do third pass of cubex..'
+            #do it in parallel on exposures
+            workers=[]
+            for dd in range(nsci):
+                #reconstruct the name 
+                pixtab="PIXTABLE_REDUCED_EXP{0:d}_off.fits".format(dd+1)
+                cube="DATACUBE_FINAL_EXP{0:d}_off.fits".format(dd+1)
+                #now launch the task
+                p = multiprocessing.Process(target=cx.fixandsky_secondpass,args=(cube,pixtab,True,currdir+'/'+highsn))
+                workers.append(p)
+                p.start()
    
-        #wait for completion of all of them 
-        for p in workers:
-            if(p.is_alive()):
-                p.join()  
-                                            
+            #wait for completion of all of them 
+            for p in workers:
+                if(p.is_alive()):
+                    p.join()  
+        else:
+            print 'High SN cube not provided.. skip step 3'
+      
         #Done - back to original directory!
         print 'All done with fancy redux... Ready to coadd'
         os.chdir(currdir)
