@@ -91,6 +91,10 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
     delta_lambda=wavec-np.roll(wavec,1)
     delta_lambda[0]=wavec[1]-wavec[0]
 
+    #if no filter or wrange, default to mix man cube
+    if not (wrange) and not (filt):
+        wrange=[np.min(wavec),np.max(wavec)]
+
     #implement filtering in wrange
     if(wrange):
         #create a good mask
