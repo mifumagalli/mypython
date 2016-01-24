@@ -1,5 +1,8 @@
 import argparse
-import pyregion as pyreg
+try:
+    import pyregion as pyreg
+except:
+    print 'Cannot import pyregion'
 import numpy as np
 
 class PyMask(object):
