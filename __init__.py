@@ -5,3 +5,5 @@ import seds
 import ramses
 import ifu
 import redshifts
+import lumfunc
+
