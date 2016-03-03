@@ -1,13 +1,18 @@
-Some info on muse redux [MF, Dec 2015]
--------------------------------------
+Some info on muse redux [MF, March 2016]
+---------------------------------------
 
 > Tested with eso muse pipeline 1.2.1
-> Tested with Cubex 1.4
+> Tested with Cubex 1.5
 
 * Step 1
 
 To run the eso pipeline, download data with calibrations from the ESO archive.
 Dump all the data in folder ./Raw, including the *xml file.
+
+If data require legacy calibrations, make sure there is a folder containing them. 
+./staticcal
+More info on legacy calibrations here: http://www.eso.org/sci/software/pipelines/#pipelines_table
+
 
 Run the basic reduction like this:
 
