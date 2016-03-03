@@ -196,7 +196,10 @@ class Muse(object):
         ########################################
         # compute offsets and re-project cubes #
         ########################################
-       
+   
+
+        #recipy provided for this in v1.2
+    
         #space
         ra_off=[]
         dec_off=[]

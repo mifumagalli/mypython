@@ -4,6 +4,7 @@ import glob
 import subprocess
 import time
 import os 
+from distutils.spawn import find_executable
 
 def grabtime(namelist):
 
@@ -92,6 +93,40 @@ def parse_xml(path='./',nproc=12):
                 mintm=np.argmin(delta_time)
                 xml_info[kk]=[currentlist[mintm]]
                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
+
+
+    #here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
+
+    #This is the largest time at one should worry about legacy products 
+    legacy_time=time.mktime(time.strptime("08 Sep 15", "%d %b %y"))       
+
+    if(reference_time < legacy_time):
+        print 'Using legacy static calibrations'
+        #pick the right one
+        tedge1=time.mktime(time.strptime("01 Dec 14", "%d %b %y"))
+        tedge2=time.mktime(time.strptime("15 Apr 15", "%d %b %y"))
+        if(reference_time <= tedge1):
+            #use commissioning static - you may need even older ones so check 
+            geometrystatic='staticcal/geometry_table_wfm_comm2b.fits'   
+            astrostatic='staticcal/astrometry_wcs_wfm_comm2b.fits'
+        elif((reference_time > tedge1) & (reference_time <= tedge2)):
+            geometrystatic='staticcal/geometry_table_wfm_2014-12-01.fits'
+            astrostatic='staticcal/astrometry_wcs_wfm_2014-12-01.fits'
+        else:
+            geometrystatic='staticcal/geometry_table_wfm_2015-04-16.fits'
+            astrostatic='staticcal/astrometry_wcs_wfm_2015-04-16.fits'
+    else:
+        print 'Using pipeline static calibrations'
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
+        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+        astrostatic=staticalpath+'astrometry_wcs_wfm.fits'
+        geometrystatic=staticalpath+'geometry_table_wfm.fits'
+        
+    #update form default
+    xml_info['ASTROMETRY_WCS']=[astrostatic]
+    xml_info['GEOMETRY_TABLE']=[geometrystatic]
 
     #now dump cal plan
     print 'Writing calibration plan in calplan.txt'            
