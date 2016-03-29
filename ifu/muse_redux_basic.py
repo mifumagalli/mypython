@@ -103,18 +103,19 @@ def parse_xml(path='./',nproc=12):
     if(reference_time < legacy_time):
         print 'Using legacy static calibrations'
         #pick the right one
+        #Static cal are assume dto be top levl dir in reduction folder
         tedge1=time.mktime(time.strptime("01 Dec 14", "%d %b %y"))
         tedge2=time.mktime(time.strptime("15 Apr 15", "%d %b %y"))
         if(reference_time <= tedge1):
             #use commissioning static - you may need even older ones so check 
-            geometrystatic='staticcal/geometry_table_wfm_comm2b.fits'   
-            astrostatic='staticcal/astrometry_wcs_wfm_comm2b.fits'
+            geometrystatic='../staticcal/geometry_table_wfm_comm2b.fits'   
+            astrostatic='../staticcal/astrometry_wcs_wfm_comm2b.fits'
         elif((reference_time > tedge1) & (reference_time <= tedge2)):
-            geometrystatic='staticcal/geometry_table_wfm_2014-12-01.fits'
-            astrostatic='staticcal/astrometry_wcs_wfm_2014-12-01.fits'
+            geometrystatic='../staticcal/geometry_table_wfm_2014-12-01.fits'
+            astrostatic='../staticcal/astrometry_wcs_wfm_2014-12-01.fits'
         else:
-            geometrystatic='staticcal/geometry_table_wfm_2015-04-16.fits'
-            astrostatic='staticcal/astrometry_wcs_wfm_2015-04-16.fits'
+            geometrystatic='../staticcal/geometry_table_wfm_2015-04-16.fits'
+            astrostatic='../staticcal/astrometry_wcs_wfm_2015-04-16.fits'
     else:
         print 'Using pipeline static calibrations'
         esorexpath=find_executable('esorex')
@@ -237,7 +238,7 @@ def make_twiflat(xml_info,nproc=12):
     sof=open("../Script/twilight.sof","w")
     for ii in flat_list:
         sof.write("../Raw/{0}.fits.fz SKYFLAT\n".format(ii))
-    sof.write("../Raw/{0}.fits GEOMETRY_TABLE\n".format(geom_cat)) 
+    sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
@@ -262,7 +263,7 @@ def make_stdstar(xml_info,nproc=12):
         
     sof=open("../Script/object_std.sof","w")
     sof.write("../Raw/{0}.fits.fz STD\n".format(std_list)) 
-    sof.write("../Raw/{0}.fits GEOMETRY_TABLE\n".format(geom_cat)) 
+    sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
@@ -318,7 +319,7 @@ def make_objects(xml_info,nproc=12):
     for ii in obj_list:
         sof.write("../Raw/{0}.fits.fz OBJECT\n".format(ii))
     sof.write("../Raw/{0}.fits.fz ILLUM\n".format(ill))
-    sof.write("../Raw/{0}.fits GEOMETRY_TABLE\n".format(geom_cat)) 
+    sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
@@ -365,7 +366,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None):
             
             #Write the sof file 
             sof=open("../Script/scipost_{0:d}.sof".format(exp+1),"w")
-            sof.write("../Raw/{0}.fits ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
+            sof.write("{0} ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
             sof.write("../Raw/{0}.fits SKY_LINES\n".format(xml_info["SKY_LINES"][0])) 
             sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(xml_info["EXTINCT_TABLE"][0])) 
             sof.write("../Raw/{0}.fits FILTER_LIST\n".format(xml_info["FILTER_LIST"][0])) 
