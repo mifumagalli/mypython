@@ -226,3 +226,79 @@ def make_ifumasks(listob,refpath='./',nproc=24):
      
         #back to top
         os.chdir(topdir)
+
+
+
+
+def make_illcorr(listob):
+
+    """
+    Loop over each OB and perform illumination correction 
+
+    listob -> OBs to process
+
+    """
+      
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+
+
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final sky-subtracted cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/')
+        print('Processing {} for illumination correction'.format(ob))
+ 
+        #Search how many exposures are there
+        scils=glob.glob("OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+
+        #loop on exposures and reduce frame with sky subtraction 
+        for exp in range(nsci):
+            
+            #define some names for final cube 
+            ifumask_cname="DATACUBE_IFUMASK_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            ifumask_iname="IMAGE_IFUMASK_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            data_cname="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            data_iname="IMAGE_FOV_LINEWCS_EXP{0:d}.fits".format(exp+1)
+ 
+
+
+            #open the fov to create a good mask 
+            data=fits.open(data_iname)
+            ifimask=fits.open(ifumask_iname)
+            goodmask=np.nan_to_num(data[1].data)*0.
+
+            
+            #grab muse rotator
+            rotation=data[0].header["HIERARCH ESO INS DROT POSANG"] 
+
+
+            #start with central ifu pixels 
+            for iff in range(24): 
+                #group slices in 4 stacks
+                for i in range(4):
+                    flagvalue = (iff+1)*100.+i+1
+              
+                    goodpx=np.where(ifimask[1].data == flagvalue)
+                    goodmask[goodpx]=1.0
+            
+                    
+
+            #plt.imshow(goodmask,origin='lower')
+            #plt.show()
+                      
+
+        #back to top for next OB 
+        os.chdir(topdir)
