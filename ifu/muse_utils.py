@@ -386,6 +386,9 @@ def readcube(cube, helio=0.0):
     If setting helio!=0 (in km/s), then helio corrections 
     are applied to the data 
 
+    Note that from v1.2, the ESO pipeline applies correction to 
+    data regarding baryocentric heliocentric correction
+    
     """
 
     from astropy.io import fits
@@ -420,3 +423,60 @@ def readcube(cube, helio=0.0):
 
     return cubdata,vardata,wcsc,wavec
 
+
+def adjust_wcsoffset(data,xpix,ypix,rag,deg):
+
+
+    """
+
+    Small script that corrects the overall zero-point of the 
+    wcs solution. 
+
+    data -> cube or image to which correction should be applied
+    xpix -> new reference x pixel, or CRPIX1 [best if close to centre of field]
+    ypix -> same but for y, or CRPIX2
+    rag  -> ra in deg for reference pixel, or CRVAL1
+    deg  -> dec in deg for reference pixel, or CRVAL2 
+
+    """
+
+    from astropy.io import fits
+
+    #open 
+    fithdu=fits.open(data,mode='update')
+    
+    #save old 
+    fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1'] 
+    fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
+    fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
+    fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
+
+    #write new 
+    fithdu[1].header['CRVAL1']=rag 
+    fithdu[1].header['CRVAL2']=deg
+    fithdu[1].header['CRPIX1']=xpix 
+    fithdu[1].header['CRPIX2']=ypix
+
+    #save 
+    fithdu.flush()
+    fithdu.close()
+
+
+
+def unpack_pixtab(flag):
+    
+    """
+
+    Take the flag extension of a pixel table and return unpacked information 
+    on the origin of the pixels 
+
+    flag - > the pixel origin extension of a pixel table
+
+    """
+
+    xpix = flag >> 24
+    ypix = (flag >> 11) & 8191
+    ifu  = (flag >> 6) & 31
+    islice = flag & 63 
+
+    return ifu, islice

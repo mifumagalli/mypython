@@ -133,7 +133,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,catalogue,xml_info,path='./',refcube=None,highsn=None):
+    def cubex_process(self,catalogue,xml_info,path='./',Refcube=None,highsn=None):
         
         """ 
         
@@ -284,6 +284,86 @@ class Muse(object):
         print 'All done with fancy redux... Ready to coadd'
         os.chdir(currdir)
     
+
+    def eso_process(self):
+
+        """
+
+        After running the basic reduction, this sequence generates 
+        a skysubtracted and combined cube following only eso recepies 
+        
+     
+        """
+
+ 
+        import os
+        import glob
+        import subprocess
+        import muse_redux_eso as ex 
+        
+        #first, list how many OBs are there
+        listob=glob.glob('OB*')
+        listob.sort()
+        nobs=len(listob)
+        print('Process {} OBs'.format(nobs))
+        
+        #rerun pipe enabling skysubtraction and 
+        #dumping fully reduced pixel table 
+        ex.individual_skysub(listob)
+        
+        #now make space as needed for final products
+        if not os.path.exists('esocombine'):
+            os.makedirs('esocombine')
+
+        #change dir
+        currdir=os.getcwd()
+        os.chdir('esocombine')
+        print('Changing dir to esocombine...')
+
+        #coadd all obs after aligment 
+        ex.coaddall(listob)
+
+        #back to original place
+        print('Back to top level...')
+        os.chdir(currdir)
+        print('All done!')
+        
+
+    def line_process(self,refpath='./esocombine/',lmin=4900,lmax=9000):
+
+        """
+
+        Produces final cubes optimised for fields that are relatively 
+        empty in continuum sources but that may have very extended 
+        emission lines.
+
+        lmin -> the minimum wavelength to consider
+        lmax -> the maximum wavelength to consider
+        refpath -> where the reference cubes for wcs resempling are 
+
+        """
+
+        import os
+        import glob
+        import subprocess
+        import muse_redux_line as ex 
+ 
+        #first, list how many OBs are there
+        listob=glob.glob('OB*')
+        listob.sort()
+        nobs=len(listob)
+        print('Process {} OBs'.format(nobs))
+        
+        #rerun pipe enabling resampling on final ESO cube
+        ex.individual_resample(listob,refpath=refpath)
+        
+        #next construct the ifu mask for each exposure 
+        ex.make_ifumasks(listob,refpath=refpath)
+
+
+        print("All done!")
+
+
 #### End of the clean and tested code #####
 #### End of the clean and tested code #####
 #### End of the clean and tested code #####

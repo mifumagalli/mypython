@@ -29,10 +29,33 @@ Typical failures arise if not all calibrations are included or if Raw data are m
 
 At the end, there should be a IMAGE_FOV and DATACUBE_FINAL for each science 
 exposure in Proc. Check if they look ok. 
- 
+
+
+A. ESO REDUCTION
+----------------
+
+This step uses eso recipies to generate final cube. See MUSE manual for details.
+Products from this step are also used in subsequent reduction/processing, so it 
+is good norm to run this by default
+
+At top level (above OB#) folders, run the following script
+
+muse=mp.ifu.muse.Muse()
+muse.eso_process()
+
+This script crawls through the OB# folders, findings science frames.
+It performs sky subtraction using ESO recipies, aligns exposures, and coadd them.
+
+B. CUBEX_REDUCTION
+------------------
+
+This part of the scrip produces enhanced dataproducts with illumination correction and
+sky subtraction following the procedures developed by S. Cantalupo. 
+Cubex is currently private code, so please contact Cantalupo directly if interested in using it. 
+
 * Step 2
 
-Step 2 uses cubex from S. Cantalupo to perform illumination correction and sky subtraction. Cubex is currently private code, so please contact Cantalupo directly if interested in using it. 
+Step 2 uses cubex from S. Cantalupo to perform illumination correction and sky subtraction. 
 
 First, prepare a list "radec.txt" of 
 
@@ -121,11 +144,21 @@ OPTIONAL:
 	              additional masking of defects, etc..
 
 
+C. LINE OPTIMISED REDUCTION
+---------------------------
 
-  
-  
+This set of utilities produces a final cube with illumination correction and 
+skysubtraction that is optimised for cubes that are relatively empty in terms
+of conitnuum sources, but that have very extended emission lines filling 
+a good fraction of the field of view.
 
- 
+It also uses bootstrap resampling to produce a robust estimate of the variance.
+
+At top level (above OB#) folders, run the following script, after ESO reduction 
+as described in step A
+
+muse=mp.ifu.muse.Muse()
+muse.line_process()
 
 
 

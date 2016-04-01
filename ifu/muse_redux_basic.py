@@ -125,7 +125,7 @@ def parse_xml(path='./',nproc=12):
         astrostatic=staticalpath+'astrometry_wcs_wfm.fits'
         geometrystatic=staticalpath+'geometry_table_wfm.fits'
         
-    #update form default
+    #update from default
     xml_info['ASTROMETRY_WCS']=[astrostatic]
     xml_info['GEOMETRY_TABLE']=[geometrystatic]
 
