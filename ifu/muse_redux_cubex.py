@@ -22,14 +22,14 @@ def fixandsky_firstpass(cube,pixtab,noclobber):
         print "Cube {0} already fixed".format(cube)
     else:
         print 'Cubefix ', cube
-        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed, "-edgemaskpix", '1'])
+        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed])
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
         print "Cube {0} already skysub".format(fixed)
     else:
         print 'Sky sub ', fixed
-        subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-lcheck","False"])
+        subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-lcheck",".false."])
                                
     #create a white image
     if ((os.path.isfile(white)) & (noclobber)):
@@ -79,7 +79,9 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
         print "Cube {0} already fixed".format(cube)
     else:
         print 'Cubefix ', cube
-        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-edgemaskpix", '1'])
+        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])
+
+    #cubeAdd2Mask if want to fix edges or weird ifus 
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
@@ -87,6 +89,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
     else:
         print 'Sky sub ', fixed
         if(highsn):
+            #now few more options to control sky sub 
             subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source,"-hsncube",highsn])
         else:
             subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source])
