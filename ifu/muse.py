@@ -168,37 +168,37 @@ class Muse(object):
         #now do the first two passes of cubex on each OB to prepare a temporary cube
         cx.cubex_driver(listob)
 
-        #combine all the OBs in a final tmp cube
-        allcubes=glob.glob('OB*/Proc/*_skysub2.fits')
-        allmasks=glob.glob('OB*/Proc/*_fix2_SliceEdgeMask.fits')
-
+        
         #dump to disk file lists
-        fl.open('cubexcombine/list_cubes.lst','w')
-        for ll in allcubes:
-            fl.write(ll+'\n')
-        fl.close
-
-        fl.open('cubexcombine/list_masks.lst','w')
-        for ll in allmasks:
-            fl.write(ll+'\n')
-        fl.close
-
-        #make the temp combine
         topdir=os.getcwd()
-        os.chdir('cubexcombine/')    
-        cx.combine_cubes('list_cubes.lst','list_masks.lst')
-        os.chdir(topdir)    
-                
-    
+        os.chdir('cubexcombine')
+
+        fl1=open('cubes.lst','w')
+        fl2=open('masks.lst','w')
+
+        #loop over OBs
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
+            #reconstruct names 
+            for ll in range(nsci):
+                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(oob+1,ll+1))
+                fl2.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(oob+1,ll+1))
+        fl1.close()
+        fl2.close()
+        
+        #make the temp combine
+        cx.combine_cubes("cubes.lst","masks.lst")
+        os.chdir(topdir)
+
         #now do the final pass of cubex using the tmp combined cube for better masking
         #....
 
         #make the final combined cube
         #cx.combine_cubes(listob,final=True)
-        
-        #end 
         print 'All done with cubex redux'
-   
+        
+
     def eso_process(self):
 
         """

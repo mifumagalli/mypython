@@ -57,91 +57,51 @@ Cubex is currently private code, so please contact Cantalupo directly if interes
 
 Step 2 uses cubex from S. Cantalupo to perform illumination correction and sky subtraction. 
 
-First, prepare a list "radec.txt" of 
+Call cubex from top level directory above OB reduction with
 
-rag1 deg1
-rag2 deg2
+#run cubex process
+>>muse=mp.ifu.muse.Muse()
+>>muse.cubex_process()
 
-of sources in the filed that can be used to refine the wcs position. 
 
-Next, call cubex with
+First, the pipeline uses the eso reduction and the muse pipeline to align each expsoure to the 
+reference, and produces a resampled cube on this frame. It's worth checking is the files 
+DATACUBE_FINAL_LINEWCS_EXP* look sesnibly alligned to absolute reference wcs.  
 
->>refcat='radec.txt'
->>muse.cubex_process(refcat,xml)
-
-with xml from step 1
-
-This produces a first pass of illumination correction and sky subtraction for each science exposure.
+Next, produces a first pass of illumination correction and sky subtraction for each science exposure in the OB#/Proc
+subfolders. 
 
 A bunch of data cubes are produced in the process:
  *_fix.fits is the cube with illumination correction
  *_skysub.fits is the suky sub cube
  *_white.fits is a projection of the processed cube
 
-The pipe next proceeds in computing the optimal aligment of the exposures, 
-written in radecoffsets.txt. New pixel table *_off.fits are written to disk.
-And a cube/image _off.fits is written for each exposures. Now, you can 
-check whether the wcs are properly aligned on the white images.
-
-OPTIONAL: At this step, the cube is trimmed to the overlapping region in the 
-exposure considered in this batch. If one is handling a large mosaic spanning more than one OB and it is reducing invividual OBs, the following steps should be followed instead.
-
- . After the first pass of cubex and wcs offsets are found, kill the pipleine.
- . Process all the OBs up to this first step, and combine all the cubes 
-   with the eso recipe muse_exp_combine
- . With the reference cube in hand "refcube.fits", restart the pipeline
-   with the call
-
-   >>refcat='radec.txt'				
-   >>refcube='refcube.fits'			
-   >>muse.cubex_process(refcat,xml,refcube=refcube)
-
-   The header of refcube (containing wcs for the entire mosaic), are then 
-   used by cubex to ensure that all the data are combined on a uniform 
-   grid.
-
-Next, the pipe makes a second pass of cubex to reconstruct the cube with the 
-updated wcs. This step is required to avoid resampling the cube more than once.
-In fact, this is just a repeat of step 1, but with a single resampling on a 
-final WCS reference. 
+Next, the pipe makes a second pass of cubex to on the cubes with the 
+updated wcs and clean source mask form the previous step.
 
 After this, illumination corrected, sky subtracted, and WCS referenced cubes
 are written to disk, one for each exposure. 
-   *_off_fix.fits for illumination correction
-   *_off_skysub.fits for sky sub cube
-   *_off_white.fits for FOV image
+   *_fix2.fits for illumination correction
+   *_skysub2.fits for sky sub cube
+   *_white2.fits for FOV image
 
-OPTIONAL:
+Once all the OBs have been processed up to this point, a final cube is reconstructed in the folder
 
-   Once all the OBs have been processed up to this point, one may want to 
-   combine all the cubes [see below] to produce a high sn cube "highsn.fits" 
-   that can be fed back in cubex for optimal sky subtraction and masking.
+cubexcombine/COMBINED_CUBE.fits
 
-   To perfom this optional (but recommended) step, just restart the pipeline
-   with the call
+If there are obvious large scale artifact that should be mask, this can simply achieved by creating
+a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
+extension .reg. The region file should be in ds9 format, with image coordinate.
 
-   >>refcat='radec.txt'				
-   >>refcube='refcube.fits'			
-   >> highsn='highsn.fits'   						
-   >>muse.cubex_process(refcat,xml,refcube=refcube,highsn=highsn)
-    
-   A second set of cubes "2" are written to disk.
-  
-* Step 3. At this point, all the data for each science exposure are processed in 
-  a final cube. The last step is simply the coaddition of all the cubes.
-  With the cubes being written on the same wcs reference, this step is trivial
-  as it involves a simple sum of the cubes.
+Once the coadded cube is finally ready, the pipeline proceeds to perform a third iteration of 
+cubex with illumination correction and skysubtraction that uses source masking from the high SN cubes.
 
-  In cubex, this can be done with the following command
+In the end, a final coadded cube is reconstructed in 
 
-  import mypython 
-  from mypython.ifu import muse_redux_cubex as cbs
-  cbs.combine_cubes("cubeall.in","maskall.in","regionsall.in")
-  
-  where cubeall.in is a list of the skysub cubes
-        maskall.in is a list of the associated SliceEdgeMask.fits
-	regionsall.in [optional] is a list of DS9 regions with boxes for 
-	              additional masking of defects, etc..
+cubexcombine/COMBINED_CUBE_FINAL.fits
+cubexcombine/COMBINED_CUBE_MED_FINAL.fits
+
+using both mean and median statistics. 
 
 
 C. LINE OPTIMISED REDUCTION

@@ -177,17 +177,16 @@ def cubex_driver(listob):
         #back to top
         os.chdir(topdir)
 
-def combine_cubes(cubes,masks,regions=None,final=False):
+def combine_cubes(cubes,masks,regions=True,final=False):
 
     """
     Combine a bunch of cubes using masks with CubeCombine
         
     cubes    -> a list of cubes to use in the combine
     masks    -> a list of goodpix masks from the pipeline
-    regions  -> if any, additional ds9 regions (image units) used to 
-                mask bad regions of the cube
-
-    final    -> is True, append final tag to name 
+    regions  -> if True, code searches for ds9 region files inside path with same name as 
+                pipeline mask (.reg), to mask additional area that one wants to clip
+    final    -> is True, append final tag to name and prepare median cubes
 
     """
     import subprocess
@@ -195,53 +194,86 @@ def combine_cubes(cubes,masks,regions=None,final=False):
     import numpy as np
     from astropy.io import fits
     from mypython.fits import pyregmask as msk
+    
 
-    if(regions):
-        print "Updating the masks"
-        
-        listmask=np.loadtxt(masks,dtype=np.dtype('a'))
-        listreg=np.loadtxt(regions,dtype=np.dtype('a'))
-        
-        mask_new="new_"+masks
-        llms=open(mask_new,"w")
-
-
-        #loop over and update with regions
-        for i,cmask in enumerate(listmask):
-            
-            #open fits
-            cfits=fits.open(cmask)
-            
-            #init reg mask
-            Mask = msk.PyMask(cfits[0].header["NAXIS1"],cfits[0].header["NAXIS2"],listreg[i])
-            for ii in range(Mask.nreg):
-                Mask.fillmask(ii)
-                if(ii == 0):
-                    totmask=Mask.mask
-                else:
-                    totmask+=Mask.mask
-            
-            #update the mask
-            cfits[0].data=cfits[0].data*1*np.logical_not(totmask)   
-            savename=cmask.split(".fits")[0]+'_wreg.fits'
-            cfits.writeto(savename,clobber=True)
-            llms.write(savename+'\n')
-        
-        #done with new masks
-        llms.close()
-
-    else:
-        print 'Using original masks'
-        mask_new=masks
-
-    #now run combine
-    print 'Combine the cube...'    
-    my_env = os.environ
-    my_env["OMP_NUM_THREADS"] = "1"
-
+    #define some names for the cubes
     if(final):
-        subprocess.call(["CubeCombine","-list",cubes,"-out","COMBINED_CUBE_FINAL.fits","-masklist",mask_new])
-        subprocess.call(["Cube2Im","-cube","COMBINED_CUBE_FINAL.fits","-out","COMBINED_IMAGE_FINAL.fits"])
+        cname="COMBINED_CUBE_FINAL.fits"
+        iname="COMBINED_IMAGE_FINAL.fits"
+        cmed="COMBINED_CUBE_MED_FINAL.fits"
+        imed="COMBINED_IMAGE_MED_FINAL.fits"
     else:
-        subprocess.call(["CubeCombine","-list",cubes,"-out","COMBINED_CUBE.fits","-masklist",mask_new])
-        subprocess.call(["Cube2Im","-cube","COMBINED_CUBE.fits","-out","COMBINED_IMAGE.fits"])
+        cname="COMBINED_CUBE.fits"
+        iname="COMBINED_IMAGE.fits"
+
+    if(os.path.isfile(cname)):
+        print ('Cube {} already exists... skip!'.format(cname))
+    else:
+        print ('Creating combined cube {}'.format(cname))
+
+        if(regions):
+            print "Updating the masks"
+        
+            #loads list
+            listmask=np.loadtxt(masks,dtype=np.dtype('a'))
+
+            #redefine new mask 
+            mask_new="new_"+masks
+            llms=open(mask_new,"w")
+            
+            #loop over and update with regions
+            for i,cmask in enumerate(listmask):
+            
+                #create region name
+                regname=(cmask.split(".fits")[0])+".reg"
+                
+                #search if file exist
+                if(os.path.isfile(regname)):
+                    
+                    #update the mask 
+                    print ("Updating mask for {}".format(regname))
+
+                    #open fits
+                    cfits=fits.open(cmask)
+             
+                    #init reg mask
+                    Mask = msk.PyMask(cfits[0].header["NAXIS1"],cfits[0].header["NAXIS2"],regname)
+                    for ii in range(Mask.nreg):
+                        Mask.fillmask(ii)
+                        if(ii == 0):
+                            totmask=Mask.mask
+                        else:
+                            totmask+=Mask.mask
+            
+                    #update the mask
+                    cfits[0].data=cfits[0].data*1*np.logical_not(totmask)   
+                    savename=cmask.split(".fits")[0]+'_wreg.fits'
+                    cfits.writeto(savename,clobber=True)
+                    llms.write(savename+'\n')
+                
+                
+                else:
+                    #keep current mask 
+                    llms.write(cmask+'\n')
+
+            #done with new masks
+            llms.close()
+
+        else:
+            print 'Using original masks'
+            mask_new=masks
+
+        #now run combine
+        print 'Combine the cube...'    
+      
+        #make mean cube - write this as script that can be ran indepedently 
+        scr=open('runcombine.sh','w')
+        scr.write("export OMP_NUM_THREADS=1\n")
+        scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+"\n")
+        scr.write("Cube2Im -cube "+cname+" -out "+iname)
+        if(final):
+            #also create median cube 
+            scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median\n")
+            scr.write("Cube2Im -cube "+cmed+" -out "+imed)
+        scr.close()
+        subprocess.call("sh runcombine.sh",shell=True)
