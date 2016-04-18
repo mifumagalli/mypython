@@ -2,9 +2,7 @@
 class Muse(object):
 
     """
-
     This is a class that bundles some of the procedures to handle muse data
-
 
     """
 
@@ -167,8 +165,8 @@ class Muse(object):
 
         #now do the first two passes of cubex on each OB to prepare a temporary cube
         cx.cubex_driver(listob)
-
-        
+       
+        #prepare for intermediate combine 
         #dump to disk file lists
         topdir=os.getcwd()
         os.chdir('cubexcombine')
@@ -192,10 +190,31 @@ class Muse(object):
         os.chdir(topdir)
 
         #now do the final pass of cubex using the tmp combined cube for better masking
-        #....
+        cx.cubex_driver(listob,last=True,highsn='../../cubexcombine/COMBINED_CUBE.fits')
 
         #make the final combined cube
-        #cx.combine_cubes(listob,final=True)
+        #dump to disk file lists
+        topdir=os.getcwd()
+        os.chdir('cubexcombine')
+
+        fl1=open('cubes_final.lst','w')
+        fl2=open('masks_final.lst','w')
+
+        #loop over OBs
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
+            #reconstruct names 
+            for ll in range(nsci):
+                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(oob+1,ll+1))
+                fl2.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(oob+1,ll+1))
+        fl1.close()
+        fl2.close()
+        
+        #make the temp combine
+        cx.combine_cubes("cubes_final.lst","masks_final.lst",final=True)
+        os.chdir(topdir)
+
         print 'All done with cubex redux'
         
 

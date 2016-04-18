@@ -53,39 +53,40 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
     import subprocess
 
     if(highsn):
-        #make some intermediate names
+        #prepare final names
         fixed=cube.split('.fits')[0]+"_fixhsn.fits"
         skysub=cube.split('.fits')[0]+"_skysubhsn.fits"
         white=cube.split('.fits')[0]+"_whitehsn.fits"
     else:
-        #make some intermediate names
+        #prepare intermediate names
         fixed=cube.split('.fits')[0]+"_fix2.fits"
         skysub=cube.split('.fits')[0]+"_skysub2.fits"
         white=cube.split('.fits')[0]+"_white2.fits"
         
-    #create a source mask 
+    #assign names for source mask 
     mask_source=cube.split('.fits')[0]+"_white.Objects_Id.fits"
     white_source=cube.split('.fits')[0]+"_white.fits"
-    print 'Create source mask ', white_source
-    
-    #if high cube provide, overwrite white image 
-    if(highsn):
-        print 'Using high SN cube...'
-        subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-        subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.'])
-    else:
-        print 'Using white image from previous loop'
-        #create source mask 
-        subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
     
     #now fix the cube using masks
     if ((os.path.isfile(fixed)) & (noclobber)):
         print "Cube {0} already fixed".format(cube)
     else:
+
+        print 'Create source mask ', white_source
+        #if high cube provide, overwrite white image 
+        if(highsn):
+            print 'Using high SN cube...'
+            subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
+            subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.','-SN_Threshold','3','-RescaleVar','.true.'])
+        else:
+            print 'Using white image from previous loop'
+            #create source mask 
+            subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
+            
         print 'Cubefix ', cube
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])
 
-    #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
+        #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
@@ -105,12 +106,14 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
         print 'Create white image for ', skysub
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
-def cubex_driver(listob):
+def cubex_driver(listob,last=False,highsn=None):
     
     """
     Procedures that drives the loops of cubex within each OB folder
+
     listob -> the list of OBs to process
-    final  -> set to True for final pass with high-sn cube 
+    last  -> set to True for final pass with high-sn cube 
+    highsn -> name of the highsn cube used for masking 
 
     """
     
@@ -134,45 +137,67 @@ def cubex_driver(listob):
         scils=glob.glob("OBJECT_RED_0*.fits*")
         nsci=len(scils)
         
-        ########################################
-        # do a first loop of cubex fix and sky #
-        ########################################
-
-        #do it in parallel on exposures
-        print ('First pass of cubex')
-        workers=[]
-        for dd in range(nsci):
-            #reconstruct the name 
-            pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
-            cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
-            #now launch the task
-            p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,))
-            workers.append(p)
-            p.start()
+        #this is the final pass with highsn cube
+        if(last):
+            #############################################################
+            # do a final loop of cubex fix and sky with proper masking  #
+            #############################################################
+            print ('Final pass of cubex')
+            workers=[]
+            for dd in range(nsci):
+                #reconstruct the name 
+                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                #now launch the task
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn))
+                workers.append(p)
+                p.start()
    
-        #wait for completion of all of them 
-        for p in workers:
-            if(p.is_alive()):
-                p.join()
-        
-        #############################################################
-        # do a second loop of cubex fix and sky with proper masking #
-        #############################################################
-        print ('Second pass of cubex')
-        workers=[]
-        for dd in range(nsci):
-            #reconstruct the name 
-            pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
-            cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
-            #now launch the task
-            p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,))
-            workers.append(p)
-            p.start()
+            #wait for completion of all of them 
+            for p in workers:
+                if(p.is_alive()):
+                    p.join()  
+            
+        else:
+            
+            ########################################
+            # do a first loop of cubex fix and sky #
+            ########################################
+            #do it in parallel on exposures
+            print ('First pass of cubex')
+            workers=[]
+            for dd in range(nsci):
+                #reconstruct the name 
+                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                #now launch the task
+                p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,))
+                workers.append(p)
+                p.start()
    
-        #wait for completion of all of them 
-        for p in workers:
-            if(p.is_alive()):
-                p.join()  
+            #wait for completion of all of them 
+            for p in workers:
+                if(p.is_alive()):
+                    p.join()
+                    
+            #############################################################
+            # do a second loop of cubex fix and sky with proper masking #
+            #############################################################
+            print ('Second pass of cubex')
+            workers=[]
+            for dd in range(nsci):
+                #reconstruct the name 
+                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                #now launch the task
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,))
+                workers.append(p)
+                p.start()
+   
+            #wait for completion of all of them 
+            for p in workers:
+                if(p.is_alive()):
+                    p.join()  
                 
         #back to top
         os.chdir(topdir)
@@ -267,13 +292,17 @@ def combine_cubes(cubes,masks,regions=True,final=False):
         print 'Combine the cube...'    
       
         #make mean cube - write this as script that can be ran indepedently 
-        scr=open('runcombine.sh','w')
+        if(final):
+            scriptname='runcombine_final.sh'
+        else:
+            scriptname='runcombine.sh'
+        scr=open(scriptname,'w')
         scr.write("export OMP_NUM_THREADS=1\n")
         scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+"\n")
-        scr.write("Cube2Im -cube "+cname+" -out "+iname)
+        scr.write("Cube2Im -cube "+cname+" -out "+iname+"\n")
         if(final):
             #also create median cube 
             scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median\n")
             scr.write("Cube2Im -cube "+cmed+" -out "+imed)
         scr.close()
-        subprocess.call("sh runcombine.sh",shell=True)
+        subprocess.call(["sh",scriptname])
