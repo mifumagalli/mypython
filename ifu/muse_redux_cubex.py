@@ -95,7 +95,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
         print 'Sky sub ', fixed
         if(highsn):
             #now few more options to control sky sub 
-            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source,"-hsncube",highsn])
+            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source,"-hsncube",highsn,"-lcheck",".false."])
         else:
             subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source])
                                
@@ -230,6 +230,8 @@ def combine_cubes(cubes,masks,regions=True,final=False):
     else:
         cname="COMBINED_CUBE.fits"
         iname="COMBINED_IMAGE.fits"
+        cmed="COMBINED_CUBE_MED.fits"
+        imed="COMBINED_IMAGE_MED.fits"
 
     if(os.path.isfile(cname)):
         print ('Cube {} already exists... skip!'.format(cname))
@@ -296,13 +298,12 @@ def combine_cubes(cubes,masks,regions=True,final=False):
             scriptname='runcombine_final.sh'
         else:
             scriptname='runcombine.sh'
+        
         scr=open(scriptname,'w')
         scr.write("export OMP_NUM_THREADS=1\n")
         scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+"\n")
         scr.write("Cube2Im -cube "+cname+" -out "+iname+"\n")
-        if(final):
-            #also create median cube 
-            scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median\n")
-            scr.write("Cube2Im -cube "+cmed+" -out "+imed)
+        scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median\n")
+        scr.write("Cube2Im -cube "+cmed+" -out "+imed)
         scr.close()
         subprocess.call(["sh",scriptname])
