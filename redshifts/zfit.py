@@ -22,6 +22,8 @@ from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from scipy import interpolate
 from astropy.io import fits
+from astropy.table import Table
+
 
 
 class zfitwin(Tkinter.Tk):
@@ -113,6 +115,12 @@ class zfitwin(Tkinter.Tk):
         self.mouse_position_w=Tkinter.Label(self.menuframe,textvariable = self.mouse_position)
         self.mouse_position_w.grid(column=0,row=4,columnspan=3)
 
+        #Message window
+        self.generic_message=Tkinter.StringVar()
+        self.generic_message.set('zfit-> Ready to go!')
+        self.generic_message_w=Tkinter.Label(self.menuframe,textvariable = self.generic_message)
+        self.generic_message_w.grid(column=5,row=3,columnspan=3)
+
         #line control stuff
         self.init_linecontrol()
 
@@ -145,6 +153,15 @@ class zfitwin(Tkinter.Tk):
         #now open with default spectrum and plot
         self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits"
         self.fits=fits.open(self.filename)
+       
+        #unpack
+        self.fitwav1d=self.fits[2].data
+        self.fitspe1d=self.fits[0].data
+        self.fiterr1d=self.fits[1].data
+        self.fitspe2d=self.fits[4].data
+        self.fiterr2d=self.fits[5].data
+        self.fitimg=self.fits[6].data
+
         self.drawdata()
 
         #set tmpfitxcorr to None to avoid error or later init
@@ -163,8 +180,8 @@ class zfitwin(Tkinter.Tk):
         llab = Tkinter.Label(self.menuframe, text="Select Lines: ")
         llab.grid(column=1,row=1)
         self.linelist = Tkinter.StringVar(self.menuframe)
-        self.linelist.set("gal_air") # default value
-        self.lineselect = Tkinter.OptionMenu(self.menuframe, self.linelist,"gal_air","gal_vac","lbg","lls","tell")
+        self.linelist.set("gal_vac") # default value
+        self.lineselect = Tkinter.OptionMenu(self.menuframe, self.linelist,"gal_vac","gal_air","lbg","lls","tell")
         self.lineselect.grid(column=2,row=1)
         #set the linelist in trace state
         self.linelist.trace("w",self.displaylines)
@@ -240,7 +257,6 @@ class zfitwin(Tkinter.Tk):
         self.template_fit = Tkinter.Button(self.menuframe,text=u"FitTemplate",command=self.fittemplate)
         self.template_fit.grid(column=5,row=2)
     
-        
     def OnExit(self):
         """ Quit all on exit """
         self.fits.close()
@@ -262,6 +278,14 @@ class zfitwin(Tkinter.Tk):
         #close old and reopen
         self.fits.close()
         self.fits=fits.open(self.filename)
+        
+        #unpack
+        self.fitwav1d=self.fits[2].data
+        self.fitspe1d=self.fits[0].data
+        self.fiterr1d=self.fits[1].data
+        self.fitspe2d=self.fits[4].data
+        self.fiterr2d=self.fits[5].data
+        self.fitimg=self.fits[6].data
 
         #redraw
         self.drawdata(refresh=True)
@@ -328,7 +352,7 @@ class zfitwin(Tkinter.Tk):
         Update = True, redraw
                 
         """
-        self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fits[7].data,origin='lower',aspect='auto')
+        self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fitimg,origin='lower',aspect='auto')
         self.twodimagePlot_prop["image"].set_cmap('hot')
         #self.twodimagePlot_prop["axis"].set_xlabel('Pix')
         #self.twodimagePlot_prop["axis"].set_ylabel('Pix')
@@ -340,10 +364,10 @@ class zfitwin(Tkinter.Tk):
         
         #create properties for this plot
         self.spectrumPlot_prop={}
-        self.spectrumPlot_prop["xmin"]=np.min(np.nan_to_num(self.fits[2].data))
-        self.spectrumPlot_prop["xmax"]=np.max(np.nan_to_num(self.fits[2].data))
-        self.spectrumPlot_prop["ymin"]=np.min(np.nan_to_num(self.fits[0].data))
-        self.spectrumPlot_prop["ymax"]=np.max(np.nan_to_num(self.fits[0].data))
+        self.spectrumPlot_prop["xmin"]=np.min(np.nan_to_num(self.fitwav1d))
+        self.spectrumPlot_prop["xmax"]=np.max(np.nan_to_num(self.fitwav1d))
+        self.spectrumPlot_prop["ymin"]=np.min(np.nan_to_num(self.fitspe1d))
+        self.spectrumPlot_prop["ymax"]=np.max(np.nan_to_num(self.fitspe1d))
 
         #figure stuff
         self.spectrumPlot_prop["figure"]= Figure(figsize=(0.99*self.pltspec_width/self.dpi,0.96*self.pltspec_height/self.dpi),
@@ -375,8 +399,8 @@ class zfitwin(Tkinter.Tk):
             self.spectrumPlot_prop["axis"].cla()
             
         #plot main data
-        self.spectrumPlot_prop["axis"].plot(self.fits[2].data,self.fits[0].data)
-        self.spectrumPlot_prop["axis"].plot(self.fits[2].data,self.fits[1].data,color='red')
+        self.spectrumPlot_prop["axis"].plot(self.fitwav1d,self.fitspe1d)
+        self.spectrumPlot_prop["axis"].plot(self.fitwav1d,self.fiterr1d,color='red',linestyle='--',zorder=1)
         self.spectrumPlot_prop["axis"].set_xlim(self.spectrumPlot_prop["xmin"],self.spectrumPlot_prop["xmax"])
         self.spectrumPlot_prop["axis"].set_ylim(self.spectrumPlot_prop["ymin"],self.spectrumPlot_prop["ymax"])
         self.spectrumPlot_prop["axis"].set_xlabel('Wavelength')
@@ -400,8 +424,13 @@ class zfitwin(Tkinter.Tk):
   
         #if needed, plot template
         if(self.shwtempstate.get()):
-            self.spectrumPlot_prop["axis"].plot(self.fits[2].data,self.templatedata_current,color='black',linestyle=":")
+            self.spectrumPlot_prop["axis"].plot(self.fitwav1d,self.templatedata_current,color='black',zorder=3)
                   
+        #plot zero line
+        self.spectrumPlot_prop["axis"].plot([self.spectrumPlot_prop["xmin"],self.spectrumPlot_prop["xmax"]],
+                                            [0,0],color='green',zorder=2,linestyle=':')
+
+
         #finally draw
         if(update):
             self.spectrumPlot.draw()
@@ -438,8 +467,8 @@ class zfitwin(Tkinter.Tk):
         """ Utility to map the pixel in 2D image to wavelegth """
         
         #wavelength mapper 
-        index=np.arange(0,len(self.fits[2].data))
-        wave=np.interp(x,index,self.fits[2].data)
+        index=np.arange(0,len(self.fitwav1d))
+        wave=np.interp(x,index,self.fitwav1d)
         'The two args are the value and tick position'
         return "%.1f" % wave
     
@@ -448,8 +477,8 @@ class zfitwin(Tkinter.Tk):
         """ Utility to map wavelegth to pixel in 2D mage """
         
         #wavelength mapper 
-        index=np.arange(0,len(self.fits[2].data))
-        pix=np.interp(x,self.fits[2].data,index,left=0,right=len(self.fits[2].data))
+        index=np.arange(0,len(self.fitwav1d))
+        pix=np.interp(x,self.fitwav1d,index,left=0,right=len(self.fitwav1d))
         return  pix
 
     def update_twodspec(self,update=False):
@@ -465,14 +494,14 @@ class zfitwin(Tkinter.Tk):
         if(update):
             self.twodspcPlot_prop["axis"].cla()
     
-        self.twodspcPlot_prop["image"]=self.twodspcPlot_prop["axis"].imshow(np.rot90(self.fits[5].data),origin='lower',aspect='auto')
+        self.twodspcPlot_prop["image"]=self.twodspcPlot_prop["axis"].imshow(np.rot90(self.fitspe2d),origin='lower',aspect='auto')
         self.twodspcPlot_prop["image"].set_cmap('hot')
        
         
         #control level
-        medianlevel=np.median(np.nan_to_num(self.fits[5].data))
-        stdlevel=np.std(np.nan_to_num(self.fits[5].data))
-        self.twodspcPlot_prop["image"].set_clim(medianlevel-stdlevel,medianlevel+stdlevel)
+        medianlevel=np.median(np.nan_to_num(self.fitspe2d))
+        stdlevel=np.std(np.nan_to_num(self.fitspe2d))
+        self.twodspcPlot_prop["image"].set_clim(medianlevel-3.*stdlevel,medianlevel+3*stdlevel)
 
         #wave mapper
         self.twodspcPlot_prop["axis"].xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(self.wavemap))
@@ -534,14 +563,14 @@ class zfitwin(Tkinter.Tk):
         if(update):
             self.twoderrPlot_prop["axis"].cla()
         
-        self.twoderrPlot_prop['image'] =self.twoderrPlot_prop['axis'].imshow(np.rot90(self.fits[6].data),origin='lower',aspect='auto')
+        self.twoderrPlot_prop['image'] =self.twoderrPlot_prop['axis'].imshow(np.rot90(self.fiterr2d),origin='lower',aspect='auto')
         self.twoderrPlot_prop['image'].set_cmap('hot')
         
 
         #control level
-        medianlevel=np.median(np.nan_to_num(self.fits[6].data))
-        stdlevel=np.std(np.nan_to_num(self.fits[6].data))
-        self.twoderrPlot_prop["image"].set_clim(medianlevel-stdlevel,medianlevel+stdlevel)
+        medianlevel=np.median(np.nan_to_num(self.fiterr2d))
+        stdlevel=np.std(np.nan_to_num(self.fiterr2d))
+        self.twoderrPlot_prop["image"].set_clim(medianlevel-3.*stdlevel,medianlevel+3*stdlevel)
 
 
         #wave mapper
@@ -570,8 +599,10 @@ class zfitwin(Tkinter.Tk):
  
         #first parse the line lists
         linefile=self.execdir+"/lines/"+self.linelist.get()+".lst"
-        self.infoline=np.loadtxt(linefile, dtype={'names': ('wave', 'tag'),
-                                                  'formats': ('f10', 'S10')})
+        
+        self.infoline = Table.read(linefile, format='ascii.basic')
+        #self.infoline=np.loadtxt(linefile, dtype={'names': ('wave', 'tag'),
+        #                                          'formats': ('f4', 'S4')})
         
         #refresh plot
         self.update_spectrum(update=True)
@@ -596,12 +627,15 @@ class zfitwin(Tkinter.Tk):
             #cosntruct wave
             waveinx=np.arange(0,len(self.templatedata['flux']),1)
             wavevac=10**(waveinx*1.*fitstemp[0].header['COEFF1']+1.*fitstemp[0].header['COEFF0'])
-            #go to air
-            self.templatedata['wave']= wavevac/(1.0+2.735182e-4+131.4182/wavevac**2+2.76249e8/wavevac**4)
+            ##go to air
+            #self.templatedata['wave']= wavevac/(1.0+2.735182e-4+131.4182/wavevac**2+2.76249e8/wavevac**4)
+            #remain in vac 
+            self.templatedata['wave']= wavevac
         else:
             #load text
-            self.templatedata=np.loadtxt(self.picktemplate, dtype={'names': ('wave', 'flux'),
-                                                                   'formats': ('f10', 'f10')},usecols=(0,1))
+            #self.templatedata=np.loadtxt(self.picktemplate, dtype={'names': ('wave', 'flux'),
+            #                                                       'formats': ('f10', 'f10')},usecols=(0,1))
+            self.templatedata = Table.read(self.picktemplate, format='ascii.basic')
             
         #set sensible pick in redshift and adjust data as needed
         if('lbg' in self.tempgroup.get()):
@@ -639,11 +673,12 @@ class zfitwin(Tkinter.Tk):
         redhfactor=(1+float(self.redshifttemp.get()))
    
         #now construct interpolation 
-        intflx = interp1d(self.templatedata['wave']*redhfactor,self.templatedata['flux'],kind='linear',
-                          bounds_error=False,fill_value=None)
+        thisw=self.templatedata['wave']*redhfactor
+        thisf=self.templatedata['flux']
+        intflx = interp1d(thisw,thisf,kind='linear',bounds_error=False,fill_value=0.0)
         #apply normalisation
-        self.templatedata_current=intflx(self.fits[2].data)*float(self.magtemp.get())
-
+        self.templatedata_current=intflx(self.fitwav1d)*float(self.magtemp.get())
+    
 
     def fitlines(self):
 
@@ -668,18 +703,18 @@ class zfitwin(Tkinter.Tk):
 
         for lw,lnam in self.infoline:
             lwplot=lw*(1+redsh)
-            if((lwplot > min(self.fits[2].data)+8) & (lwplot < max(self.fits[2].data)-8)):
+            if((lwplot > min(self.fitwav1d)+8) & (lwplot < max(self.fitwav1d)-8)):
                 
                 #do a boxchart in 6A bin to see if line exists 
-                inside=np.where((self.fits[2].data > lwplot-4)& (self.fits[2].data < lwplot+4))
-                continuum=np.where(((self.fits[2].data > lwplot-20)& (self.fits[2].data < lwplot-10)) |
-                                   ((self.fits[2].data > lwplot+10)& (self.fits[2].data < lwplot+20)))
-                clevel=np.median(self.fits[0].data[continuum])
-                flux=np.sum((self.fits[0].data[inside]-clevel))
-                noise=np.sqrt(np.sum(self.fits[1].data[inside]**2))
+                inside=np.where((self.fitwav1d > lwplot-4)& (self.fitwav1d < lwplot+4))
+                continuum=np.where(((self.fitwav1d > lwplot-20)& (self.fitwav1d < lwplot-10)) |
+                                   ((self.fitwav1d > lwplot+10)& (self.fitwav1d < lwplot+20)))
+                clevel=np.median(self.fitspe1d[continuum])
+                flux=np.sum((self.fitspe1d[inside]-clevel))
+                noise=np.sqrt(np.sum(self.fiterr1d[inside]**2))
                 
-                #cut in SN>5
-                if(flux/noise > 5):
+                #cut in SN
+                if(flux/noise > 2):
                     
                     #stash 
                     lines_good_wave_rest.append(lw)
@@ -694,20 +729,22 @@ class zfitwin(Tkinter.Tk):
         if(nlines%ncol > 0):
             nraw=nraw+1
         
+        czall=[]
+
         #loop on good stuff for fits
         for ii in range(nlines):
 
             #select region to fit
-            fitwindow=np.where((self.fits[2].data > lines_good_wave_obs[ii]-10) & (self.fits[2].data < lines_good_wave_obs[ii]+10))
-            continuum=np.where(((self.fits[2].data > lines_good_wave_obs[ii]-20)& (self.fits[2].data < lines_good_wave_obs[ii]-10)) |
-                               ((self.fits[2].data > lines_good_wave_obs[ii]+10)& (self.fits[2].data < lines_good_wave_obs[ii]+20)))
-            clevel=np.median(self.fits[0].data[continuum])
+            fitwindow=np.where((self.fitwav1d > lines_good_wave_obs[ii]-10) & (self.fitwav1d < lines_good_wave_obs[ii]+10))
+            continuum=np.where(((self.fitwav1d > lines_good_wave_obs[ii]-20)& (self.fitwav1d < lines_good_wave_obs[ii]-10)) |
+                               ((self.fitwav1d > lines_good_wave_obs[ii]+10)& (self.fitwav1d < lines_good_wave_obs[ii]+20)))
+            clevel=np.median(self.fitspe1d[continuum])
             p0=np.array([10.,1.*float(lines_good_wave_obs[ii]),2.,0.])
 
             #fit a Gaussian 
-            yval=np.nan_to_num(self.fits[0].data[fitwindow]-clevel)
-            yerr=np.nan_to_num(self.fits[1].data[fitwindow]*1.)
-            xval=np.nan_to_num(self.fits[2].data[fitwindow]*1.)
+            yval=np.nan_to_num(self.fitspe1d[fitwindow]-clevel)
+            yerr=np.nan_to_num(self.fiterr1d[fitwindow]*1.)
+            xval=np.nan_to_num(self.fitwav1d[fitwindow]*1.)
             popt,pcov=curve_fit(self.gauss,xval,yval,p0=p0, sigma=yerr)
             perr = np.sqrt(np.diag(pcov))
             #eval fit 
@@ -717,19 +754,25 @@ class zfitwin(Tkinter.Tk):
             #grab fits
             czfit=popt[1]/lines_good_wave_rest[ii]-1.
             czfiterr=perr[1]/lines_good_wave_rest[ii]
+            czall.append(czfit)
 
             #display
             ax = fig.add_subplot(nraw,ncol,ii+1)
             ax.plot(xval,yval)
-            ax.plot(xval,yerr,color='red')
+            ax.plot(xval,yerr,color='red',linestyle="--",zorder=1)
             ax.plot(xg,fitg,color='black',linestyle=":")
             ax.set_title("{0}{1} z = {2:.5} +/- {3:.5}".format(lines_good_name[ii],int(lines_good_wave_rest[ii]),czfit,czfiterr))
 
+        #send message to user  and reset redshift 
+        bestz=np.median(np.array(czall))
+        bestez=np.std(np.array(czall))
+        self.generic_message.set(r'zfit-> Best fit is {:6.5f}+/-{:6.5f}'.format(bestz,bestez))
+        self.redshiftline.set(bestz)
 
         #send figure to canvas
         self.linefitplot = FigureCanvasTkAgg(fig,master=self.lnfit)
         self.linefitplot.show()
-        fig.tight_layout()
+        #fig.tight_layout()
         self.linefitplot.get_tk_widget().grid()
  
     def fittemplate(self):
@@ -737,7 +780,7 @@ class zfitwin(Tkinter.Tk):
         """ Fit the template  """
 
         #init the template correlation 
-        realdata={'wave':self.fits[2].data,'flux':self.fits[0].data,'error':self.fits[1].data}
+        realdata={'wave':self.fitwav1d,'flux':self.fitspe1d,'error':self.fiterr1d}
         
         ##Testing sequence
         #realdata={'wave':self.templatedata['wave']*(1+0.4329),'flux':self.templatedata['flux'], 
@@ -1060,10 +1103,10 @@ class zfitwin(Tkinter.Tk):
              self.update_twoderr(update=True)
          #set reset plot
          if(event.key == "W"):
-             self.spectrumPlot_prop["xmin"]=np.min(np.nan_to_num(self.fits[2].data))
-             self.spectrumPlot_prop["xmax"]=np.max(np.nan_to_num(self.fits[2].data))
-             self.spectrumPlot_prop["ymin"]=np.min(np.nan_to_num(self.fits[0].data))
-             self.spectrumPlot_prop["ymax"]=np.max(np.nan_to_num(self.fits[0].data))
+             self.spectrumPlot_prop["xmin"]=np.min(np.nan_to_num(self.fitwav1d))
+             self.spectrumPlot_prop["xmax"]=np.max(np.nan_to_num(self.fitwav1d))
+             self.spectrumPlot_prop["ymin"]=np.min(np.nan_to_num(self.fitspe1d))
+             self.spectrumPlot_prop["ymax"]=np.max(np.nan_to_num(self.fitspe1d))
              self.update_spectrum(update=True)
              #update 2d spectra accordingly
              self.update_twodspec(update=True)

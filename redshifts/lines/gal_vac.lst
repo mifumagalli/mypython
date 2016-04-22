@@ -1,95 +1,75 @@
-  912.00   Lybreak
- 1026.00   Lybeta
- 1035.00    OVI
- 1190.42   SiII
- 1193.28   SiII
- 1199.90    NI
- 1206.51   SiIII
- 1216.00   Lyalpha
- 1238.81    NV
+#Table of Spectral Lines Used in SDSS
+#http://classic.sdss.org/dr6/algorithms/linestable.html
+#REFERENCE WAVELENGTHS, IN VACUUM, USED IN SPECTRO1D
+#Supplemented and corrected by LLS list, lbg.lst and gal_vac.lst
+#See also http://www.star.ucl.ac.uk/~msw/lines.html
+ wave       tag
+  911.76    LL
+ 1025.72    Lyb
+1031.9261   OVI1031  
+1037.6167   OVI1037  
+ 1206.50    SiIII
+ 1215.67    Lya
+ 1238.82    NV
  1242.80    NV
- 1250.59    SII
- 1253.81    SII
- 1255.00   FeV
- 1259.52   SiII
- 1260.42   SiII
- 1302.08    OI
- 1304.40   SiII
+ 1260.42    SiII
+ 1302.16    OI
+ 1304.37    SiII
  1334.53    CII
- 1335.70    CII*
  1371.00    OV
- 1393.76   SiIV
- 1402.77   SiIV
- 1406.00    O[IV]
- 1428.00    CIII
- 1486.00    NIV]
- 1526.72   SiII
+ 1393.76    SiIV
+ 1402.77    SiIV
+ 1526.71    SiII
  1548.20    CIV
  1550.77    CIV
- 1608.45   FeII
- 1640.00   HeII
- 1670.91   AlII
- 1719.00    NIV
- 1854.72   AlIII
- 1862.78   AlIII
- 1907.00    CIII]
- 1909.00    CIII]
- 2327.71    CII]
- 2796.82   MgII
- 2803.83   MgII
- 3203.93   HeII
- 3345.96   Ne[V]
- 3426.98   Ne[V]
- 3727.100   O[II]
- 3729.860   O[II]
- 3750.57   FeI
- 3798.98    H10
- 3836.49    H9
- 3869.84   Ne[III]
- 3890.00    H8
- 3890.15    Hf
- 3934.79   CaIIK
- 3969.61   CaIIH
- 4027.14   HeI
- 4102.90    Hd
- 4227.89   CaI
+ 1608.45    FeII
+ 1640.00    HeII
+ 1670.79    AlII
+ 1854.72    AlIII
+ 1862.78    AlIII
+ 2344.214   FeII 
+ 2374.4612  FeII
+ 2382.765   FeII
+ 2586.6500  FeII 
+ 2600.1729  FeII
+ 2796.35    MgII
+ 2803.53    MgII
+ 2852.96    MgI
+ 3203.93    HeII
+ 3727.092   O[II]
+ 3729.875   O[II]
+ 3889.0	    HeI
+ 3934.78    CaIIK
+ 3969.59    CaIIH
+ 3971.19    He
+ 4027.14    HeI
+ 4102.89    Hd
  4305.61    Gband
- 4341.69    Hgamma
+ 4341.68    Hg
  4364.44    O[III]
- 4384.78   FeI
- 4456.25   CaI
- 4669.31   FeI
- 4687.31   HeII
- 4726.32   Ne[IV]
+ 4687.31    HeII
  4862.688   Hb
- 4960.29    O[III]
- 5008.24    O[III]
- 5168.74   MgI
- 5174.14   MgI
- 5185.04   MgI
- 5209.45   MgH
- 5270.47   CaI
- 5271.75   FeI
- 5332.98   FeI
- 5402.90   FeI
- 5412.50   HeII
- 5877.28   HeI
- 5891.61   NaI
- 5894.13   NaI
- 5897.57   NaI
- 6302.04    O[I]
- 6312.75    S[III]
- 6364.76    O[I]
- 6549.91    N[II]
- 6564.633   Ha
- 6585.42    N[II]
+ 4960.295   O[III]
+ 5008.240   O[III]
+ 5168.74    MgI
+ 5174.14    MgI
+ 5185.04    MgI
+ 5412.50    HeII
+ 5756.24    [NII]
+ 5877.28    HeI
+ 5891.61    NaI
+ 5894.13    NaI
+ 5897.57    NaI
+ 6549.86    N[II]
+ 6564.61    Ha
+ 6585.27    N[II]
  6678.0     HeI
- 6718.854   S[II]
- 6733.164   S[II]
- 7065.00    HI
- 7136.97   Ar[III]
- 7319.0     O[II]
- 8239.26   HeII
- 9071.49    S[III]
- 9547.62    S[III]
-10122.77   HeII
+ 6718.29    S[II]
+ 6732.67    S[II]
+ 8500.36    CaII
+ 8544.44    CaII
+ 8664.52    CaII
+ 5578.5	    Sky
+ 5894.6	    Sky
+ 6301.7	    Sky
+ 7246.0	    Sky

@@ -4,21 +4,29 @@ These are sets of utilities to handle muse sources
 """
 
 
-def findsources(image,cube,check=False,output='./',spectra=False,helio=0.0):
+def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.,
+                minarea=10.,regmask=None,clean=True,outspec='Spectra'):
 
     """      
+
     Take a detection image (collapse of a cube), or median 
     of an RGB, or whatever you want (but aligned to the cube)
     and run sourceextractor 
 
-    Use SEP utilities http://sep.readthedocs.org/en/v0.4.x/
+   
+    Use SEP utilities http://sep.readthedocs.org/en/stable/
 
-    image -> fits file of image to process
-    check -> if true write a bunch of check mages
-    output -> where to dump the output
-    cube   -> the cube used to extract spectra
-    spectra -> if True, extract spectra
+    image   -> fits file of image to process
+    check   -> if true write a bunch of check mages
+    output  -> where to dump the output
+    cube    -> the cube used to extract spectra
+    spectra -> if True, extract spectra in VACUUM wave!!
     helio   -> pass additional heliocentric correction
+    nsig    -> number of skyrms used for source id 
+    minarea -> minimum area for extraction 
+    regmask -> ds9 region file (image) of regions to be masked before extraction [e.g. edges]
+    clean   -> clean souces 
+    outspec -> where to store output spectra 
 
     """
 
@@ -27,18 +35,43 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0.0):
     import numpy as np
     import os
     from mypython.ifu import muse_utils as utl
+    from mypython.fits import pyregmask as msk
 
     #open image
     img=fits.open(image)
     header=img[0].header
-    data=img[1].data
+    try:
+        #this is ok for narrow band images 
+        data=img[1].data
+    except:
+        #white cubex images
+        data=img[0].data
     data=data.byteswap(True).newbyteorder()
     #close fits
     img.close()
 
-    #check bacground level, but do not subtract it
+    #create bad pixel mask
+    if(regmask):
+        Mask=msk.PyMask(header["NAXIS1"],header["NAXIS2"],regmask)
+        for ii in range(Mask.nreg):
+            Mask.fillmask(ii)
+            if(ii == 0):
+                badmask=Mask.mask
+            else:
+                badmask+=Mask.mask
+            badmask=1.*badmask
+    else:
+        badmask=np.zeros((header["NAXIS1"],header["NAXIS2"]))
+
+    if(check):
+        print('Dumping badmask')
+        hdumain  = fits.PrimaryHDU(badmask,header=header)
+        hdulist = fits.HDUList([hdumain])
+        hdulist.writeto(output+"/badmask.fits",clobber=True)
+    
+    #check background level, but do not subtract it
     print 'Checking background levels'
-    bkg = sep.Background(data)    
+    bkg = sep.Background(data,mask=badmask)    
     print 'Residual background level ', bkg.globalback
     print 'Residual background rms ', bkg.globalrms
 
@@ -53,30 +86,35 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0.0):
         hdulist = fits.HDUList([hdumain,hdubk,hdurms])
         hdulist.writeto(output+"/skyprop.fits",clobber=True)
 
-    #extracting sources 
-    thresh = 2. * bkg.globalrms
-    objects = sep.extract(data,thresh, minarea=10, clean=0.0)
+    #extracting sources at nsigma
+    thresh = nsig * bkg.globalrms
+    segmap = np.zeros((header["NAXIS1"],header["NAXIS2"]))
+    objects,segmap=sep.extract(data,thresh,segmentation_map=True,
+                               minarea=minarea,clean=clean,mask=badmask)
     print "Extracted {} objects... ".format(len(objects))
     
     if(spectra):
-        if not os.path.exists("Spectra"):
-            os.makedirs("Spectra")
+        if not os.path.exists(outspec):
+            os.makedirs(outspec)
 
     if((check) | (spectra)):
-        #create a detection mask
-        srcmask=np.zeros((data.shape[0],data.shape[1]))
+        #create a detection mask alla cubex
+        srcmask=np.zeros((1,data.shape[0],data.shape[1]))
         nbj=1
+        print('Generating spectra...')
         #loop over detections
         for obj in objects:
             #init mask
             tmpmask=np.zeros((data.shape[0],data.shape[1]),dtype=np.bool)
+            tmpmask3d=np.zeros((1,data.shape[0],data.shape[1]),dtype=np.bool)
             #fill this mask
             sep.mask_ellipse(tmpmask,obj['x'],obj['y'],obj['a'],obj['b'],obj['theta'],r=2)
-            srcmask=srcmask+tmpmask*nbj
+            tmpmask3d[0,:,:]=tmpmask[:,:]
+            srcmask=srcmask+tmpmask3d*nbj
             if(spectra):
-                savename="Spectra/id{}.fits".format(nbj)
+                savename="{}/id{}.fits".format(outspec,nbj)
                 utl.cube2spec(cube,obj['x'],obj['y'],None,write=savename,
-                              shape='mask',helio=helio,mask=tmpmask)
+                              shape='mask',helio=helio,mask=tmpmask3d,tovac=True)
             #go to next
             nbj=nbj+1
 
@@ -87,6 +125,13 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0.0):
         hdulist = fits.HDUList([hdumain,hdubk])
         hdulist.writeto(output+"/source.fits",clobber=True)
         
+        print 'Dumping segmentation map'
+        hdumain  = fits.PrimaryHDU(segmap,header=header)
+        hdubk  = fits.ImageHDU(segmap)
+        hdulist = fits.HDUList([hdumain,hdubk])
+        hdulist.writeto(output+"/segmap.fits",clobber=True)
+    
+
     #write source catalogue
     print 'Writing catalogue..'
     cols = fits.ColDefs(objects)

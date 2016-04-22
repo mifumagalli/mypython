@@ -1,5 +1,3 @@
-
-
 def aligntocat(cube,catalogue):
 
     """ 
@@ -59,7 +57,7 @@ def aligntocat(cube,catalogue):
                              
     return raoff,decoff
 
-def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
+def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
     
     """
     Take a cube and make a projection, extracting also WCS information.
@@ -68,56 +66,61 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
     
     wrange -> if set to a (minl,maxl) compress only part of the cube
     write -> if set to string, write image in output
-    helio -> passes heliocentric correction in km/s
+    helio -> passes heliocentric correction in km/s [not needed for pipeline v1.2.1 and later]
     filt -> The ID of a filter transmission curve to use for convolution,
             which filter package can understand (e.g. 129 for SDSS r-band) 
             Filt overwrite wrange
 
     """
 
-
     import numpy as np
     import matplotlib.pyplot as plt
     from astropy.io import fits 
     from astropy import wcs
-    import mypython.filters as fil
+    from mypython.filters import filter as fil
     from scipy import interpolate
     from scipy import integrate
 
     #read the cube
-    cubdata,vardata,wcsc,wavec=readcube(cube,helio=helio)
+    cubdata,vardata,wcsc,wavec,regions=readcube(cube,helio=helio)
         
     #find delta lambda
     delta_lambda=wavec-np.roll(wavec,1)
     delta_lambda[0]=wavec[1]-wavec[0]
 
-    #if no filter or wrange, default to mix man cube
+    #########################################
+    #compute the desired transmission curves#
+    #########################################
+
+    #if no filter or wrange, default to mix max cube
     if not (wrange) and not (filt):
         wrange=[np.min(wavec),np.max(wavec)]
 
     #implement filtering in wrange
     if(wrange):
-        #create a good mask
+        
+        #create a good mask escluding NaN
         mask=np.isfinite(cubdata)
         mask=mask.astype(int)
+        
+        #trim data in desired range
         trim=np.where((wavec < wrange[0]) | (wavec > wrange[1]))
-        print 'Trim within range ', wrange
         mask[trim[0],:,:]=0
         
-        #set the trasmission T=1 for white image, trim edges
+        #set the trasmission T=1 for white/tophat image masking 5 pixel at edges
         trans=np.zeros(len(wavec))+1
         trans[0:5]=0
         trans[-5:]=0
 
         #set zeropoint 
         #now compute the zero point of the image
-        lefffn=interpolate.interp1d(wavec,wavec*trans)
+        lefffn=interpolate.interp1d(wavec,wavec*trans,bounds_error=False,fill_value=0)
         trans_fnc=interpolate.interp1d(wavec,trans,bounds_error=False,fill_value=0)
         num,err=integrate.quad(lefffn,wrange[0],wrange[1])
         den,err=integrate.quad(trans_fnc,wrange[0],wrange[1])
         lmean=num/den
         print 'Filter mean wavelength ', lmean 
-        #Compute the ZP - image is in 1e-20 erg/s/cm2/A
+        #Compute the ZP in AB - native image is in 1e-20 erg/s/cm2/A
         ZP=-2.5*np.log10(lmean*lmean/29979245800.*1e-8*1e-20)-48.6
         print 'Filter zeropoint ',  ZP
         
@@ -128,10 +131,10 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
         mask=mask.astype(int)
         
         #load the filter 
-        myfilter=fil.filter.Filter(filt)
+        myfilter=fil.Filter(filt)
         myfilter.loadtrans()
 
-        #restrict to sensible range
+        #restrict to sensible range in transmission 
         good=np.where(myfilter.filter['tran'] > 5e-4)
         good=good[0]
         fltn=myfilter.filter['tran'][good]
@@ -152,11 +155,16 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
         den,err=integrate.quad(trans_fnc,min(flwn),max(flwn))
         lmean=num/den
         print 'Filter mean wavelength ', lmean 
-        #Compute the ZP - image is in 1e-20 erg/s/cm2/A
+        #Compute the ZP AB - image is in 1e-20 erg/s/cm2/A
         ZP=-2.5*np.log10(lmean*lmean/29979245800.*1e-8*1e-20)-48.6
         print 'Filter zeropoint ',  ZP
 
-    #fix nans
+
+    ###############################
+    #now do the actual combination#
+    ###############################
+
+    #fix nans [already masked above]
     cubdata=np.nan_to_num(cubdata)
     vardata=np.nan_to_num(vardata)
 
@@ -180,7 +188,7 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
             if(wgt[xx,yy] <= 0):
                 wgt[xx,yy]=1e-20
 
-    #reassembled
+    #reassemble - this is constrcuting a mean image weighted by the transmission curve
     img=np.nan_to_num(img/wgt)
     var=np.nan_to_num(var/wgt**2)
 
@@ -200,19 +208,19 @@ def cube2img(cube,write=None,wrange=None,helio=0.0,filt=None):
 
     return img, var, wcsimg
 
-def cube2spec(cube,x,y,s,write=None,shape='box',helio=0.0,mask=None,twod=True):
+def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tovac=False):
 
     """ 
-    Extract a 1D spectrum from a cube at position x,y 
-    in box/circle of radius s 
+    Extract a 1D spectrum from a cube at position x,y in box or circle of radius s 
 
-    If shape = 'mask', then mask is a boolean mask and
-    pixels within it will be extracted form there
+    If shape = 'mask', then mask is a boolean mask and pixels within it will be extracted form 
+    argument mask. Mask is a datacube [e.g. from cubex]
 
-    helio passes an heliocentric correction in km/s
+    helio passes an heliocentric correction in km/s [should be 0 with pipeline v1.2.1]
 
-    twod -> reconstruct a 2D spec
-    
+    twod -> also reconstruct a 2D spec
+
+    tovac -> if true, return wavelengths in vacuum 
 
     """
     import matplotlib.pyplot as plt
@@ -220,13 +228,14 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0.0,mask=None,twod=True):
     from astropy.io import fits 
 
     #read the cube
-    cubdata,vardata,wcsc,wavec=readcube(cube,helio=helio)
- 
+    cubdata,vardata,wcsc,wavec,regi=readcube(cube,helio=helio)
+    cubdata=np.nan_to_num(cubdata)
+
     #if mask extract all True pixels 
     if('mask' in shape):
         goodpix=np.nonzero(mask)
-        xpix=goodpix[0]
-        ypix=goodpix[1]
+        xpix=goodpix[1]
+        ypix=goodpix[2]
     else:
         #If user defined region, grab inner pixels
         #cut region of interest according to shape
@@ -255,11 +264,8 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0.0,mask=None,twod=True):
 
     #now make space for the 1d spectrum 
     spec_flx=np.zeros(len(wavec))
-    spec_opt=np.zeros(len(wavec))
     spec_var=np.zeros(len(wavec))
-    spec_varopt=np.zeros(len(wavec))
     spec_med=np.zeros(len(wavec))
-
 
     #if want 2d, prepapre space for it
     #This simulates a slit in the x direction 
@@ -274,18 +280,11 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0.0,mask=None,twod=True):
         twoderr=np.zeros((nwv,npix))
 
     #loop over all wavelength to fill in spectrum
-    
-    #find the lightweight for optimal extraction 
-    weight=np.median(cubdata[:,xpix,ypix],axis=0)
-    weight=weight/np.sum(weight)
-
     for ii,ww in enumerate(wavec):
         #get the total spec in the aperture, 
         #summing over all the pixels 
         spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])
-        spec_opt[ii]=np.sum(cubdata[ii,xpix,ypix]*weight)
         spec_var[ii]=np.sum(vardata[ii,xpix,ypix])
-        spec_varopt[ii]=np.sum(vardata[ii,xpix,ypix]*weight**2)
         spec_med[ii]=np.median(cubdata[ii,xpix,ypix])
         
         #fill in 2D spectrum in a box 
@@ -299,37 +298,49 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0.0,mask=None,twod=True):
     #extract the 2D image with a small buffer around
     if(twod):
         twodimg=np.median(cubdata[:,uxpix[0]-5:uxpix[-1]+6,uypix[0]-5:uypix[-1]+6],axis=0)
+        #from variance to error
+        twoderr=np.sqrt(twoderr)
 
-    #from variance to error
-    spec_err=np.sqrt(spec_var)
-    spec_erropt=np.sqrt(spec_varopt)
-    twoderr=np.sqrt(twoderr)
+    #mean in aperture
+    totpix=len(xpix)
+    spec_flx=spec_flx/totpix
+    spec_err=np.sqrt(spec_var/totpix)
+ 
+    
+    #if set, convert to vacuum using airtovac.pro conversion
+    if(tovac):
+        #save current wave
+        wavec=np.array(wavec,dtype=np.float64)
+        wave_air=wavec
+        
+        sigma2 = (1e4/wavec)**2.    
+        fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
+        wavec = wavec*fact  
 
-    #plt.plot(wavec, spec_flx)
-    #plt.plot(wavec, spec_err)
-    #plt.show()
+    #tested and working
+    #fl=open('test.txt','w') 
+    #for rr in range(len(wavec)):
+    #    fl.write("{} {}\n".format(wave_air[rr],wavec[rr]))
+    #fl.close()
 
     #if write, write
     if(write):
-        hduflxopt  = fits.PrimaryHDU(spec_opt)
-        hduerropt  = fits.ImageHDU(spec_erropt)
-        hduwav  = fits.ImageHDU(wavec)
-        hduflx  = fits.ImageHDU(spec_flx)
-        hduerr  = fits.ImageHDU(spec_err)
-        if(twod):
+        hduflx  = fits.PrimaryHDU(spec_flx) #mean in region
+        hduerr  = fits.ImageHDU(spec_err) #associated errors
+        hduwav  = fits.ImageHDU(wavec)    #wave
+        hdumed  = fits.ImageHDU(spec_med) #median spectrum 
+        if(twod): #twod 
             hdu2flx  = fits.ImageHDU(twodspec)
             hdu2err  = fits.ImageHDU(twoderr)
             hduimg   = fits.ImageHDU(twodimg)
-            hdulist = fits.HDUList([hduflxopt,hduerropt,hduwav,hduflx,hduerr,hdu2flx,hdu2err,hduimg])
+            hdulist = fits.HDUList([hduflx,hduerr,hduwav,hdumed,hdu2flx,hdu2err,hduimg])
         else:
-            hdulist = fits.HDUList([hduflxopt,hduerropt,hduwav,hduflx,hduerr])
+            hdulist = fits.HDUList([hduflx,hduerr,hduwav,hdumed])
         hdulist.writeto(write,clobber=True)
 
-    return wavec, spec_opt, spec_erropt, spec_med
+    return wavec, spec_flx, spec_err, spec_med
 
-
-
-def cubestat(cube,region=False,delta=10,lambdabin=1.25,pixbin=0.2):
+def cubestat(cube,region=False,delta=10):
 
     """
     Take the cube and measure the pixel rms in chunks of 10A
@@ -340,24 +351,26 @@ def cubestat(cube,region=False,delta=10,lambdabin=1.25,pixbin=0.2):
 
     delta  -> wavelength window in A
 
-    lambdabin  -> sampling of wave of final cube  (A)
-    pixbin     -> sampling of pixel of final cube (as)
-
     """
 
     import numpy as np
     import matplotlib.pyplot as plt
 
     #read the cube
-    cubdata,vardata,wcsc,wavec=readcube(cube)
+    cubdata,vardata,wcsc,wavec,reg=readcube(cube)
+    
+    #grab info on grid
+    lambdabin=wcsc.pixel_scale_matrix[2,2]*1e10 #in A
+    pixbin=wcsc.pixel_scale_matrix[1,1]*3600 #in as
 
-    #find blocks of lambda
+    #find blocks of lambda within the cube 
     nblocks=int(np.floor((np.max(wavec)-np.min(wavec))/delta))
 
-    #carve out box if needed
+    #carve out box if needed in spatial direction
     if(region):
         cubdata=cubdata[:,region[0]:region[2],region[1]:region[3]]
 
+    #init arrays
     rms=np.zeros(nblocks)
     wrms=np.zeros(nblocks)
 
@@ -373,12 +386,12 @@ def cubestat(cube,region=False,delta=10,lambdabin=1.25,pixbin=0.2):
         rms[ii]=np.std(cubdata[wpix,:,:])
         wrms[ii]=wcent
 
-    #normalise units
+    #normalise units from pixel to as^2 and from pix to A
     rms=rms*1e-20/lambdabin/pixbin**2
    
     return wrms,rms
 
-def readcube(cube, helio=0.0):
+def readcube(cube, helio=0):
 
     """
     Read a cube, expanding wcs and wavelegth
@@ -387,8 +400,10 @@ def readcube(cube, helio=0.0):
     are applied to the data 
 
     Note that from v1.2, the ESO pipeline applies correction to 
-    data regarding baryocentric heliocentric correction
-    
+    data regarding baryocentric heliocentric correction, so helio should be left a 0
+  
+    MUSE wavelength solution is in air!!
+
     """
 
     from astropy.io import fits
@@ -404,8 +419,11 @@ def readcube(cube, helio=0.0):
     vardata=cfits['STAT'].data
 
     #compute the helio correction on the fly
-    hel_corr = np.sqrt( (1. + helio/299792.458) / (1. - helio/299792.458) )
-    print 'Helio centric correction of {} km/s and lambda {}'.format(helio,hel_corr) 
+    if(helio != 0):
+        hel_corr = np.sqrt( (1. + helio/299792.458) / (1. - helio/299792.458) )
+        print 'Helio centric correction of {} km/s and lambda {}'.format(helio,hel_corr) 
+    else:
+        hel_corr=1.0
 
     #reconstruct wave array
     #wave in air
@@ -414,14 +432,17 @@ def readcube(cube, helio=0.0):
     zero_lambda=cfits[1].header["CRVAL3"]*hel_corr
     wavec=np.arange(0,sz[0],1)*delta_lambda+zero_lambda
  
-    #suck up wcs 
+    #compute ds9 style regions
+    regions=np.arange(0,sz[0],1)+1
+
+    #suck up the wcs 
     wcsc=WCS(header=cfits[1].header)
     #wcscube.printwcs()
     
     #close unit
     cfits.close()
 
-    return cubdata,vardata,wcsc,wavec
+    return cubdata,vardata,wcsc,wavec,regions
 
 
 def adjust_wcsoffset(data,xpix,ypix,rag,deg):

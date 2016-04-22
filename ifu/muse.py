@@ -6,7 +6,6 @@ class Muse(object):
 
     """
 
-
     def __init__(self):
 
         """ Stuff at init .. not much for now """
