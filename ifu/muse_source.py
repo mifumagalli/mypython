@@ -3,7 +3,6 @@ These are sets of utilities to handle muse sources
 
 """
 
-
 def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.,
                 minarea=10.,regmask=None,clean=True,outspec='Spectra'):
 
@@ -143,7 +142,8 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
 
 
 
-def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,noise=[False],zpab=False, kn=1.0):
+def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
+               noise=[False],zpab=False, kn=2.5, circap=1.0):
 
     """ 
 
@@ -158,16 +158,16 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     instrument -> if not MUSE, map positions from detection to image
 
     dxp,dyp    -> shifts in pixel of image to register MUSE and image astrometry   
-
-    
+   
     noise      -> if set to a noise model, use equation noise[0]*noise[1]*npix**noise[2]
                   to compute the error
 
     zpab  -> if ZPAB (zeropoint AB) not stored in header, must be supplied
 
-    kn   -> factor to be used in Kron aperture
-
+    kn   -> factor to be used when scaling Kron apertures [sextractor default 2.5]
   
+    circap -> radius in arcsec for aperture photmetry to be used when Kron aperture fails 
+
     """  
 
     from astropy.io import fits
@@ -177,28 +177,35 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     from astropy.table import Table
     from astropy import wcs 
 
+
+    #grab root name 
+    rname=((image.split('/')[-1]).split('.fits'))[0]
+    print ('Working on {}'.format(rname))
+
     #open the catalogue/fits 
     cat=fits.open(catalogue)
     img=fits.open(image)
     seg=fits.open(segmap)
     det=fits.open(detection)
 
-    #grab reference wcs
+    #grab reference wcs from detection image 
     wref=wcs.WCS(det[0].header)
-    psref=wref.wcs.pc[1,1]*3600.
-     
-    #if not handling MUSE, special cases
+    psref=wref.pixel_scale_matrix[1,1]*3600.
+    print ('Reference pixel size {}'.format(psref))
+
+
+    #if not handling MUSE, special cases for format of data
     if('MUSE' not in instrument):
         #handle instrument cases
         if('LRIS' in instrument):
+            #data 
             imgdata=img[1].data
-            #place holder.. will use noise model
-            #afterwards...
+            #place holder for varaince as will use noise model below
             vardata=imgdata*0+1
             vardata=vardata.byteswap(True).newbyteorder()
             #grab wcs image
             wimg=wcs.WCS(img[1].header)
-            psimg=wimg.wcs.cd[1,1]*3600.
+            psimg=wimg.pixel_scale_matrix[1,1]*3600.
             #store the ZP 
             if(zpab):
                 img[0].header['ZPAB']=zpab
@@ -206,6 +213,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             print 'Instrument not supported!!'
             exit()
     else:
+        #for muse, keep eveything the same
         imgdata=img[0].data
         vardata=img[1].data
         psimg=psref
@@ -215,7 +223,8 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     datavar=np.nan_to_num(vardata.byteswap(True).newbyteorder())
     #grab detection and seg mask 
     detflx=np.nan_to_num(det[0].data.byteswap(True).newbyteorder())
-    segmask=np.nan_to_num(seg[0].data.byteswap(True).newbyteorder())
+    #go back to 1d
+    segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))[0,:,:]
 
     #if needed, map the segmap to new image with transformation
     if('MUSE' not in instrument):
@@ -251,12 +260,14 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         #dump the transformed segmap for checking 
         hdumain  = fits.PrimaryHDU(segmasktrans,header=img[1].header)
         hdulist = fits.HDUList(hdumain)
-        hdulist.writeto("segremap_check.fits",clobber=True)
+        hdulist.writeto("{}_segremap.fits".format(rname),clobber=True)
     else:
+        #no transformation needed
         segmasktrans=segmask
 
     #source to extract
     nsrc=len(cat[1].data)
+    print('Extract photometry for {} sources'.format(nsrc))
     phot = Table(names=('ID', 'MAGAP', 'MAGAP_ERR','FXAP', 'FXAP_ERR', 
                         'RAD', 'MAGSEG', 'MAGSEG_ERR', 'FXSEG', 'FXSEG_ERR','ZP'), 
                  dtype=('i4','f4','f4','f4','f4','f4','f4','f4','f4','f4','f4'))
@@ -264,8 +275,9 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
    
     #create check aperture mask 
     checkaperture=np.zeros(dataflx.shape)
-    print 'Computing photometry for objects...'
+    print('Computing photometry for objects...')
 
+    #loop over each source
     for idobj in range(nsrc):
         
         #########
@@ -283,12 +295,24 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         #Kron rad in units of a,b
         tmpdata=np.copy(detflx)
         tmpmask=np.copy(segmask)
-        kronrad, flg = sep.kron_radius(tmpdata, x, y, a, b, theta, 6.0, mask=tmpmask)
+        #mask all other sources to avoid overlaps but keep desired one
+        pixels=np.where(tmpmask == idobj+1) 
+        tmpmask[pixels]=0
+
+        #compute kron radius [pixel of reference image]
+        kronrad, flg = sep.kron_radius(tmpdata,x,y,a,b,theta,6.0,mask=tmpmask)
+
+        #plt.imshow(np.log10(tmpdata+1),origin='low')
+        #plt.show()
+        #exit()
 
         #now check if size is sensible in units of MUSE data 
         rmin = 2.0  #MUSE pix 
         use_circle = kronrad * np.sqrt(a*b) < rmin
-
+      
+        #use circular aperture of 2" in muse pixel unit
+        rcircap = circap/psref
+        
         #now use info to compute photometry and apply 
         #spatial transformation if needed
         if('MUSE' not in instrument):
@@ -302,7 +326,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             yphot=newxy[0][1]+dyp
                       
             #scale radii to new pixel size 
-            rminphot=rmin*psref/psimg
+            rminphot=rcircap*psref/psimg
             aphot=a*psref/psimg
             bphot=b*psref/psimg
             #Kron radius in units of a,b
@@ -311,17 +335,24 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             #for muse, transfer to same units
             xphot=x
             yphot=y
-            rminphot=rmin
+            rminphot=rcircap
             aphot=a
             bphot=b     
             
         #####
         #Compute local sky 
         #####
-        skyreg=kn*kronrad*np.sqrt(aphot*bphot)+10
-        cutskymask=segmasktrans[xphot-skyreg:xphot+skyreg,yphot-skyreg:yphot+skyreg]
-        cutskydata=dataflx[xphot-skyreg:xphot+skyreg,yphot-skyreg:yphot+skyreg]
+        skyreg=kn*kronrad*np.sqrt(aphot*bphot)+15
+        cutskymask=segmasktrans[yphot-skyreg:yphot+skyreg,xphot-skyreg:xphot+skyreg]
+        cutskydata=dataflx[yphot-skyreg:yphot+skyreg,xphot-skyreg:xphot+skyreg]
         skymedian=np.nan_to_num(np.median(cutskydata[np.where(cutskymask < 1.0)]))
+
+        #print skymedian    
+        #plt.imshow(cutskymask,origin='low')
+        #plt.show()
+        #if(idobj > 30):
+        #    exit()
+
 
         #########
         #Now grab the Kron mag computed using detection image
@@ -336,10 +367,16 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         pixels=np.where(tmpmask == idobj+1) 
         tmpmask[pixels]=0
 
-        if(use_circle):
-            
-            #circular aperture
-            flux_kron, err, flg = sep.sum_circle(tmpdata, xphot, yphot, rminphot,subpix=1,mask=tmpmask)
+        #plt.imshow(tmpmask,origin='low')
+        #plt.show()
+        #exit()
+
+        #circular aperture
+        if(use_circle):        
+           
+            #flux in circular aperture
+            flux_kron, err, flg = sep.sum_circle(tmpdata,xphot,yphot,rminphot,subpix=1,mask=tmpmask)
+            #propagate variance
             fluxvar, err, flg = sep.sum_circle(tmpvar,xphot,yphot,rminphot,subpix=1,mask=tmpmask)
             #store Rused in arcsec
             rused=rminphot*psimg
@@ -349,13 +386,15 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             sep.mask_ellipse(tmpcheckaper,xphot,yphot,1.,1.,0.,r=rminphot)
             checkaperture=checkaperture+tmpcheckaper*(idobj+1)
 
+        #kron apertures 
         else:
-
-            #kr mag
+            #kron flux 
             flux_kron, err, flg = sep.sum_ellipse(tmpdata,xphot, yphot, aphot, bphot, theta, kn*kronrad,
                                                   subpix=1,mask=tmpmask)            
+            #propagate variance 
             fluxvar, err, flg = sep.sum_ellipse(tmpvar,xphot,yphot, aphot, bphot, theta, kn*kronrad,
                                                 subpix=1,mask=tmpmask)
+            #translate in radius
             rused=kn*kronrad*psimg*np.sqrt(aphot*bphot)
 
             #update check aperture
@@ -365,27 +404,26 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
 
         #compute error for aperture
         if(noise[0]):
+            #use model 
             appix=np.where(tmpcheckaper > 0)
             errflux_kron=noise[0]*noise[1]*len(appix[0])**noise[2]
         else:
+            #propagate variance 
             errflux_kron=np.sqrt(fluxvar)
 
         #go to mag 
-        try:
+        if(flux_kron > 0):
             mag_aper=-2.5*np.log10(flux_kron)+img[0].header['ZPAB']
-        except:
-            mag_aper=99.0
-        try:
             errmg_aper=2.5*np.log10(1.+errflux_kron/flux_kron)
-        except:
+        else:
+            mag_aper=99.0
             errmg_aper=99.0
-    
+        
         #find out if non detections
         if(errflux_kron >= flux_kron):
             errmg_aper=9
             mag_aper=-2.5*np.log10(2.*errflux_kron)+img[0].header['ZPAB']
-        
-  
+          
         #######
         #grab the photometry in the segmentation map 
         #####
@@ -408,13 +446,11 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             errfx_seg=np.sqrt(np.sum(datavar[pixels]))
   
         #go to mag with calibrations 
-        try:
+        if(flux_seg > 0):
             mag_seg=-2.5*np.log10(flux_seg)+img[0].header['ZPAB']
-        except:
+            errmg_seg=2.5*np.log10(1.+errfx_seg/flux_seg)     
+        else:
             mag_seg=99.0
-        try:
-            errmg_seg=2.5*np.log10(1.+errfx_seg/flux_seg)
-        except:
             errmg_seg=99.0
       
         #find out if non detections
@@ -429,7 +465,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     #dump the aperture check image 
     hdumain  = fits.PrimaryHDU(checkaperture,header=img[1].header)
     hdulist = fits.HDUList(hdumain)
-    hdulist.writeto("aperture_check.fits",clobber=True)
+    hdulist.writeto("{}_aper.fits".format(rname),clobber=True)
 
     #close
     cat.close()
