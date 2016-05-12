@@ -208,7 +208,7 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
 
     return img, var, wcsimg
 
-def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tovac=False):
+def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tovac=False,idsource=None):
 
     """ 
     Extract a 1D spectrum from a cube at position x,y in box or circle of radius s 
@@ -216,11 +216,15 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     If shape = 'mask', then mask is a boolean mask and pixels within it will be extracted form 
     argument mask. Mask is a datacube [e.g. from cubex]
 
+    idsource -> if > 0, then only pixels in mask with that ID will be extracted
+
     helio passes an heliocentric correction in km/s [should be 0 with pipeline v1.2.1]
 
     twod -> also reconstruct a 2D spec
 
     tovac -> if true, return wavelengths in vacuum 
+
+    write -> output file 
 
     """
     import matplotlib.pyplot as plt
@@ -233,7 +237,10 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
 
     #if mask extract all True pixels 
     if('mask' in shape):
-        goodpix=np.nonzero(mask)
+        if(idsource):
+            goodpix=np.nonzero(mask == idsource)
+        else:
+            goodpix=np.nonzero(mask)
         xpix=goodpix[1]
         ypix=goodpix[2]
     else:
@@ -501,3 +508,4 @@ def unpack_pixtab(flag):
     islice = flag & 63 
 
     return ifu, islice
+

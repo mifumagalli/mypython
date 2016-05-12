@@ -474,3 +474,127 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     det.close()
 
     return phot
+
+
+def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6.):
+
+    """
+
+    Inject mock line emission in a cube using a flat distribution between fluxlimits
+    and a three dimensional Gaussian with x/y FWHM = spatwidth and lambda FWHM = wavewidth
+
+
+    cube -> a MUSE cube [filename] to use for mock 
+    fluxlimits -> mock sources will be drawn in range [min,max] in units of CUBE [default 1e-20]
+    num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
+    wavelimits -> [min,max] slices in which mocks are populated 
+    spatwidth -> FWHM in spatial direction, in pixels 
+    wavewidth -> FWHM in spectral direction, in slices
+    outprefix -> prefix for output  
+
+    fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+
+    """
+    
+    from astropy.io import fits 
+    import numpy as np
+    import matplotlib.pyplot as plt
+    
+    #open the cube 
+    cubhdu=fits.open(cube)
+    
+    try:
+        newcube=cubhdu[0].data
+        ext=0
+    except:
+        newcube=cubhdu[1].data
+        ext=1
+    
+    #find ranges
+    if not wavelimits:
+        #auto select with gap 
+        minw=10
+        maxw=cubhdu[0].header['NAXIS3']-10
+    minx=20
+    maxx=cubhdu[0].header['NAXIS1']-20
+    miny=20
+    maxy=cubhdu[0].header['NAXIS2']-20
+    
+    #now draw random distributions
+    mflux=np.random.uniform(fluxlimits[0],fluxlimits[1],num)
+    mx=np.random.uniform(minx,maxx,num)
+    my=np.random.uniform(miny,maxy,num)
+    #sort wave for convinience in comparison
+    mlambda=np.random.uniform(minw,maxw,num)
+    mlambda=np.sort(mlambda)
+
+
+    #construct the x,y,lambda index images
+    #xindex=np.arange(0,cubhdu[0].header['NAXIS1'])
+    #yindex=np.arange(0,cubhdu[0].header['NAXIS2'])
+    #windex=np.arange(0,cubhdu[0].header['NAXIS3'])
+    #xmap=np.tile(xindex,(cubhdu[0].header['NAXIS2'],1))+0.5
+    #ymap=np.tile(yindex,(cubhdu[0].header['NAXIS1'],1))
+    #ymap=ymap.transpose()+0.5
+    
+    #open output to store mocks
+    fl=open("{}_{}_catalogue.txt".format(outprefix,cube.split('.fits')[0]),'w')
+    
+    #loop on mocks
+    print('Looping on mock sources')
+    for mm in range(num):
+
+        #compute Gaussian parameters 
+        sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+        sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+        sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
+        xc=mx[mm]
+        yc=my[mm]
+        wc=mlambda[mm]
+        norm=mflux[mm]/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
+
+        #now evaluate Gaussian at pixel center [can do better with Gauss integral]
+        allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
+        ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
+        allw=np.round(np.arange(np.floor(wc-fill*sigmaw),wc+fill*sigmaw,1))
+
+        fl.write("{} {} {} {}\n".format(xc,yc,wc,mflux[mm]))
+        
+
+        for xx in allx:
+            for yy in ally:
+                for ww in allw:
+
+                    if((xx > minx) & (yy > miny) & (ww > minw) & 
+                       (xx < maxx) & (yy < maxy) & (ww < maxw)):
+                        #eval 
+                        pix=norm*np.exp(-1.*((((xx+0.5-xc)**2)/(2.*sigmax**2))+
+                                             (((yy+0.5-yc)**2)/(2.*sigmay**2))+
+                                             (((ww+0.5-wc)**2)/(2.*sigmaw**2))))
+                              
+                        #store
+                        newcube[ww,yy,xx]=newcube[ww,yy,xx]+pix
+    
+    print('Done.. writing!')
+
+    #store output
+    if(ext==0):
+        hdufirst = fits.PrimaryHDU(newcube)
+        hdulist = fits.HDUList([hdufirst])
+        hdulist[0].header=cubhdu[0].header
+    elif(ext==1):
+        hdufirst = fits.PrimaryHDU([])
+        hdusecond = fits.ImageHDU(newcube)
+        hdulist = fits.HDUList([hdufirst,hdusecond])
+        hdulist[0].header=cubhdu[0].header
+        hdulist[1].header=cubhdu[1].header
+
+    write='{}_{}'.format(outprefix,cube)
+    hdulist.writeto(write,clobber=True)
+    
+
+    fl.close()
+              
+    return
+
+
