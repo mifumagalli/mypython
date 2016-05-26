@@ -290,8 +290,8 @@ class Muse(object):
         #next construct the ifu mask for each exposure 
         ex.make_ifumasks(listob,refpath=refpath)
 
-        #run illumination correction 
-        #ex.make_illcorr(listob)
+        #compute illumination correction 
+        ex.make_illcorr(listob)
         
         print("All done!")
 
