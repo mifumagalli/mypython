@@ -375,9 +375,9 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         if(use_circle):        
            
             #flux in circular aperture
-            flux_kron, err, flg = sep.sum_circle(tmpdata,xphot,yphot,rminphot,subpix=1,mask=tmpmask)
+            flux_kron, err, flg = sep.sum_circle(tmpdata,xphot,yphot,rminphot,mask=tmpmask)
             #propagate variance
-            fluxvar, err, flg = sep.sum_circle(tmpvar,xphot,yphot,rminphot,subpix=1,mask=tmpmask)
+            fluxvar, err, flg = sep.sum_circle(tmpvar,xphot,yphot,rminphot,mask=tmpmask)
             #store Rused in arcsec
             rused=rminphot*psimg
 
@@ -390,10 +390,10 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         else:
             #kron flux 
             flux_kron, err, flg = sep.sum_ellipse(tmpdata,xphot, yphot, aphot, bphot, theta, kn*kronrad,
-                                                  subpix=1,mask=tmpmask)            
+                                                  mask=tmpmask)            
             #propagate variance 
             fluxvar, err, flg = sep.sum_ellipse(tmpvar,xphot,yphot, aphot, bphot, theta, kn*kronrad,
-                                                subpix=1,mask=tmpmask)
+                                                mask=tmpmask)
             #translate in radius
             rused=kn*kronrad*psimg*np.sqrt(aphot*bphot)
 
@@ -598,3 +598,70 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     return
 
 
+def forcephot(image,x,y,rad,skyreg=[10,20],show=False,mask=None):
+    
+    """
+
+    Compute the photometry on a MUSE reconstructed image within an aperture 
+    Treat limits as 2sigma
+
+    x,y        -> position of the aperture in pixels
+    radap      -> radius of the aperture in pixels
+    skyreg     -> radius of inner/outer sky region in pixel
+    mask       -> mask to avoid pixels
+    
+    show       -> if true, show what's appening
+
+
+    """
+    
+    from astropy.io import fits
+    import matplotlib.pyplot as plt
+    import sep
+    import numpy as np
+
+    #open the image
+    image=fits.open(image)
+    data = image[1].data.byteswap().newbyteorder()
+    var = image[2].data.byteswap().newbyteorder()
+
+    #grab the zp
+    zp=image[0].header['ZPAB']
+    flux, err, flg = sep.sum_circle(data,x,y,rad,var=var,bkgann=skyreg,mask=mask)
+
+    #compute magnitudes
+    if(flux < 2*err):
+        mag=-2.5*np.log10(2*err)+zp
+        errmag=99
+    else:
+        mag=-2.5*np.log10(flux)+zp
+        errmag=2.5*np.log10(1.+err/flux)     
+
+    #if show
+    if(show):
+        
+
+        #display field
+        median=np.median(data)
+        stddev=np.std(data)
+        plt.imshow(data,clim=[median-0.2*stddev,median+stddev],origin='low')
+        
+
+        #now the aperture 
+        circ=plt.Circle((x,y),radius=rad, color='red', fill=False)
+        ax=plt.gca()
+        ax.add_patch(circ)
+    
+        if(skyreg):
+             circ1=plt.Circle((x,y),radius=skyreg[0], color='red', fill=False)
+             circ2=plt.Circle((x,y),radius=skyreg[1], color='red', fill=False)
+             ax.add_patch(circ1)
+             ax.add_patch(circ2)
+
+        
+
+        plt.show()
+
+
+
+    return mag, errmag

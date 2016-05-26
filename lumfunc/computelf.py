@@ -18,9 +18,15 @@ class LumFun:
         if('Buow15' in self.whichlf):
             print ('Init Buow15 LF at z={}'.format(self.redshift))
             self.param=self.Bouwens15()
+        elif('Cassata11' in self.whichlf):
+            print ('Init Cassata11 LF at z={}'.format(self.redshift))
+            self.param=self.Cassata11()
+        elif('Grove09' in self.whichlf):
+            print ('Init Grove09 LF at z={}'.format(self.redshift))
+            self.param=self.Grove09()
+
         else:
             raise TypeError('LF {} not known'.format(self.whichlf))
-
             
     def Bouwens15(self):
 
@@ -37,7 +43,50 @@ class LumFun:
         ltype='Schechter'
         
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+    
+    def Cassata11(self):
 
+        """
+        This evaluates the Lya luminosity function from Cassata et al. 2011, A&A 525, A143
+        Generlly valid between z~2-6. Use corrected IGM values 
+        
+        """
+        
+        if(self.redshift < 3.0):
+            #use redshift 2-3
+            alpha=-1.6
+            phistar=7.1e-4
+            Mstar=42.70
+            ltype='SchLum'
+        elif((self.redshift >= 3.0) & (self.redshift < 4.55)):
+            #use redshift 3-4.5
+            alpha=-1.78
+            phistar=4.8e-4
+            Mstar= 42.70 
+            ltype='SchLum'
+        elif((self.redshift >= 4.55) & (self.redshift < 6.6)):
+            #use redshift 4.55-6.6
+            alpha=-1.69
+            phistar=9.2e-4
+            Mstar=42.72
+            ltype='SchLum'
+
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+
+    def Grove09(self):
+
+        """
+        This evaluates the Lya luminosity function from Grove et al. 2009, AA 497, 689-702
+        Generally valid around z~3 
+        
+        """
+        alpha=-1.74
+        phistar=3.2e-4
+        Mstar=43.3
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
 
     def plot(self):
 
@@ -48,29 +97,41 @@ class LumFun:
         import matplotlib.pyplot as plt
 
 
-        #make the mag array 
-        Marr=np.arange(-24,-15,0.1)
-
+        #make the     
+        delta=0.1
+        if('Schechter' in self.param['type']):
+            Marr=np.arange(-24,-15,delta)
+        elif('SchLum' in self.param['type']):
+            Marr=np.arange(40,44,delta)
+                
         lf=self.eval(Marr)
-        
-        plt.plot(Marr,np.log10(lf))
+
+        ax=plt.subplot(111)
+        ax.plot(Marr,lf)
+        ax.set_yscale("log")
         plt.show()
         
         
     def eval(self,Marr):
 
         """
-        Evaluate the luminosity function at a given Mag value
+        Evaluate the luminosity function at a given Mag/lum value
 
         """
 
         lf=None
 
         if('Schechter' in self.param['type']):
-            
+            #in magnitude
             lf=self.param['phi']*(np.log(10.)/2.5)*\
-            10**(-0.4*(Marr-self.param['Mstar'])*(self.param['alpha']+1))\
-            *np.exp(-10**(-0.4*(Marr-self.param['Mstar'])))
+                10**(-0.4*(Marr-self.param['Mstar'])*(self.param['alpha']+1))\
+                *np.exp(-10**(-0.4*(Marr-self.param['Mstar'])))
+            
+        elif('SchLum' in self.param['type']):
+            #in luminosity 
+            lf=self.param['phi']*np.log(10.)*\
+                10**((Marr-self.param['Mstar'])*(self.param['alpha']+1))\
+                *np.exp(-10**(Marr-self.param['Mstar']))
             
         else:
             raise TypeError('LF {} not known'.format(self.param['type']))
