@@ -249,11 +249,13 @@ def make_illcorr(listob):
     import matplotlib.pyplot as plt
     import scipy.signal as sgn
     from scipy.stats import sigmaclip
+    from scipy import interpolate
+    import sep
 
     #grab top dir
     topdir=os.getcwd()
 
-    #now loop over each folder and make the final sky-subtracted cubes
+    #now loop over each folder and make the final illcorrected cubes
     for ob in listob:
         
         #change dir
@@ -278,14 +280,140 @@ def make_illcorr(listob):
             #open the ifu mask to create a good mask 
             data=fits.open(data_cname)
             ifimask=fits.open(ifumask_iname)
+            fovdata=fits.open(data_iname)
+
+            #define geometry 
             nwave=data[1].header["NAXIS3"]
             nx=data[1].header["NAXIS1"]
             ny=data[1].header["NAXIS2"]
+            
+            #now flag the sources
             goodmask=np.zeros((ny,nx))
             edgemask=np.zeros((ny,nx))+1
+            image=fovdata[1].data.byteswap().newbyteorder()
+            bkg=sep.Background(image)
+            bkg.subfrom(image)
+            obj,segmap=sep.extract(image,3*bkg.globalrms,minarea=10,segmentation_map=True)
+
+            #plt.imshow(image,origin='low')
+            #plt.show()
+            #plt.imshow(segmap,origin='low')
+            #plt.show()
 
             #grab muse rotator for this exposure
-            rotation=data[0].header["HIERARCH ESO INS DROT POSANG"] 
+            #rotation=data[0].header["HIERARCH ESO INS DROT POSANG"] 
+            
+            #make a first corse illumination correction
+            binwidth=100
+            nbins=nwave/binwidth
+            illcorse=np.zeros((nbins,24))
+            illnorm=np.zeros((nbins,24))
+            illsmoo=np.zeros((nbins,24))
+
+            cbins=np.array(range(nbins))*binwidth+binwidth/2
+
+            #some save names
+            outcorr="ILLCORR_EXP{0:d}.fits".format(exp+1)
+            outcorrnorm="ILLCORRNORM_EXP{0:d}.fits".format(exp+1)
+           
+            if not os.path.isfile(outcorr):
+                                
+                #loop over ifus forst
+                for iff in range(24):                     
+                    print ('Computing correction for IFU {}'.format(iff+1))
+                    #reconstruct id of pixels in this IFU 
+                    flagvalue = (iff+1)*100.
+                    #pick pixels in this group and without sources
+                    #these are indexes in 2D image - flattened
+                    goodpx=np.where((ifimask[1].data == flagvalue+1)&
+                                    (ifimask[1].data == flagvalue+2)&
+                                    (ifimask[1].data == flagvalue+3)&
+                                    (ifimask[1].data == flagvalue+4)&
+                                    (segmap==0))
+                    goodpx=goodpx[0]
+                    #loop over bins
+                    for bb in range(nbins):
+                        #get the start end index
+                        wstart=bb*binwidth 
+                        wend=(bb+1)*binwidth
+                        #sum all in wave
+                        img=np.nansum(data[1].data[wstart:wend,:,:],axis=0)/binwidth
+                        #take median
+                        illcorse[bb,iff]=np.nanmedian(img[goodpx])#/len(goodpx)
+
+                #save 
+                hdu = fits.PrimaryHDU(illcorse)
+                hdulist = fits.HDUList([hdu])
+                hdulist.writeto(outcorr,clobber=True)
+            else:
+                print('Loading pre-computed corrections')
+                illcorse=(fits.open(outcorr))[0].data
+       
+            #next go for ifus normalisation
+            for iff in range(24):
+                illnorm[:,iff]=illcorse[:,iff]/illcorse[:,18]
+                illsmoo[:,iff]=sgn.savgol_filter(illnorm[:,iff],5,1)
+                
+                #plt.scatter(cbins,illnorm[:,iff])
+                #plt.plot(cbins,illsmoo[:,iff])
+                #plt.show()
+                                          
+            #save corrections
+            hdu1 = fits.PrimaryHDU(illnorm)
+            hdu2 = fits.ImageHDU(illsmoo)
+            hdulist = fits.HDUList([hdu1,hdu2])
+            hdulist.writeto(outcorrnorm,clobber=True)
+               
+            #now apply
+            for iff in range(24):   
+                print ('Correct IFUs {}'.format(iff+1))
+                if(iff < 23):
+                    #first, interpolation along ifus
+                    x_current_ifu=(iff+1)*100.
+                    x_next_ifu=(iff+2)*100.
+                    #grab relevant pixels 
+                    goodpx=np.where((ifimask[1].data >=x_current_ifu) & (ifimask[1].data < x_next_ifu))
+                    fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
+                    fnext=interpolate.interp1d(cbins,illsmoo[:,iff+1],fill_value="extrapolate")
+
+                    for ww in range(nwave):
+                        y_current=fcurrent(ww)
+                        y_next=fnext(ww)
+                        slope=((y_next-y_current)/(x_next_ifu-x_current_ifu))
+                        correction=y_current+slope*(ifimask[1].data[goodpx]-x_current_ifu)
+                        img=np.nan_to_num(data[1].data[ww,:,:])
+                        img[goodpx]=img[goodpx]/correction
+                        data[1].data[ww,:,:]=img
+                else:
+                    #deal with last 
+                    x_current_ifu=(iff+1)*100.
+                    goodpx=np.where((ifimask[1].data >=x_current_ifu))
+                    fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
+                    for ww in range(nwave):
+                        img=np.nan_to_num(data[1].data[ww,:,:])
+                        img[goodpx]=img[goodpx]/fcurrent(ww)
+                        data[1].data[ww,:,:]=img
+           
+            #save new cubes 
+            data.writeto("test.fits",clobber=True)
+            
+            
+            exit()
+
+
+         
+            #make sure slices are in line with each other
+            print('Correct stacks')
+            for iff in range(24):                     
+                print ('Correct stacks for IFU {}'.format(iff+1))
+                for i in range(4):
+                    plt.plot(illcorse[:,iff,i]/illcorse[:,iff,1])
+                plt.title(iff+1)
+                plt.show()
+            
+
+                
+            exit()
 
             #make space for illumination corrections 
             illcorr=np.zeros((nwave,24,4))
@@ -293,15 +421,11 @@ def make_illcorr(listob):
             illcorrnorm=np.zeros((nwave,24,4))            
             pixinstack=np.zeros(nwave)
             
-            #some save names
-            outcorr="ILLCORR_EXP{0:d}.fits".format(exp+1)
-            outcorrnorm="ILLCORRNORM_EXP{0:d}.fits".format(exp+1)
-
+         
             if not os.path.isfile(outcorr):
                 #start with central ifu pixels 
                 #this loops over ifus
                 for iff in range(24): 
-                    print ('Computing correction for IFU {}'.format(iff+1))
                     #next loop over each stack of slices inside ifu
                     for i in range(4):
                         #reconstruct id of pixels in this stack 
@@ -320,6 +444,8 @@ def make_illcorr(listob):
                 
                         #stash solution
                         illcorr[:,iff,i]=pixinstack
+                
+
                 #save 
                 hdu = fits.PrimaryHDU(illcorr)
                 hdulist = fits.HDUList([hdu])
@@ -328,8 +454,9 @@ def make_illcorr(listob):
                 print('Loading pre-computed corrections')
                 illcorr=(fits.open(outcorr))[0].data
                 
-            #compute the actual correction by normalising to the superstack
-            superstack=np.median(illcorr,axis=(1,2))
+            #compute the actual correction by normalising to a reference IFU
+            #superstack=np.median(illcorr,axis=(1,2))
+            superstack=illcorr[:,16,2]
             illcorrnorm=illcorrnorm*0.
             illcorrfilt=illcorrfilt*0.
             for iff in range(24): 
@@ -342,7 +469,6 @@ def make_illcorr(listob):
                     illcorrfilt[:,iff,i]=sgn.savgol_filter(sky,99,1)
                     #plt.plot(illcorrnorm[:,iff,i])
                     #plt.plot(illcorrfilt[:,iff,i])
-                    #plt.plot(bb)
                     #plt.show()
                                         
             #save corrections
@@ -382,7 +508,6 @@ def make_illcorr(listob):
                             data[1].data[ww,:,:]=img
 
                         
-                
             #edges=np.where((ifimask[1].data > current) & (ifimask[1].data < next))
             #edgemask[edges]=0.0        
             #stick in nans
