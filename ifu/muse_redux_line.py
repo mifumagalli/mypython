@@ -226,34 +226,21 @@ def make_ifumasks(listob,refpath='./',nproc=24):
         #back to top
         os.chdir(topdir)
 
-
-
-
 def make_illcorr(listob):
 
-    """
-    Loop over each OB and perform illumination correction 
-
-    listob -> OBs to process
+    """    
+    Wrapper function for illumination correction
 
     """
-      
+
     import os
     import glob
-    import subprocess
-    import shutil
-    from astropy.io import fits
-    import muse_utils as mut 
-    import numpy as np
-    import matplotlib as mpl
-    import matplotlib.pyplot as plt
-    import scipy.signal as sgn
-    from scipy.stats import sigmaclip
-    from scipy import interpolate
-    import sep
-
+ 
     #grab top dir
     topdir=os.getcwd()
+
+    #define the bandwidth for illumination correction.
+    binwidth=100
 
     #now loop over each folder and make the final illcorrected cubes
     for ob in listob:
@@ -276,250 +263,297 @@ def make_illcorr(listob):
             #these are the data cubes
             data_cname="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(exp+1)
             data_iname="IMAGE_FOV_LINEWCS_EXP{0:d}.fits".format(exp+1)
- 
-            #open the ifu mask to create a good mask 
-            data=fits.open(data_cname)
-            ifimask=fits.open(ifumask_iname)
-            fovdata=fits.open(data_iname)
 
-            #define geometry 
-            nwave=data[1].header["NAXIS3"]
-            nx=data[1].header["NAXIS1"]
-            ny=data[1].header["NAXIS2"]
-            
-            #now flag the sources
-            goodmask=np.zeros((ny,nx))
-            edgemask=np.zeros((ny,nx))+1
-            image=fovdata[1].data.byteswap().newbyteorder()
-            bkg=sep.Background(image)
-            bkg.subfrom(image)
-            obj,segmap=sep.extract(image,3*bkg.globalrms,minarea=10,segmentation_map=True)
-
-            #plt.imshow(image,origin='low')
-            #plt.show()
-            #plt.imshow(segmap,origin='low')
-            #plt.show()
-
-            #grab muse rotator for this exposure
-            #rotation=data[0].header["HIERARCH ESO INS DROT POSANG"] 
-            
-            #make a first corse illumination correction
-            binwidth=100
-            nbins=nwave/binwidth
-            illcorse=np.zeros((nbins,24))
-            illnorm=np.zeros((nbins,24))
-            illsmoo=np.zeros((nbins,24))
-
-            cbins=np.array(range(nbins))*binwidth+binwidth/2
-
-            #some save names
-            outcorr="ILLCORR_EXP{0:d}.fits".format(exp+1)
-            outcorrnorm="ILLCORRNORM_EXP{0:d}.fits".format(exp+1)
-           
-            if not os.path.isfile(outcorr):
-                                
-                #loop over ifus forst
-                for iff in range(24):                     
-                    print ('Computing correction for IFU {}'.format(iff+1))
-                    #reconstruct id of pixels in this IFU 
-                    flagvalue = (iff+1)*100.
-                    #pick pixels in this group and without sources
-                    #these are indexes in 2D image - flattened
-                    goodpx=np.where((ifimask[1].data == flagvalue+1)&
-                                    (ifimask[1].data == flagvalue+2)&
-                                    (ifimask[1].data == flagvalue+3)&
-                                    (ifimask[1].data == flagvalue+4)&
-                                    (segmap==0))
-                    goodpx=goodpx[0]
-                    #loop over bins
-                    for bb in range(nbins):
-                        #get the start end index
-                        wstart=bb*binwidth 
-                        wend=(bb+1)*binwidth
-                        #sum all in wave
-                        img=np.nansum(data[1].data[wstart:wend,:,:],axis=0)/binwidth
-                        #take median
-                        illcorse[bb,iff]=np.nanmedian(img[goodpx])#/len(goodpx)
-
-                #save 
-                hdu = fits.PrimaryHDU(illcorse)
-                hdulist = fits.HDUList([hdu])
-                hdulist.writeto(outcorr,clobber=True)
-            else:
-                print('Loading pre-computed corrections')
-                illcorse=(fits.open(outcorr))[0].data
-       
-            #next go for ifus normalisation
-            for iff in range(24):
-                illnorm[:,iff]=illcorse[:,iff]/illcorse[:,18]
-                illsmoo[:,iff]=sgn.savgol_filter(illnorm[:,iff],5,1)
+            #do pass on IFUs
+            print('First pass for exposure {}'.format(exp))           
+            #go for IFU corrections in coarse wavelenght bins
+            outcorr="ILLCORR_EXP{0:d}_ifu.fits".format(exp+1)
+            outcorrnorm="ILLCORRNORM_EXP{0:d}_ifu.fits".format(exp+1)
+            newcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_ILLCORR_ifu.fits".format(exp+1)
+            newimage="IMAGE_FOV_LINEWCS_EXP{0:d}_ILLCORR_ifu.fits".format(exp+1)
+            make_illcorr_ifu(ifumask_cname,ifumask_iname,data_cname,\
+                                 data_iname,outcorr,outcorrnorm,newcube,newimage,binwidth)
                 
-                #plt.scatter(cbins,illnorm[:,iff])
-                #plt.plot(cbins,illsmoo[:,iff])
-                #plt.show()
-                                          
-            #save corrections
-            hdu1 = fits.PrimaryHDU(illnorm)
-            hdu2 = fits.ImageHDU(illsmoo)
-            hdulist = fits.HDUList([hdu1,hdu2])
-            hdulist.writeto(outcorrnorm,clobber=True)
-               
-            #now apply
-            for iff in range(24):   
-                print ('Correct IFUs {}'.format(iff+1))
-                if(iff < 23):
-                    #first, interpolation along ifus
-                    x_current_ifu=(iff+1)*100.
-                    x_next_ifu=(iff+2)*100.
-                    #grab relevant pixels 
-                    goodpx=np.where((ifimask[1].data >=x_current_ifu) & (ifimask[1].data < x_next_ifu))
-                    fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
-                    fnext=interpolate.interp1d(cbins,illsmoo[:,iff+1],fill_value="extrapolate")
-
-                    for ww in range(nwave):
-                        y_current=fcurrent(ww)
-                        y_next=fnext(ww)
-                        slope=((y_next-y_current)/(x_next_ifu-x_current_ifu))
-                        correction=y_current+slope*(ifimask[1].data[goodpx]-x_current_ifu)
-                        img=np.nan_to_num(data[1].data[ww,:,:])
-                        img[goodpx]=img[goodpx]/correction
-                        data[1].data[ww,:,:]=img
-                else:
-                    #deal with last 
-                    x_current_ifu=(iff+1)*100.
-                    goodpx=np.where((ifimask[1].data >=x_current_ifu))
-                    fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
-                    for ww in range(nwave):
-                        img=np.nan_to_num(data[1].data[ww,:,:])
-                        img[goodpx]=img[goodpx]/fcurrent(ww)
-                        data[1].data[ww,:,:]=img
-           
-            #save new cubes 
-            data.writeto("test.fits",clobber=True)
-            
-            
-            exit()
-
-
-         
-            #make sure slices are in line with each other
-            print('Correct stacks')
-            for iff in range(24):                     
-                print ('Correct stacks for IFU {}'.format(iff+1))
-                for i in range(4):
-                    plt.plot(illcorse[:,iff,i]/illcorse[:,iff,1])
-                plt.title(iff+1)
-                plt.show()
-            
-
-                
-            exit()
-
-            #make space for illumination corrections 
-            illcorr=np.zeros((nwave,24,4))
-            illcorrfilt=np.zeros((nwave,24,4))
-            illcorrnorm=np.zeros((nwave,24,4))            
-            pixinstack=np.zeros(nwave)
-            
-         
-            if not os.path.isfile(outcorr):
-                #start with central ifu pixels 
-                #this loops over ifus
-                for iff in range(24): 
-                    #next loop over each stack of slices inside ifu
-                    for i in range(4):
-                        #reconstruct id of pixels in this stack 
-                        flagvalue = (iff+1)*100.+i+1
-                        #grab the pixels in that family 
-                        goodpx=np.where(ifimask[1].data == flagvalue)
-                        goodmask[goodpx]=1.0
-                    
-                        #now reconstruct spectrum
-                        pixinstack=pixinstack*0.
-                        for ww in range(nwave):
-                            #now generate a median spectrum in this stack
-                            img=np.nan_to_num(data[1].data[ww,:,:])
-                            sclp,lw,up=sigmaclip(img[goodpx],3.,3.)
-                            pixinstack[ww]=sclp.mean()
-                
-                        #stash solution
-                        illcorr[:,iff,i]=pixinstack
-                
-
-                #save 
-                hdu = fits.PrimaryHDU(illcorr)
-                hdulist = fits.HDUList([hdu])
-                hdulist.writeto(outcorr,clobber=True)
-            else:
-                print('Loading pre-computed corrections')
-                illcorr=(fits.open(outcorr))[0].data
-                
-            #compute the actual correction by normalising to a reference IFU
-            #superstack=np.median(illcorr,axis=(1,2))
-            superstack=illcorr[:,16,2]
-            illcorrnorm=illcorrnorm*0.
-            illcorrfilt=illcorrfilt*0.
-            for iff in range(24): 
-                print ('Compute filtered correction for IFU {}'.format(iff+1))
-                for i in range(4):
-                    #normalise to superstack 
-                    illcorrnorm[:,iff,i]=illcorr[:,iff,i]/superstack
-                    #filter the sky lines
-                    sky=sgn.medfilt(illcorrnorm[:,iff,i],99)
-                    illcorrfilt[:,iff,i]=sgn.savgol_filter(sky,99,1)
-                    #plt.plot(illcorrnorm[:,iff,i])
-                    #plt.plot(illcorrfilt[:,iff,i])
-                    #plt.show()
-                                        
-            #save corrections
-            hdu1 = fits.PrimaryHDU(illcorrnorm)
-            hdu2 = fits.ImageHDU(illcorrfilt)
-            hdulist = fits.HDUList([hdu1,hdu2])
-            hdulist.writeto(outcorrnorm,clobber=True)
-
-            #now apply corrections accounting for interpolation
-            for iff in range(24): 
-                print ('Apply correction for IFU {}'.format(iff+1))
-                for i in range(3):
-                    if(iff < 23):
-                        #first, interpolation along ifus
-                        x_current_ifu=(iff+1)*100.+i+1
-                        x_next_ifu=(iff+2)*100.+i+1
-                        #grab relevant pixels 
-                        goodpx=np.where((ifimask[1].data >=x_current_ifu) & (ifimask[1].data < x_next_ifu))
-                        
-                        for ww in range(nwave):
-                            y_current=illcorrfilt[ww,iff,i]
-                            y_next=illcorrfilt[ww,iff,i]
-                            slope=((y_next-y_current)/(x_next_ifu-x_current_ifu))
-                            correction=y_current+slope*(ifimask[1].data[goodpx]-x_current_ifu)
-                            img=np.nan_to_num(data[1].data[ww,:,:])
-                            img[goodpx]=img[goodpx]/correction
-                            data[1].data[ww,:,:]=img
-                            
-                    else:
-                        #deal with last 
-                        x_current_ifu=(iff+1)*100.+i+1
-                        goodpx=np.where((ifimask[1].data ==x_current_ifu))
-                       
-                        for ww in range(nwave):
-                            img=np.nan_to_num(data[1].data[ww,:,:])
-                            img[goodpx]=img[goodpx]/illcorrfilt[ww,iff,i]
-                            data[1].data[ww,:,:]=img
-
-                        
-            #edges=np.where((ifimask[1].data > current) & (ifimask[1].data < next))
-            #edgemask[edges]=0.0        
-            #stick in nans
-            #nanpix=np.where(np.isnan(ifimask[1].data))
-            #edgemask[nanpix]=0.0     
-            #plt.imshow(edgemask,origin='lower')
-            #plt.show()
-
-            #save new cubes 
-            data.writeto("test.fits",clobber=True)
-
-            exit()
-
         #back to top for next OB 
         os.chdir(topdir)
+ 
+
+def make_illcorr_ifu(ifumask_cname,ifumask_iname,data_cname,data_iname,outcorr,outcorrnorm,newcube,newimage,binwidth,debug=True):
+
+    """
+    Perform illumination correction on IFUs
+
+    ifumask_cname,ifumask_iname  --> IFU mask cube and image names
+    data_cname,data_iname        --> data cube and image names
+    outcorr,outcorrnorm          --> correction save name
+    newcube,newimage             --> final data cube and image names
+    binwidth                     --> how big chuncks in z-direction used for computing illumination correction
+
+    debug                        --> enable interactive displays 
+
+    """
+      
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+    import matplotlib as mpl
+    import matplotlib.pyplot as plt
+    import scipy.signal as sgn
+    from scipy.stats import sigmaclip
+    from scipy import interpolate
+    import sep
+
+    #open the ifu mask to create a good mask 
+    data=fits.open(data_cname)
+    ifimask=fits.open(ifumask_iname)
+    fovdata=fits.open(data_iname)
+
+   
+   
+    #define geometry 
+    nwave=data[1].header["NAXIS3"]
+    nx=data[1].header["NAXIS1"]
+    ny=data[1].header["NAXIS2"]
+            
+    #now flag the sources
+    ifumsk=ifimask[1].data
+    image=fovdata[1].data.byteswap().newbyteorder()
+    bkg=sep.Background(image)
+    bkg.subfrom(image)
+    obj,segmap=sep.extract(image,3*bkg.globalrms,minarea=10,segmentation_map=True)
+
+    if(debug):
+        plt.imshow(image,origin='low')
+        plt.title('Field')
+        plt.show()
+        plt.imshow(segmap,origin='low')
+        plt.title('Source mask')            
+        plt.show()
+        plt.imshow(ifumsk,origin='low')
+        plt.title('IFU mask')            
+        plt.show()
+
+
+           
+    #make a corse illumination correction in wavelenght
+    nbins=nwave/binwidth
+    illcorse=np.zeros((nbins,24))
+    illnorm=np.zeros((nbins,24))
+    illsmoo=np.zeros((nbins,24))
+    cbins=np.array(range(nbins))*binwidth+binwidth/2
+
+    #skip if already processed
+    if not os.path.isfile(outcorr):
+        #pixels used
+        usedpix=np.zeros((ny,nx))
+        #loop over ifus 
+        for iff in range(24):                     
+            print ('Computing correction for IFU {}'.format(iff+1))
+            #reconstruct id of pixels in this IFU 
+            flagvalue = (iff+1)*100.
+            #pick pixels in this group and without sources
+            #these are x,y in 2D image 
+            goodpx=np.nonzero(((ifimask[1].data == flagvalue+1) |
+                              (ifimask[1].data == flagvalue+2) |
+                              (ifimask[1].data == flagvalue+3) |
+                              (ifimask[1].data == flagvalue+4)) & (segmap < 1))
+            usedpix[goodpx]=1
+              
+            
+            #loop over bins
+            for bb in range(nbins):
+                #get the start end index
+                wstart=bb*binwidth 
+                wend=(bb+1)*binwidth
+                #sum all in wave
+                img=np.nansum(data[1].data[wstart:wend,:,:],axis=0)/binwidth
+                #take median
+                illcorse[bb,iff]=np.nanmedian(img[goodpx])
+                
+                #compute robust mean - nans already excluded [does not perform very well]
+                #c,l,u=sigmaclip(img[goodpx],3.,3.)
+                #illcorse[bb,iff]=c.mean()
+
+        #save 
+        hdu = fits.PrimaryHDU(illcorse)
+        hdulist = fits.HDUList([hdu])
+        hdulist.writeto(outcorr,clobber=True)
+
+        if(debug):
+            plt.imshow(usedpix,origin='low')
+            plt.title('Pixels used for IFU correction')
+            plt.show()
+    
+    else:
+        print('Loading pre-computed corrections')
+        illcorse=(fits.open(outcorr))[0].data
+    
+    #skip if already exists
+    if not os.path.isfile(newcube):      
+          
+        #next go for ifus normalisation given median
+        for iff in range(24):
+            #normalise
+            illnorm[:,iff]=illcorse[:,iff]/np.nanmedian(illcorse,axis=1)
+            #remove small scales bumps - [does not work well for discontinuities]
+            #illsmoo[:,iff]=sgn.savgol_filter(illnorm[:,iff],5,1)
+            illsmoo[:,iff]=illnorm[:,iff]
+            
+            if(debug):
+                plt.scatter(cbins,illnorm[:,iff])
+                plt.plot(cbins,illsmoo[:,iff])
+                plt.title("Corrections for IFU {}".format(iff+1))
+                plt.show()
+                
+        #save corrections
+        hdu1 = fits.PrimaryHDU(illnorm)
+        hdu2 = fits.ImageHDU(illsmoo)
+        hdulist = fits.HDUList([hdu1,hdu2])
+        hdulist.writeto(outcorrnorm,clobber=True)
+        
+        #store old cube to check normalisation 
+        oldcube=np.copy(data[1].data)
+        #now apply
+        for iff in range(24):   
+            print ('Correct IFUs {}'.format(iff+1))
+            if(iff < 23):
+                #first, interpolation along ifus
+                x_current_ifu=(iff+1)*100.
+                x_next_ifu=(iff+2)*100.
+                #grab relevant pixels 
+                goodpx=np.where((ifimask[1].data >=x_current_ifu) & (ifimask[1].data < x_next_ifu))
+                fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
+                fnext=interpolate.interp1d(cbins,illsmoo[:,iff+1],fill_value="extrapolate")
+                #loop over wave and apply correction 
+                for ww in range(nwave):
+                    y_current=fcurrent(ww)
+                    y_next=fnext(ww)
+                    slope=((y_next-y_current)/(x_next_ifu-x_current_ifu))
+                    correction=y_current+slope*(ifimask[1].data[goodpx]-x_current_ifu)
+                    #apply correction to data
+                    img=data[1].data[ww,:,:]
+                    img[goodpx]=img[goodpx]/correction
+                    data[1].data[ww,:,:]=img
+                    #preserve SN
+                    var=data[2].data[ww,:,:]
+                    var[goodpx]=var[goodpx]/correction/correction
+                    data[2].data[ww,:,:]=var
+            else:
+                #deal with last - simple correction with no interpolation 
+                x_current_ifu=(iff+1)*100.
+                goodpx=np.where((ifimask[1].data >=x_current_ifu))
+                fcurrent=interpolate.interp1d(cbins,illsmoo[:,iff],fill_value="extrapolate")
+                for ww in range(nwave):
+                    #apply to data
+                    img=data[1].data[ww,:,:]
+                    img[goodpx]=img[goodpx]/fcurrent(ww)
+                    data[1].data[ww,:,:]=img                                       
+                    #preserve SN
+                    var=data[2].data[ww,:,:]
+                    var[goodpx]=var[goodpx]/fcurrent(ww)/fcurrent(ww)
+                    data[2].data[ww,:,:]=var                                       
+  
+        #the step above removes any wave dependency
+        #now apply a stack by stack correction computed on white image
+        print('Computing correction for stacks on white image')
+        white=np.zeros((ny,nx))
+        for xx in range(nx):
+            for yy in range(ny):
+                white[yy,xx]=np.nansum(data[1].data[:,yy,xx])/nwave
+        
+        #compute white corrections        
+        usedpix=np.zeros((ny,nx))
+        #renormalise on sky only 
+        goodpx=np.where((segmap==0) & (np.isfinite(ifimask[1].data)))
+        medcoeff=np.median(white[goodpx])
+
+        #now compute individual on stacks corrections
+        white_corrections=np.zeros((24,4))
+        for iff in range(24):   
+            for i in range(4):
+                #reconstruct id of pixels in this IFU 
+                flagvalue = (iff+1)*100.+i+1
+                #pick pixels in this group and without sources
+                #these are indexes in 2D image
+                goodpx=np.where((ifimask[1].data == flagvalue)&(segmap==0))
+                usedpix[goodpx]=1
+                white_corrections[iff,i]=medcoeff/np.median(white[goodpx])
+
+        if(debug):
+            plt.imshow(usedpix,origin='low')
+            plt.title('Pixels used for stack white correction')
+            plt.show()
+
+        #grab muse rotator for this exposure
+        rotation=data[0].header["HIERARCH ESO INS DROT POSANG"] 
+   
+        #next apply them
+        for iff in range(24):  
+                #this ifu pixel 
+                thisifu=(iff+1)*100.
+            for i in range(4):
+                #reconstruct id of pixels in this stack 
+                thisstack=(iff+1)*100.+i+1
+                #try to apply for nearest integer without interpolation
+                goodpx=np.where((ifimask[1].data >=x_current_ifu) & (ifimask[1].data < x_next_ifu))
+
+                #first find left-right edges of the stacks - this is dependent on rotation
+                if((rotation == 0.) | (rotation == 180.) | (rotation == 360.)):
+                    aa=0
+                elif((rotation == 90.) | (rotation == 270.)):
+                    bb=0
+                else:
+                    print("Cannot handle rotation {}... quit!".format(rotation))
+                    exit()
+
+                #next, grab all the pixels relative of this IFU bounded by edge of the stack
+
+                #apply correction to them [maybe with interpolation?]
+
+        exit()
+
+        #finally, check for normalisation 
+        print ('Checking flux normalisation...')
+        white_old=np.zeros((ny,nx))
+        white_new=np.zeros((ny,nx))
+        for xx in range(nx):
+            for yy in range(ny):
+                white_old[yy,xx]=np.nansum(oldcube[:,yy,xx])/nwave
+                white_new[yy,xx]=np.nansum(data[1].data[:,yy,xx])/nwave
+                  
+        #renormalise on sky only 
+        goodpx=np.where((segmap==0) & (np.isfinite(ifimask[1].data)))
+        oldcoeff=np.median(white_old[goodpx])
+        newcoeff=np.median(white_new[goodpx])
+        print ('Renormalise by {}'.format(oldcoeff/newcoeff))
+        data[1].data=data[1].data*oldcoeff/newcoeff
+        data[2].data=data[2].data*(oldcoeff/newcoeff)*(oldcoeff/newcoeff)
+
+        #save new cubes 
+        data.writeto(newcube,clobber=True)
+        
+        #create white image
+        print ('Creating final white image')
+        white_new=np.zeros((ny,nx))
+        for xx in range(nx):
+            for yy in range(ny):
+                white_new[yy,xx]=np.nansum(data[1].data[:,yy,xx])/nwave  
+
+        #save image
+        hdu1 = fits.PrimaryHDU([])
+        hdu2 = fits.ImageHDU(white_new)
+        hdu2.header=data[1].header
+        hdulist = fits.HDUList([hdu1,hdu2])
+        hdulist.writeto(newimage,clobber=True)
+
+        #create edge mask image
+        print ('Creating edge mask image')
+   
+                          
+    else:
+        print ("Exposure already corrected... move to next")
+        
