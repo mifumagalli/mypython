@@ -9,17 +9,19 @@ class PyMask(object):
     
     """Class to handle masks in fits files """
 
-    def __init__(self, x, y, regfile):
+    def __init__(self, x, y, regfile, header=None):
         
 	""" Parse the ds9 region file here. Also save the number 
 	of regions and the x y dimensions of the data"""
-	
-	self.reg = pyreg.open(regfile)
+	if(header):
+            self.reg = pyreg.open(regfile).as_imagecoord(header=header)
+        else:
+            self.reg = pyreg.open(regfile)
+
 	self.filter = self.reg.get_filter()
 	self.x = x
 	self.y = y
 	self.nreg = len(self.reg)
-	
     
     def fillmask(self, ind):
         
