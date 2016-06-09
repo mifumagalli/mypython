@@ -259,7 +259,7 @@ class Muse(object):
         print('All done!')
         
 
-    def line_process(self,refpath='./esocombine/',lmin=4900,lmax=9000):
+    def line_process(self,skymode='internal',refpath='./esocombine/',skymask=None,lmin=4900,lmax=9000):
 
         """
 
@@ -270,6 +270,9 @@ class Muse(object):
         lmin -> the minimum wavelength to consider
         lmax -> the maximum wavelength to consider
         refpath -> where the reference cubes for wcs resempling are 
+        skymask -> a skymask to be used for identify good regions for skysubtraction
+        skymode -> internal: use good pixels (i.e. not containing sources or defined in skymask) to perform 
+                   skysubtraction
 
         """
 
@@ -293,6 +296,13 @@ class Muse(object):
         #compute illumination correction 
         ex.make_illcorr(listob)
         
+        #now do background subtraction
+        if('internal' in skymode):
+            ex.internalskysub(listob,skymask)
+        else:
+            print ("Sky subtraction mode {} not supported".format(skymode))
+        
+
         print("All done!")
 
 

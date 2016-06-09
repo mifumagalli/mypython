@@ -179,6 +179,7 @@ def cubex_driver(listob,last=False,highsn=None):
             for p in workers:
                 if(p.is_alive()):
                     p.join()
+
                     
             #############################################################
             # do a second loop of cubex fix and sky with proper masking #

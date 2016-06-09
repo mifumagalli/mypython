@@ -727,3 +727,103 @@ def make_illcorr_stack(ifumask_cname,ifumask_iname,data_cname,data_iname,outcorr
 
     else:
         print ("Exposure already corrected... go to next")
+
+
+        
+def internalskysub(listob,skymask):
+
+    """
+
+    Perform sky-subtraction using pixels within the cube
+
+    listob  -> OBs to loop on
+    skymask -> if defined, use goodpixels in the mask for computing sky. Otherwise mask sources.
+
+    """
+    
+    import os
+    import glob
+    from astropy.io import fits
+    import numpy as np
+
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final illcorrected cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/')
+        print('Processing {} for illumination correction'.format(ob))
+ 
+        #Search how many exposures are there
+        scils=glob.glob("OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+
+        #loop on exposures and reduce frame with sky subtraction 
+        for exp in range(nsci):
+           
+            #do pass on IFUs
+            print('Skysubtraction of exposure {}'.format(exp+1))           
+           
+            #define names
+            oldcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_ILLCORR_stack.fits".format(exp+1)
+            oldimage="IMAGE_FOV_LINEWCS_EXP{0:d}_ILLCORR_stack.fits".format(exp+1)
+            newcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_lineskysub.fits".format(exp+1)
+            newimage="IMAGE_FOV_LINEWCS_EXP{0:d}_lineskysub.fits".format(exp+1)
+            ifumask_iname="IMAGE_IFUMASK_LINEWCS_EXP{0:d}.fits".format(exp+1)
+
+            #open the cube 
+            cube=fits.open(oldcube)
+
+            #open mask ifu
+            ifumask=fits.open(ifumask_iname)
+  
+            #define geometry 
+            nwave=cube[1].header["NAXIS3"]
+            nx=cube[1].header["NAXIS1"]
+            ny=cube[1].header["NAXIS2"]
+            
+            #loop over ifu
+            for iff in range(24):
+                #loop over 
+                #for i in range(4):
+                #    #grab the pixels in this slice
+                #    thisstack=(iff+1)*100.+i+1
+                #    nextstack=(iff+1)*100.+i+2
+                #    pixels=np.where((ifumask[1].data >= thisstack) & (ifumask[1].data < nextstack))
+                 
+                thisifu=(iff+1)*100.
+                nextifu=(iff+2)*100.+1
+                pixels=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu))
+                
+                #loop over wavelength 
+                for ww in range(nwave):
+                    skyimg=cube[1].data[ww,:,:]
+                    medsky=np.nanmedian(skyimg[pixels])
+                    skyimg[pixels]=skyimg[pixels]-medsky
+                    cube[1].data[ww,:,:]=skyimg
+                    
+            #write final cube
+            cube.writeto(newcube,clobber=True)
+            
+            #create white image
+            print ('Creating final white image')
+            white_new=np.zeros((ny,nx))
+            for xx in range(nx):
+                for yy in range(ny):
+                    white_new[yy,xx]=np.nansum(cube[1].data[:,yy,xx])/nwave  
+                    
+            #save image
+            hdu1 = fits.PrimaryHDU([])
+            hdu2 = fits.ImageHDU(white_new)
+            hdu2.header=cube[1].header
+            hdulist = fits.HDUList([hdu1,hdu2])
+            hdulist.writeto(newimage,clobber=True)
+
+            
+          
+        #back to top for next OB 
+        os.chdir(topdir)
+
+    
