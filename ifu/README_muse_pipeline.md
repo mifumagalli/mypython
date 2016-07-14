@@ -2,6 +2,7 @@ Some info on muse redux [MF, March 2016]
 ---------------------------------------
 
 > Tested with eso muse pipeline 1.2.1
+> Tested with eso muse pipeline 1.6.2
 > Tested with Cubex 1.5
 
 * Step 1
