@@ -14,7 +14,6 @@ class LumFun:
         self.redshift=redshift
         self.whichlf=whichlf
         
-
         if('Buow15' in self.whichlf):
             print ('Init Buow15 LF at z={}'.format(self.redshift))
             self.param=self.Bouwens15()
@@ -24,7 +23,8 @@ class LumFun:
         elif('Grove09' in self.whichlf):
             print ('Init Grove09 LF at z={}'.format(self.redshift))
             self.param=self.Grove09()
-
+        elif('Reddy09' in self.whichlf):
+            self.param=self.Reddy09()
         else:
             raise TypeError('LF {} not known'.format(self.whichlf))
             
@@ -44,6 +44,30 @@ class LumFun:
         
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
     
+    def Reddy09(self):
+
+        """
+        This evaluates the luminosity function from Reddy & Steidel 2009 ApJ 692, 778
+        Use table 3 paramaters with switch on redshift
+        
+        """
+        
+        if(self.redshift < 2.7):
+            #this is valid between z = 1.9 - 2.7
+            alpha=-1.73
+            phistar=2.75e-3
+            Mstar=-20.70 #AB abs mag 
+        else:
+            #this is valid between z = 2.7 - 3.4
+            alpha=-1.73
+            phistar=1.71e-3
+            Mstar=-20.97 #AB abs mag 
+
+        ltype='Schechter'        
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+    
+
+
     def Cassata11(self):
 
         """

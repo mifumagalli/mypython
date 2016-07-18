@@ -98,7 +98,7 @@ def parse_xml(path='./',nproc=12):
     #here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
 
     #This is the largest time at one should worry about legacy products 
-    legacy_time=time.mktime(time.strptime("08 Sep 15", "%d %b %y"))       
+    legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
 
     if(reference_time < legacy_time):
         print 'Using legacy static calibrations'
@@ -106,6 +106,7 @@ def parse_xml(path='./',nproc=12):
         #Static cal are assume dto be top levl dir in reduction folder
         tedge1=time.mktime(time.strptime("01 Dec 14", "%d %b %y"))
         tedge2=time.mktime(time.strptime("15 Apr 15", "%d %b %y"))
+        tedge3=time.mktime(time.strptime("09 Sep 15", "%d %b %y"))
         if(reference_time <= tedge1):
             #use commissioning static - you may need even older ones so check 
             geometrystatic='../staticcal/geometry_table_wfm_comm2b.fits'   
@@ -113,9 +114,12 @@ def parse_xml(path='./',nproc=12):
         elif((reference_time > tedge1) & (reference_time <= tedge2)):
             geometrystatic='../staticcal/geometry_table_wfm_2014-12-01.fits'
             astrostatic='../staticcal/astrometry_wcs_wfm_2014-12-01.fits'
-        else:
+        elif((reference_time > tedge2) & (reference_time <= tedge3)):
             geometrystatic='../staticcal/geometry_table_wfm_2015-04-16.fits'
             astrostatic='../staticcal/astrometry_wcs_wfm_2015-04-16.fits'
+        else:
+            geometrystatic='../staticcal/geometry_table_wfm_2015-09-10.fits'
+            astrostatic='../staticcal/astrometry_wcs_wfm_2015-09-10.fits'
     else:
         print 'Using pipeline static calibrations'
         esorexpath=find_executable('esorex')
