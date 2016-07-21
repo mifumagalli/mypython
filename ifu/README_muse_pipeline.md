@@ -4,6 +4,7 @@ Some info on muse redux [MF, March 2016]
 > Tested with eso muse pipeline 1.2.1
 > Tested with eso muse pipeline 1.6.2
 > Tested with Cubex 1.5
+> Tested with ZAP v1
 
 * Step 1
 
@@ -14,6 +15,7 @@ If data require legacy calibrations, make sure there is a folder containing them
 ./staticcal
 More info on legacy calibrations here: http://www.eso.org/sci/software/pipelines/#pipelines_table
 
+These are updated regularly with pipeline releases, so check this before running the code!
 
 Run the basic reduction like this:
 
@@ -26,7 +28,8 @@ producing cubes without sky subtraction for each exposure.
 Step 1 is best run is data from a single OB or group of OBs taken within a 
 few days apart. The calibrations used are stored in calplan.txt for inspection. 
 
-Typical failures arise if not all calibrations are included or if Raw data are missing
+Typical failures arise if not all calibrations are included or if Raw data are missing.
+Also there are problems with old calibrations.
 
 At the end, there should be a IMAGE_FOV and DATACUBE_FINAL for each science 
 exposure in Proc. Check if they look ok. 
@@ -46,6 +49,27 @@ muse.eso_process()
 
 This script crawls through the OB# folders, findings science frames.
 It performs sky subtraction using ESO recipies, aligns exposures, and coadd them.
+
+Possible points of failure are bad aligment of the exposures before coadding.
+That may require manual interaction with the algnment step in muse_exp_align
+such as tweaking the threshold. 
+
+Finally, one can register the absolute calibrations with code in muse_utils.py, 
+where a procedure adjust_wcsoffset allows to reset the WCS zero point for cube and image.
+
+E.g.
+
+>> #correct the overall WCS solution 
+>> x=165.994
+>> y=129.625
+>> ra=184.31369
+>> dec=22.51928
+>> data='esocombine/IMAGE_FOV_0001.fits'
+>> mut.adjust_wcsoffset(data,x,y,ra,dec)
+>> data='esocombine/DATACUBE_FINAL.fits'
+>> mut.adjust_wcsoffset(data,x,y,ra,dec)
+
+
 
 B. CUBEX_REDUCTION
 ------------------
@@ -110,20 +134,26 @@ C. LINE OPTIMISED REDUCTION
 
 This set of utilities produces a final cube with illumination correction and 
 skysubtraction that is optimised for cubes that are relatively empty in terms
-of conitnuum sources, but that have very extended emission lines filling 
+of continuum sources, but that may have extended emission lines filling 
 a good fraction of the field of view.
 
-It also uses bootstrap resampling to produce a robust estimate of the variance.
+Sky surbtraction is performed with the public ZAP package 
+https://github.com/ktsoto/zap
+http://zap.readthedocs.io/en/latest/
 
 At top level (above OB#) folders, run the following script, after ESO reduction 
-as described in step A
+as described in step A (it can be used also after cubex reduction, as it is independent code).
 
 muse=mp.ifu.muse.Muse()
 muse.line_process()
 
+This perform illumination correction at IFU level as a function of coarse bins of wavelength.
+Next, residual illumination correction on white images is performed at the stack level.
 
+Finally, a zeroth order sky model is subtracted from the data and residual corrections
+are perfomed with ZAP. A mask can be passed to avoid regions of extended flux emission.
 
-
+Datacubes are produced with median and mean statistics. 
 
 
 

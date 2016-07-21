@@ -509,3 +509,91 @@ def unpack_pixtab(flag):
 
     return ifu, islice
 
+
+def check_flux_scaling(reference,listexp,maskedges=None,verbose=True,flxlim=150.):
+
+    """
+
+    Perform basic photomety checks to make sure that 
+    none of the exposures in a coadd has a very weird calibration error
+    relative to the median
+
+    reference -> the refence cube to use as gold standard
+    listexp   -> a text file containing the file names of the cubes to check
+    maskedges -> if set to a number clips Npixels from the edge
+    verbose -> make a bunch of check plots
+    flxlim  -> how bright sources to be considered 
+
+    """
+    
+    from astropy.io import fits 
+    import numpy as np 
+    import matplotlib.pyplot as plt
+    import sep
+
+    #open reference and create image
+    refcube=fits.open(reference)
+    refimage=np.nanmedian(refcube[1].data,axis=0)
+    header=refcube[1].header
+
+    #run source id on reference image - pick brightest only
+    bkg = sep.Background(refimage)    
+    thresh = 5. * bkg.globalrms
+    minarea=20.
+    clean=True
+    segmap = np.zeros((header["NAXIS2"],header["NAXIS1"]))
+    mask=np.zeros((header["NAXIS2"],header["NAXIS1"]))
+    
+    #create mask if desired 
+    if(maskedges):
+        mask[0:maskedges,:]=1
+        mask[-maskedges:-1,:]=1
+        mask[:,0:maskedges]=1
+        mask[:,-maskedges:-1]=1
+    
+    if(verbose):
+        plt.imshow(mask)
+        plt.show()
+        
+    
+    #extract objects
+    objects,segmap=sep.extract(refimage,thresh,segmentation_map=True,
+                               minarea=minarea,clean=clean,mask=mask)
+    if(verbose):
+        plt.imshow(segmap)
+        plt.show()
+    
+    #grab phot on ref imge
+    ref_phot=[]
+    for ii in range(len(objects)):
+        pix=np.where(segmap == ii+1)
+        ref_phot.append(np.nansum(refimage[pix]))
+    ref_phot=np.array(ref_phot)
+
+    use=np.where(ref_phot > flxlim)
+
+    #get photometry for check images
+    fl=open(listexp)
+    for ff in fl:
+        #create image 
+        cubck=fits.open(ff.strip())
+        imck=np.nanmedian(cubck[1].data,axis=0)
+        #get photometry
+        chk_phot=[]
+        for ii in range(len(objects)):
+            pix=np.where(segmap == ii+1)
+            chk_phot.append(np.nansum(imck[pix]))
+        chk_phot=np.array(chk_phot)
+        if(verbose):
+            plt.scatter(ref_phot[use],chk_phot[use]/ref_phot[use])
+            plt.show()
+        print ("Scaling for {} is {}".format(ff,np.median(chk_phot[use]/ref_phot[use])))
+        
+    fl.close()
+
+   
+
+    
+
+
+    
