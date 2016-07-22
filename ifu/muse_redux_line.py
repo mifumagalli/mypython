@@ -932,7 +932,7 @@ def combine_cubes(listcubes,listmasks):
         print "Coadded cubes already exists!"
         return
 
-    print ("Combining cubes with {}".format(mode))
+    print ("Combining cubes with mean and median")
 
     #load the relevant lists
     cblis=open(listcubes)
@@ -940,16 +940,12 @@ def combine_cubes(listcubes,listmasks):
 
     allcubes=[]
     allmasks=[]
-    fitscubes=[]
-    fitsmaks=[]
 
     for cc in cblis:
-        allcubes.append(cc)
-        fitscubes.append(fits.open(cc))
+        allcubes.append(fits.open(cc.strip()))
 
     for mm in mklis:
-        allmasks.append()
-        fitsmaks.append(fits.open(mm))
+        allmasks.append(fits.open(mm.strip()))
 
     cblis.close()
     mklis.close()
@@ -979,10 +975,10 @@ def combine_cubes(listcubes,listmasks):
                 #now loop over exposure
                 for ee in range(nexp):
                     #a good pixel is not in a mask or a nan
-                    pix=(allcubes[ee])[1].data[yy,xx]
-                    var=(allcubes[ee])[2].data[yy,xx]
+                    pix=(allcubes[ee])[1].data[ww,yy,xx]
+                    var=(allcubes[ee])[2].data[ww,yy,xx]
                     msk=(allmasks[ee])[1].data[yy,xx]
-                    if((mks < 1) & np.isfinite(pix)):
+                    if((msk < 1) & np.isfinite(pix)):
                         goodpixels.append(pix)
                         goodvariance.append(pix)
                 #go to numpy 
@@ -1001,7 +997,7 @@ def combine_cubes(listcubes,listmasks):
                 except:
                     finalcube_median[ww,yy,xx]=0.
                     finalcube_mean[ww,yy,xx]=0.
-                    finalvar[ww,yy,xx]=1e50.
+                    finalvar[ww,yy,xx]=1e50
                     
     #write
     hdu1 = fits.PrimaryHDU([])

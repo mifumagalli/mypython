@@ -324,8 +324,8 @@ class Muse(object):
             nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{0:d}_zapsky.fits\n'.format(oob+1,ll+1))
-                fl2.write('../OB{}/Proc/MASK_EXP{0:d}_ILLCORR_edges.fits\n'.format(oob+1,ll+1))
+                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(oob+1,ll+1))
+                fl2.write('../OB{}/Proc/MASK_EXP{}_ILLCORR_edges.fits\n'.format(oob+1,ll+1))
         fl1.close()
         fl2.close()
         
