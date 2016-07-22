@@ -259,7 +259,8 @@ class Muse(object):
         print('All done!')
         
 
-    def line_process(self,skymode='internal',refpath='./esocombine/',skymask=None,lmin=4900,lmax=9000):
+    def line_process(self,skymode='internal',refpath='./esocombine/',skymask=None,lmin=4900,lmax=9000,
+                     deepwhite=None):
 
         """
 
@@ -272,21 +273,28 @@ class Muse(object):
         refpath -> where the reference cubes for wcs resempling are 
         skymask -> a skymask to be used for identify good regions for skysubtraction
         skymode -> internal: use good pixels (i.e. not containing sources or defined in skymask) to perform 
-                   skysubtraction
-
+                   skysubtraction plus run ZAP on it.
+        deepwhite -> if set to an image, this is used to mask sources during sky subtraction.
+                     otherwise the cube itself is used 
+                   
         """
 
         import os
         import glob
         import subprocess
         import muse_redux_line as ex 
- 
+
         #first, list how many OBs are there
         listob=glob.glob('OB*')
         listob.sort()
         nobs=len(listob)
         print('Process {} OBs'.format(nobs))
         
+    
+        #now make space as needed for final products
+        if not os.path.exists('linecombine'):
+            os.makedirs('linecombine')
+
         #rerun pipe enabling resampling on final ESO cube
         ex.individual_resample(listob,refpath=refpath)
         
@@ -298,7 +306,7 @@ class Muse(object):
         
         #now do background subtraction
         if('internal' in skymode):
-            ex.internalskysub(listob,skymask)
+            ex.internalskysub(listob,skymask,deepwhite=deepwhite)
         else:
             print ("Sky subtraction mode {} not supported".format(skymode))
         

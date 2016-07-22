@@ -730,7 +730,7 @@ def make_illcorr_stack(ifumask_cname,ifumask_iname,data_cname,data_iname,outcorr
 
 
         
-def internalskysub(listob,skymask):
+def internalskysub(listob,skymask,deepwhite=None):
 
     """
 
@@ -745,26 +745,28 @@ def internalskysub(listob,skymask):
     import glob
     from astropy.io import fits
     import numpy as np
+    import zap 
+    import matplotlib.pyplot as plt
+    import sep
 
     #grab top dir
     topdir=os.getcwd()
-
     #now loop over each folder and make the final illcorrected cubes
     for ob in listob:
         
         #change dir
         os.chdir(ob+'/Proc/')
-        print('Processing {} for illumination correction'.format(ob))
+        print('Processing {} for sky subtraction correction'.format(ob))
  
         #Search how many exposures are there
         scils=glob.glob("OBJECT_RED_0*.fits*")
         nsci=len(scils)
 
-        #loop on exposures and reduce frame with sky subtraction 
+        #loop on exposures and reduce frame with zeroth order sky subtraction + ZAP 
         for exp in range(nsci):
            
             #do pass on IFUs
-            print('Skysubtraction of exposure {}'.format(exp+1))           
+            print('Interal sky subtraction of exposure {}'.format(exp+1))           
            
             #define names
             oldcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_ILLCORR_stack.fits".format(exp+1)
@@ -772,20 +774,59 @@ def internalskysub(listob,skymask):
             newcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_lineskysub.fits".format(exp+1)
             newimage="IMAGE_FOV_LINEWCS_EXP{0:d}_lineskysub.fits".format(exp+1)
             ifumask_iname="IMAGE_IFUMASK_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            source_mask="IMAGE_SOURCEMASK_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            zapcube="DATACUBE_FINAL_LINEWCS_EXP{0:d}_zapsky.fits".format(exp+1)
+            zapimage="IMAGE_FOV_LINEWCS_EXP{0:d}_zapsky.fits".format(exp+1)
+            zapsvdout="ZAPSVDOUT_EXP{0:d}.fits".format(exp+1)
 
-            #open the cube 
-            cube=fits.open(oldcube)
+            if not os.path.isfile(zapcube):
+                
+                #open the cube 
+                cube=fits.open(oldcube)
+                #open mask ifu
+                ifumask=fits.open(ifumask_iname)
+                
+                #if white image provided load it
+                if(deepwhite):
+                    print("Use source mask image {}".format(deepwhite))
+                    whsrc=fits.open(topdir+'/'+deepwhite)
+                    whitesource=whsrc[0].data.byteswap().newbyteorder()
+                else:
+                #create from cube
+                    print("Create source mask image from cube")
+                    whitesource=np.nanmedian(cube[1].data,axis=0)
+                    
+                #now create a source mask 
+                print ('Create a source mask')
+                header=cube[1].header
+                bkg = sep.Background(whitesource) 
+                bkg_subtraced_data = whitesource - bkg.back()
+                thresh = 3. * bkg.globalrms
+                minarea=20.
+                clean=True
+                segmap = np.zeros((header["NAXIS2"],header["NAXIS1"]))
 
-            #open mask ifu
-            ifumask=fits.open(ifumask_iname)
-  
-            #define geometry 
-            nwave=cube[1].header["NAXIS3"]
-            nx=cube[1].header["NAXIS1"]
-            ny=cube[1].header["NAXIS2"]
+                #extract objects
+                objects,segmap=sep.extract(bkg_subtraced_data,thresh,segmentation_map=True,
+                                           minarea=minarea,clean=clean)
             
-            #loop over ifu
-            for iff in range(24):
+                #plt.imshow(segmap,origin='low')
+                #plt.show()
+                
+                #plt.imshow(whitesource,origin='low')
+                #plt.show()
+                
+                #define geometry 
+                nwave=cube[1].header["NAXIS3"]
+                nx=cube[1].header["NAXIS1"]
+                ny=cube[1].header["NAXIS2"]
+            
+                #make sure pixels are sky sub once and only once
+                countsub=np.copy(ifumask[1].data)*0.
+
+                
+                #loop over ifu
+                for iff in range(24):
                 #loop over 
                 #for i in range(4):
                 #    #grab the pixels in this slice
@@ -793,35 +834,79 @@ def internalskysub(listob,skymask):
                 #    nextstack=(iff+1)*100.+i+2
                 #    pixels=np.where((ifumask[1].data >= thisstack) & (ifumask[1].data < nextstack))
                  
-                thisifu=(iff+1)*100.
-                nextifu=(iff+2)*100.+1
-                pixels=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu))
-                
-                #loop over wavelength 
-                for ww in range(nwave):
-                    skyimg=cube[1].data[ww,:,:]
-                    medsky=np.nanmedian(skyimg[pixels])
-                    skyimg[pixels]=skyimg[pixels]-medsky
-                    cube[1].data[ww,:,:]=skyimg
-                    
-            #write final cube
-            cube.writeto(newcube,clobber=True)
-            
-            #create white image
-            print ('Creating final white image')
-            white_new=np.zeros((ny,nx))
-            for xx in range(nx):
-                for yy in range(ny):
-                    white_new[yy,xx]=np.nansum(cube[1].data[:,yy,xx])/nwave  
-                    
-            #save image
-            hdu1 = fits.PrimaryHDU([])
-            hdu2 = fits.ImageHDU(white_new)
-            hdu2.header=cube[1].header
-            hdulist = fits.HDUList([hdu1,hdu2])
-            hdulist.writeto(newimage,clobber=True)
+                    thisifu=(iff+1)*100.
+                    nextifu=(iff+2)*100.+1
+                    #grab pixels in ifu without sources
+                    pixels=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu) & (segmap < 1) )
+                    pixels_ifu=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu)
+                                        & (countsub < 1))
+                    #update used pixels
+                    countsub[pixels_ifu]=1
 
+                    #loop over wavelength 
+                    for ww in range(nwave):
+                        skyimg=cube[1].data[ww,:,:]
+                        #compute sky in good regions
+                        medsky=np.nanmedian(skyimg[pixels])
+                        #subtract from all IFU pixels
+                        skyimg[pixels_ifu]=skyimg[pixels_ifu]-medsky
+                        cube[1].data[ww,:,:]=skyimg
+                        
+                #write final cube
+                cube.writeto(newcube,clobber=True)
             
+               #create white image
+                print ('Creating final white image')
+                white_new=np.zeros((ny,nx))
+                for xx in range(nx):
+                    for yy in range(ny):
+                        white_new[yy,xx]=np.nansum(cube[1].data[:,yy,xx])/nwave  
+                    
+                #save projected image 
+                hdu1 = fits.PrimaryHDU([])
+                hdu2 = fits.ImageHDU(white_new)
+                hdu2.header=cube[1].header
+                hdulist = fits.HDUList([hdu1,hdu2])
+                hdulist.writeto(newimage,clobber=True)
+
+                #save segmap
+                hdu1 = fits.PrimaryHDU([])
+                hdu2 = fits.ImageHDU(segmap)
+                hdu2.header=header
+                hdulist = fits.HDUList([hdu1,hdu2])
+                hdulist.writeto(source_mask,clobber=True)
+                
+                print('Running ZAP on exposure {}'.format(exp+1))           
+            
+                #deal with masks
+                if(skymask):
+                ##implement sky mask
+                    aa=0
+                else:
+                    zapmask=source_mask
+                           
+                #clean old
+                os.remove(zapsvdout) 
+                #run new
+                zap.process(newcube,outcubefits=zapcube,clean=True,svdoutputfits=zapsvdout,mask=zapmask)
+            
+                #create white image from zap cube
+                cube=fits.open(zapcube)
+                print ('Creating final white image from ZAP')
+                white_new=np.zeros((ny,nx))
+                for xx in range(nx):
+                    for yy in range(ny):
+                        white_new[yy,xx]=np.nansum(cube[1].data[:,yy,xx])/nwave  
+                    
+                #save projected image 
+                hdu1 = fits.PrimaryHDU([])
+                hdu2 = fits.ImageHDU(white_new)
+                hdu2.header=cube[1].header
+                hdulist = fits.HDUList([hdu1,hdu2])
+                hdulist.writeto(zapimage,clobber=True)
+
+            else:
+                print("ZAP cube exist alread for exposure {}... skip!".format(exp+1))
           
         #back to top for next OB 
         os.chdir(topdir)
