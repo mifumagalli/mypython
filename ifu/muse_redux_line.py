@@ -885,8 +885,11 @@ def internalskysub(listob,skymask,deepwhite=None):
                 else:
                     zapmask=source_mask
                            
-                #clean old
-                os.remove(zapsvdout) 
+                #clean old if exists 
+                try:
+                    os.remove(zapsvdout) 
+                except:
+                    pass
                 #run new
                 zap.process(newcube,outcubefits=zapcube,clean=True,svdoutputfits=zapsvdout,mask=zapmask)
             
@@ -912,3 +915,148 @@ def internalskysub(listob,skymask,deepwhite=None):
         os.chdir(topdir)
 
     
+def combine_cubes(listcubes,listmasks):
+
+    """
+    Combine cubes with 3sigma clipping in mean mode o with median.
+    Apply masks as desired.
+
+    """
+
+    from astropy.io import fits
+    import numpy as np
+    import scipy
+    import os
+
+    if(os.path.isfile("COMBINED_CUBE_MED.fits") & os.path.isfile("COMBINED_CUBE.fits") ):
+        print "Coadded cubes already exists!"
+        return
+
+    print ("Combining cubes with {}".format(mode))
+
+    #load the relevant lists
+    cblis=open(listcubes)
+    mklis=open(listmasks)
+
+    allcubes=[]
+    allmasks=[]
+    fitscubes=[]
+    fitsmaks=[]
+
+    for cc in cblis:
+        allcubes.append(cc)
+        fitscubes.append(fits.open(cc))
+
+    for mm in mklis:
+        allmasks.append()
+        fitsmaks.append(fits.open(mm))
+
+    cblis.close()
+    mklis.close()
+
+    #generate list of cubes
+    nexp=len(allcubes)
+    print ('Coadding {} exposures...'.format(nexp))
+    
+    #make space for final grid
+    finalcube_mean=np.copy((allcubes[1])[1].data)
+    finalvar=np.copy((allcubes[1])[2].data)
+    finalcube_median=np.copy((allcubes[1])[1].data)
+
+    #grab info on pixels
+    nx=(allcubes[1])[1].header["NAXIS1"]
+    ny=(allcubes[1])[1].header["NAXIS2"]
+    nw=(allcubes[1])[1].header["NAXIS3"]
+
+    #giant for loop over wave,pix
+    for ww in range(nw):
+        print ('Working on slice {} of {}'.format(ww,nw))
+        for xx in range(nx):
+            for yy in range(ny):
+                #make list of good pixels
+                goodpixels=[]
+                goodvariance=[]
+                #now loop over exposure
+                for ee in range(nexp):
+                    #a good pixel is not in a mask or a nan
+                    pix=(allcubes[ee])[1].data[yy,xx]
+                    var=(allcubes[ee])[2].data[yy,xx]
+                    msk=(allmasks[ee])[1].data[yy,xx]
+                    if((mks < 1) & np.isfinite(pix)):
+                        goodpixels.append(pix)
+                        goodvariance.append(pix)
+                #go to numpy 
+                goodpixels=np.array(goodpixels)
+                goodvariance=np.array(goodvariance)
+                    
+                #find mean with sigma clipping
+                try:
+                    cfact=3.0
+                    clipped=scipy.stats.sigmaclip(goodpixels,low=cfact,high=cfact)
+                    good=np.where((goodpixels >= (clipped.mean()-cfact*clipped.std())) & 
+                                  (goodpixels <= (clipped.mean()+cfact*clipped.std())))
+                    finalcube_median[ww,yy,xx]=np.median(goodpixels[good])
+                    finalcube_mean[ww,yy,xx]=np.mean(goodpixels[good])
+                    finalvar[ww,yy,xx]=np.total(goodpixels[good])/len(good[0])
+                except:
+                    finalcube_median[ww,yy,xx]=0.
+                    finalcube_mean[ww,yy,xx]=0.
+                    finalvar[ww,yy,xx]=1e50.
+                    
+    #write
+    hdu1 = fits.PrimaryHDU([])
+    hdu2 = fits.ImageHDU(finalcube_mean)
+    hdu3 = fits.ImageHDU(finalvar)
+    hdu2.header=(allcubes[0])[1].header
+    hdulist = fits.HDUList([hdu1,hdu2,hdu3])
+    hdulist.writeto("COMBINED_CUBE.fits",clobber=True)
+            
+    #write
+    hdu1 = fits.PrimaryHDU([])
+    hdu2 = fits.ImageHDU(finalcube_median)
+    hdu3 = fits.ImageHDU(finalvar)
+    hdu2.header=(allcubes[0])[1].header
+    hdulist = fits.HDUList([hdu1,hdu2,hdu3])
+    hdulist.writeto("COMBINED_CUBE_MED.fits",clobber=True)
+         
+    #make white images
+    print ('Creating final white images')
+    white_mean=np.zeros((ny,nx))
+    white_med=np.zeros((ny,nx))
+
+    for xx in range(nx):
+        for yy in range(ny):
+            white_mean[yy,xx]=np.sum(finalcube_mean[:,yy,xx])/nwave  
+            white_med[yy,xx]=np.sum(finalcube_median[:,yy,xx])/nwave  
+
+            
+    #save projected image 
+    hdu1 = fits.PrimaryHDU([])
+    hdu2 = fits.ImageHDU(white_mean)
+    hdu2.header=(allcubes[0])[1].header
+    hdulist = fits.HDUList([hdu1,hdu2])
+    hdulist.writeto("COMBINED_IMAGE.fits",clobber=True)
+              
+    #save projected image 
+    hdu1 = fits.PrimaryHDU([])
+    hdu2 = fits.ImageHDU(white_median)
+    hdu2.header=(allcubes[0])[1].header
+    hdulist = fits.HDUList([hdu1,hdu2])
+    hdulist.writeto("COMBINED_IMAGE_MED.fits",clobber=True)
+  
+       
+    
+                
+
+    
+
+
+
+    
+    
+
+
+    
+
+
+
