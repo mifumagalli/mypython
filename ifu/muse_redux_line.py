@@ -1022,9 +1022,9 @@ def combine_cubes(listcubes,listmasks,regions=True):
     print ('Coadding {} exposures...'.format(nexp))
     
     #make space for final grid
-    finalcube_mean=np.copy((allcubes[1])[1].data)*0.
-    finalvar=np.copy((allcubes[1])[2].data)*0.
-    finalcube_median=np.copy((allcubes[1])[1].data)*0.
+    finalcube_mean=np.copy((allcubes[1])[1].data)
+    finalvar=np.copy((allcubes[1])[2].data)
+    finalcube_median=np.copy((allcubes[1])[1].data)
 
     #grab info on pixels
     nx=(allcubes[1])[1].header["NAXIS1"]
@@ -1040,15 +1040,10 @@ def combine_cubes(listcubes,listmasks,regions=True):
     
     for ww in range(nw):
         #print (' {} '.format(ww+1),end='')
-        #rest values 
-        piximage=piximage*0.
-        varimage=varimage*0.
-        mskimage=mskimage*0.
         #now loop over exposure
         for ee in range(nexp):        
             piximage[ee,:]=(allcubes[ee])[1].data[ww,:]
-            varimage[ee,:]=(allcubes[ee])[2].data[ww,:]
-            
+            varimage[ee,:]=(allcubes[ee])[2].data[ww,:]    
             #clean nan
             masknans=masknans*0
             notnans=np.where(np.isfinite(piximage[ee,:]))
