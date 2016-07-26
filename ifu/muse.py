@@ -331,7 +331,7 @@ class Muse(object):
         
         #make the temp combine
         ex.combine_cubes("cubes.lst","masks.lst")
-        os.chdir(topdir)
+        os.chdir(currdir)
 
         print("All done!")
 

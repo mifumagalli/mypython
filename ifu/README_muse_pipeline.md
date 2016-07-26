@@ -134,7 +134,7 @@ C. LINE OPTIMISED REDUCTION
 
 This set of utilities produces a final cube with illumination correction and 
 skysubtraction that is optimised for cubes that are relatively empty in terms
-of continuum sources, but that may have extended emission lines filling 
+of continuum sources, but that may have faint extended emission lines filling 
 a good fraction of the field of view.
 
 Sky surbtraction is performed with the public ZAP package 
@@ -153,11 +153,17 @@ Next, residual illumination correction on white images is performed at the stack
 Finally, a zeroth order sky model is subtracted from the data and residual corrections
 are perfomed with ZAP. A mask can be passed to avoid regions of extended flux emission.
 
+Next, the code comabined exposures into final cubes. Masks with IFU edges are automatically
+propagated.
+
+If there are obvious large scale artifacts that should be mask, this can simply achieved by creating
+a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
+extension .reg. The region file should be in ds9 format, with image coordinate.
+
+In the end, a final coadded cube is reconstructed in 
+
+linecombine/COMBINED_CUBE_FINAL.fits
+linecombine/COMBINED_CUBE_MED_FINAL.fits
+
 Datacubes are produced with median and mean statistics. 
-
-
-
-
-
-
 

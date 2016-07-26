@@ -4,6 +4,7 @@ These are sets of procedures optimised for almost empty fields
 but with extended line emission  
 
 """
+from __future__ import print_function
 
 def individual_resample(listob,refpath='./',nproc=24):
 
@@ -210,7 +211,7 @@ def make_ifumasks(listob,refpath='./',nproc=24):
                         pixinside=np.where((islice >= imin) & (islice <= imax) & (ifu == (iff+1)))
                         pxt[4].data[pixinside] = (iff+1)*100.+i+1
                         
-                    print 'Done with IFU:', iff+1
+                    print('Done with IFU:', iff+1)
 
                 #save updated
                 pxt.writeto(newpix,clobber=True)
@@ -881,7 +882,8 @@ def internalskysub(listob,skymask,deepwhite=None):
                 #deal with masks
                 if(skymask):
                 ##implement sky mask
-                    aa=0
+                    print ("I am not ready for skymasks!!!")
+                    exit()
                 else:
                     zapmask=source_mask
                            
@@ -915,28 +917,93 @@ def internalskysub(listob,skymask,deepwhite=None):
         os.chdir(topdir)
 
     
-def combine_cubes(listcubes,listmasks):
+def combine_cubes(listcubes,listmasks,regions=True):
 
     """
-    Combine cubes with 3sigma clipping in mean mode o with median.
+    Combine cubes in mean mode o with median.
     Apply masks as desired.
 
+    cubes    -> a list of cubes to use in the combine
+    masks    -> a list of goodpix masks from the pipeline
+ 
+    regions  -> if True, code searches for ds9 region files inside path with same 
+                name as pipeline mask (.reg), to mask additional area that one wants 
+                to clip
+
+           
     """
 
     from astropy.io import fits
     import numpy as np
     import scipy
     import os
+    import matplotlib.pyplot as plt
+    from mypython.fits import pyregmask as msk
+
 
     if(os.path.isfile("COMBINED_CUBE_MED.fits") & os.path.isfile("COMBINED_CUBE.fits") ):
-        print "Coadded cubes already exists!"
+        print ("Coadded cubes already exists!")
         return
+    
+    #continue with implicit else if passed the checks
+    
+    if(regions):
+        print ("Updating the masks following ds9 regions")
+        
+        #loads list
+        clistmask=np.loadtxt(listmasks,dtype=np.dtype('a'))
+        
+        #redefine new mask 
+        mask_new="new_"+listmasks
+        llms=open(mask_new,"w")
+        
+        #loop over and update with regions
+        for i,cmask in enumerate(clistmask):
+            
+            #create region name
+            regname=(cmask.split(".fits")[0])+".reg"
+                
+            #search if file exist
+            if(os.path.isfile(regname)):
+                
+                #update the mask 
+                print ("Updating mask for {}".format(regname))
+                
+                #open fits
+                cfits=fits.open(cmask)
+               
+                #init reg mask
+                Mask = msk.PyMask(cfits[1].header["NAXIS1"],cfits[1].header["NAXIS2"],regname)
+                for ii in range(Mask.nreg):
+                    Mask.fillmask(ii)
+                    if(ii == 0):
+                        totmask=Mask.mask
+                    else:
+                        totmask+=Mask.mask
+                        
+                #update the mask
+                cfits[1].data=cfits[1].data*1*np.logical_not(totmask)   
+                savename=cmask.split(".fits")[0]+'_wreg.fits'
+                cfits.writeto(savename,clobber=True)
+                llms.write(savename+'\n')
+                
+            else:
+                #keep current mask 
+                llms.write(cmask+'\n')
+
+        #done with new masks
+        llms.close()
+
+    else:
+        print ('Using original masks...')
+        mask_new=listmasks
+
 
     print ("Combining cubes with mean and median")
 
     #load the relevant lists
     cblis=open(listcubes)
-    mklis=open(listmasks)
+    mklis=open(mask_new)
 
     allcubes=[]
     allmasks=[]
@@ -955,9 +1022,9 @@ def combine_cubes(listcubes,listmasks):
     print ('Coadding {} exposures...'.format(nexp))
     
     #make space for final grid
-    finalcube_mean=np.copy((allcubes[1])[1].data)
-    finalvar=np.copy((allcubes[1])[2].data)
-    finalcube_median=np.copy((allcubes[1])[1].data)
+    finalcube_mean=np.copy((allcubes[1])[1].data)*0.
+    finalvar=np.copy((allcubes[1])[2].data)*0.
+    finalcube_median=np.copy((allcubes[1])[1].data)*0.
 
     #grab info on pixels
     nx=(allcubes[1])[1].header["NAXIS1"]
@@ -965,40 +1032,38 @@ def combine_cubes(listcubes,listmasks):
     nw=(allcubes[1])[1].header["NAXIS3"]
 
     #giant for loop over wave,pix
+    print ('Working on {} slices...'.format(nw))
+    piximage=np.zeros((nexp,ny,nx))
+    varimage=np.zeros((nexp,ny,nx))
+    mskimage=np.zeros((nexp,ny,nx))
+    masknans=np.zeros((ny,nx))
+    
     for ww in range(nw):
-        print ('Working on slice {} of {}'.format(ww,nw))
-        for xx in range(nx):
-            for yy in range(ny):
-                #make list of good pixels
-                goodpixels=[]
-                goodvariance=[]
-                #now loop over exposure
-                for ee in range(nexp):
-                    #a good pixel is not in a mask or a nan
-                    pix=(allcubes[ee])[1].data[ww,yy,xx]
-                    var=(allcubes[ee])[2].data[ww,yy,xx]
-                    msk=(allmasks[ee])[1].data[yy,xx]
-                    if((msk < 1) & np.isfinite(pix)):
-                        goodpixels.append(pix)
-                        goodvariance.append(pix)
-                #go to numpy 
-                goodpixels=np.array(goodpixels)
-                goodvariance=np.array(goodvariance)
-                    
-                #find mean with sigma clipping
-                try:
-                    cfact=3.0
-                    clipped=scipy.stats.sigmaclip(goodpixels,low=cfact,high=cfact)
-                    good=np.where((goodpixels >= (clipped.mean()-cfact*clipped.std())) & 
-                                  (goodpixels <= (clipped.mean()+cfact*clipped.std())))
-                    finalcube_median[ww,yy,xx]=np.median(goodpixels[good])
-                    finalcube_mean[ww,yy,xx]=np.mean(goodpixels[good])
-                    finalvar[ww,yy,xx]=np.total(goodpixels[good])/len(good[0])
-                except:
-                    finalcube_median[ww,yy,xx]=0.
-                    finalcube_mean[ww,yy,xx]=0.
-                    finalvar[ww,yy,xx]=1e50
-                    
+        #print (' {} '.format(ww+1),end='')
+        #rest values 
+        piximage=piximage*0.
+        varimage=varimage*0.
+        mskimage=mskimage*0.
+        #now loop over exposure
+        for ee in range(nexp):        
+            piximage[ee,:]=(allcubes[ee])[1].data[ww,:]
+            varimage[ee,:]=(allcubes[ee])[2].data[ww,:]
+            #clean nan
+            masknans=masknans*0
+            notnans=np.where(np.isfinite(piximage[ee,:]))
+            masknans[notnans]=1
+            #1 good pixels at first, then 1 bad pixels
+            mskimage[ee,:]=np.logical_not(((allmasks[ee])[1].data)*masknans)
+            
+        #construct masked arrays
+        pixmasked=np.ma.array(piximage,mask=mskimage)
+        varmasked=np.ma.array(varimage,mask=mskimage)
+        
+        #make coadds with masking    
+        finalcube_median[ww,:]=np.ma.median(pixmasked,axis=0)
+        finalcube_mean[ww,:]=np.ma.mean(pixmasked,axis=0)
+        finalvar[ww,:]=np.ma.sum(varmasked,axis=0)/np.ma.count(varmasked,axis=0)
+
     #write
     hdu1 = fits.PrimaryHDU([])
     hdu2 = fits.ImageHDU(finalcube_mean)
@@ -1022,9 +1087,8 @@ def combine_cubes(listcubes,listmasks):
 
     for xx in range(nx):
         for yy in range(ny):
-            white_mean[yy,xx]=np.sum(finalcube_mean[:,yy,xx])/nwave  
-            white_med[yy,xx]=np.sum(finalcube_median[:,yy,xx])/nwave  
-
+            white_mean[yy,xx]=np.sum(finalcube_mean[:,yy,xx])/nw
+            white_med[yy,xx]=np.sum(finalcube_median[:,yy,xx])/nw
             
     #save projected image 
     hdu1 = fits.PrimaryHDU([])
@@ -1035,24 +1099,7 @@ def combine_cubes(listcubes,listmasks):
               
     #save projected image 
     hdu1 = fits.PrimaryHDU([])
-    hdu2 = fits.ImageHDU(white_median)
+    hdu2 = fits.ImageHDU(white_med)
     hdu2.header=(allcubes[0])[1].header
     hdulist = fits.HDUList([hdu1,hdu2])
     hdulist.writeto("COMBINED_IMAGE_MED.fits",clobber=True)
-  
-       
-    
-                
-
-    
-
-
-
-    
-    
-
-
-    
-
-
-
