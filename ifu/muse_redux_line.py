@@ -1048,6 +1048,7 @@ def combine_cubes(listcubes,listmasks,regions=True):
         for ee in range(nexp):        
             piximage[ee,:]=(allcubes[ee])[1].data[ww,:]
             varimage[ee,:]=(allcubes[ee])[2].data[ww,:]
+            
             #clean nan
             masknans=masknans*0
             notnans=np.where(np.isfinite(piximage[ee,:]))
@@ -1062,13 +1063,15 @@ def combine_cubes(listcubes,listmasks,regions=True):
         #make coadds with masking    
         finalcube_median[ww,:]=np.ma.median(pixmasked,axis=0)
         finalcube_mean[ww,:]=np.ma.mean(pixmasked,axis=0)
-        finalvar[ww,:]=np.ma.sum(varmasked,axis=0)/np.ma.count(varmasked,axis=0)
+        countmap=np.ma.count(varmasked,axis=0)
+        finalvar[ww,:]=np.ma.sum(varmasked,axis=0)/countmap/countmap
 
     #write
     hdu1 = fits.PrimaryHDU([])
     hdu2 = fits.ImageHDU(finalcube_mean)
     hdu3 = fits.ImageHDU(finalvar)
     hdu2.header=(allcubes[0])[1].header
+    hdu3.header=(allcubes[0])[2].header
     hdulist = fits.HDUList([hdu1,hdu2,hdu3])
     hdulist.writeto("COMBINED_CUBE.fits",clobber=True)
             
@@ -1077,6 +1080,7 @@ def combine_cubes(listcubes,listmasks,regions=True):
     hdu2 = fits.ImageHDU(finalcube_median)
     hdu3 = fits.ImageHDU(finalvar)
     hdu2.header=(allcubes[0])[1].header
+    hdu3.header=(allcubes[0])[2].header
     hdulist = fits.HDUList([hdu1,hdu2,hdu3])
     hdulist.writeto("COMBINED_CUBE_MED.fits",clobber=True)
          
