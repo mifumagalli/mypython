@@ -7,3 +7,4 @@ import ifu
 import redshifts
 import lumfunc
 import cosmo
+import spectra
