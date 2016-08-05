@@ -904,9 +904,11 @@ def internalskysub(listob,skymask,deepwhite=None):
                 hdulist.writeto(newimage,clobber=True)
 
                 #save segmap
-                hdu1 = fits.PrimaryHDU([])
+                #make it redundant to be sure ZAP read right extension
+                hdu1 = fits.PrimaryHDU(segmap)
+                #hdu1.header=header
                 hdu2 = fits.ImageHDU(segmap)
-                hdu2.header=header
+                #hdu2.header=header
                 hdulist = fits.HDUList([hdu1,hdu2])
                 hdulist.writeto(source_mask,clobber=True)
                 
@@ -915,11 +917,12 @@ def internalskysub(listob,skymask,deepwhite=None):
                 #deal with masks
                 if(skymask):
                     #combine sky mask with source mask 
-                    tmpmask=fits.open(source_mask)
-                    tmpzapmask=tmpmask[1].data+skyimg   
-                    hdu1 = fits.PrimaryHDU([])
+                    #make it redundant to be sure ZAP read right extension
+                    tmpzapmask=segmap+skybox  
+                    hdu1 = fits.PrimaryHDU(tmpzapmask)
+                    #hdu1.header=header
                     hdu2 = fits.ImageHDU(tmpzapmask)
-                    hdu2.header=header
+                    #hdu2.header=header
                     hdulist = fits.HDUList([hdu1,hdu2])
                     hdulist.writeto("ZAP_"+source_mask,clobber=True)
                     zapmask="ZAP_"+source_mask
