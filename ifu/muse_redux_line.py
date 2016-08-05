@@ -738,7 +738,8 @@ def internalskysub(listob,skymask,deepwhite=None):
     Perform sky-subtraction using pixels within the cube
 
     listob  -> OBs to loop on
-    skymask -> if defined, use goodpixels in the mask for computing sky. Otherwise mask sources.
+    skymask -> if defined to a ds9 region file, compute sky in these regions (excluding sources)
+               Otherwise mask sources and use all the pixels in the field.
 
     """
     
@@ -759,6 +760,7 @@ def internalskysub(listob,skymask,deepwhite=None):
         os.chdir(ob+'/Proc/')
         print('Processing {} for sky subtraction correction'.format(ob))
  
+      
         #Search how many exposures are there
         scils=glob.glob("OBJECT_RED_0*.fits*")
         nsci=len(scils)
@@ -825,34 +827,65 @@ def internalskysub(listob,skymask,deepwhite=None):
                 #make sure pixels are sky sub once and only once
                 countsub=np.copy(ifumask[1].data)*0.
 
-                
-                #loop over ifu
-                for iff in range(24):
-                #loop over 
-                #for i in range(4):
-                #    #grab the pixels in this slice
-                #    thisstack=(iff+1)*100.+i+1
-                #    nextstack=(iff+1)*100.+i+2
-                #    pixels=np.where((ifumask[1].data >= thisstack) & (ifumask[1].data < nextstack))
-                 
-                    thisifu=(iff+1)*100.
-                    nextifu=(iff+2)*100.+1
-                    #grab pixels in ifu without sources
-                    pixels=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu) & (segmap < 1) )
-                    pixels_ifu=np.where((ifumask[1].data >= thisifu) & (ifumask[1].data < nextifu)
-                                        & (countsub < 1))
-                    #update used pixels
-                    countsub[pixels_ifu]=1
-
+                #if mask is set do a corse median sky subtraction 
+                if(skymask):
+                    print('Constructing sky mask')
+                    #for zap, sky region should be 0, and sources >1
+                    skybox=np.zeros((ny,nx))+1
+                    #construct the sky region mask
+                    from mypython.fits import pyregmask as pmk
+                    mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cube[1].header)
+                    for ii in range(mysky.nreg):
+                        mysky.fillmask(ii)
+                        skybox=skybox-mysky.mask
+                                            
+                    #plt.imshow(skybox,origin='low')
+                    #plt.show()
+                    #plt.imshow(segmap,origin='low')
+                    #plt.show()
+                    #plt.imshow(ifumask[1].data,origin='low')
+                    #plt.show()
+                    #exit()
+                    
+                    #now do median sky subtraction 
                     #loop over wavelength 
                     for ww in range(nwave):
+                        #extract sky slice
                         skyimg=cube[1].data[ww,:,:]
+                        #grab pixels with no source and in mask region
+                        #avoid edges not flagged by IFU mask
+                        pixels=np.where((skybox<1)&(segmap < 1)&(ifumask[1].data>0))
                         #compute sky in good regions
                         medsky=np.nanmedian(skyimg[pixels])
-                        #subtract from all IFU pixels
-                        skyimg[pixels_ifu]=skyimg[pixels_ifu]-medsky
-                        cube[1].data[ww,:,:]=skyimg
-                        
+                        #subtract from all  pixels
+                        cube[1].data[ww,:,:]=skyimg-medsky
+
+                else:
+                    #otherwise do coarse sky IFU by IFU 
+                    #loop over ifu
+                    for iff in range(24):
+                        thisifu=(iff+1)*100.
+                        nextifu=(iff+2)*100.+1
+                        #grab pixels in ifu without sources
+                        pixels=np.where((ifumask[1].data >= thisifu) & \
+                                            (ifumask[1].data < nextifu)\
+                                            & (segmap < 1) )
+                        pixels_ifu=np.where((ifumask[1].data >= thisifu) \
+                                                & (ifumask[1].data < nextifu)\
+                                                & (countsub < 1))
+                        #update used pixels
+                        countsub[pixels_ifu]=1
+
+                        #loop over wavelength 
+                        for ww in range(nwave):
+                            skyimg=cube[1].data[ww,:,:]
+                            #compute sky in good regions
+                            medsky=np.nanmedian(skyimg[pixels])
+                            #subtract from all IFU pixels
+                            skyimg[pixels_ifu]=skyimg[pixels_ifu]-medsky
+                            cube[1].data[ww,:,:]=skyimg
+            
+
                 #write final cube
                 cube.writeto(newcube,clobber=True)
             
@@ -881,9 +914,15 @@ def internalskysub(listob,skymask,deepwhite=None):
             
                 #deal with masks
                 if(skymask):
-                ##implement sky mask
-                    print ("I am not ready for skymasks!!!")
-                    exit()
+                    #combine sky mask with source mask 
+                    tmpmask=fits.open(source_mask)
+                    tmpzapmask=tmpmask[1].data+skyimg   
+                    hdu1 = fits.PrimaryHDU([])
+                    hdu2 = fits.ImageHDU(tmpzapmask)
+                    hdu2.header=header
+                    hdulist = fits.HDUList([hdu1,hdu2])
+                    hdulist.writeto("ZAP_"+source_mask,clobber=True)
+                    zapmask="ZAP_"+source_mask
                 else:
                     zapmask=source_mask
                            
