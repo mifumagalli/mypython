@@ -553,32 +553,33 @@ def make_illcorr_stack(ifumask_cname,ifumask_iname,data_cname,data_iname,outcorr
     from scipy import interpolate
     import sep
 
-    #open the ifu mask to create a good mask 
-    data=fits.open(data_cname)
-    ifimask=fits.open(ifumask_iname)
-    fovdata=fits.open(data_iname)
-      
-    #define geometry 
-    nwave=data[1].header["NAXIS3"]
-    nx=data[1].header["NAXIS1"]
-    ny=data[1].header["NAXIS2"]
-            
-    #now flag the sources
-    ifumsk=ifimask[1].data
-    image=fovdata[1].data.byteswap().newbyteorder()
-    bkg=sep.Background(image)
-    bkg.subfrom(image)
-    obj,segmap=sep.extract(image,5.*bkg.globalrms,minarea=10,segmentation_map=True)
-
-    #remove illumination patterns that can be selected as sources
-    #by allowing very extended regions
-    for ii,pp in enumerate(obj):
-        if(pp['npix'] > 900):
-            #print ii, pp['npix']
-            pix=np.where(segmap == ii+1)
-            segmap[pix]=0
-
     if not os.path.isfile(newcube):
+
+        #open the ifu mask to create a good mask 
+        data=fits.open(data_cname)
+        ifimask=fits.open(ifumask_iname)
+        fovdata=fits.open(data_iname)
+
+        #define geometry 
+        nwave=data[1].header["NAXIS3"]
+        nx=data[1].header["NAXIS1"]
+        ny=data[1].header["NAXIS2"]
+
+        #now flag the sources
+        ifumsk=ifimask[1].data
+        image=fovdata[1].data.byteswap().newbyteorder()
+        bkg=sep.Background(image)
+        bkg.subfrom(image)
+        obj,segmap=sep.extract(image,5.*bkg.globalrms,minarea=10,segmentation_map=True)
+
+        #remove illumination patterns that can be selected as sources
+        #by allowing very extended regions
+        for ii,pp in enumerate(obj):
+            if(pp['npix'] > 900):
+                #print ii, pp['npix']
+                pix=np.where(segmap == ii+1)
+                segmap[pix]=0
+
         
         if(debug):
             plt.imshow(image,origin='low')
