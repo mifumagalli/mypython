@@ -53,7 +53,9 @@ class zfitwin(Tkinter.Tk):
 
         #find exect dir
         self.execdir=__file__.split('zfit.py')[0]
-
+        if(len(self.execdir)==0):
+            self.execdir='./'
+            
         #Fiddle with font
         default_font = tkFont.nametofont("TkDefaultFont")
         default_font.configure(size=14)
@@ -599,7 +601,6 @@ class zfitwin(Tkinter.Tk):
  
         #first parse the line lists
         linefile=self.execdir+"/lines/"+self.linelist.get()+".lst"
-        
         self.infoline = Table.read(linefile, format='ascii.basic')
         #self.infoline=np.loadtxt(linefile, dtype={'names': ('wave', 'tag'),
         #                                          'formats': ('f4', 'S4')})

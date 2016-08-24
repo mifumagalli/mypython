@@ -1,0 +1,47 @@
+Panels:
+------
+
+Main panel, from top to bottom:
+1D spectrum (blue flux, red error)
+2D spectrum (white highest values; red lowest value)
+2D error
+
+Side panel: object image
+
+General
+-------
+
+Open   Open new spectrum
+Save   Does not work
+Exit   Quit
+
+Window controls
+---------------
+
+Click on window to activate.
+[]  pan spectrum left/right
+i   zoom in
+o   zoom out
+W   reset window
+t   use mouse location to set top of window
+b   use mouse location to set bottom of window
+
+
+Line control
+------------
+
+Select Lines   Select library of lines from dropdown menu 
+Show Lines     Turn lines on/off
+z              enter redshift
+Right click    open line list and compute redshift at mouse position
+fit lines      fit Gaussian lines given initial guess
+
+Template control
+----------------
+
+Pick template       Select template from library
+Show/Hide template  Does what it says
+z                   Assign redshift to template
+flux                Scaling flux of template
+FitTemplate         Does not work!!!!
+
