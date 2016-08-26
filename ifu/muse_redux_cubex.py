@@ -1,20 +1,45 @@
 
-def fixandsky_firstpass(cube,pixtab,noclobber):
+def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     
     
     """ 
-
     Take a cube and pixel table and fix the cube, then skysub and produce white image, using CubEx utils
 
     """
 
     import os 
     import subprocess
-
+    import numpy as np
+    from astropy.io import fits
+    from mypython.fits import pyregmask as pmk
+    import matplotlib.pyplot as plt
+               
     #make some intermediate names
     fixed=cube.split('.fits')[0]+"_fix.fits"
     skysub=cube.split('.fits')[0]+"_skysub.fits"
     white=cube.split('.fits')[0]+"_white.fits"
+
+    #if told to mask sky do it.. otherwise leave image empty
+    cb=fits.open(cube)
+    nx=cb[1].header['NAXIS1']
+    ny=cb[1].header['NAXIS2']
+    sharpmask=np.zeros((nx,ny))
+    if(skymask):
+        #construct the sky region mask
+        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+        print ('OK??')
+        exit()
+        for ii in range(mysky.nreg):
+            mysky.fillmask(ii)
+            sharpmask=sharpmask+mysky.mask
+            
+    plt.imshow(sharpmask,origin='low')
+    plt.show()
+
+    exit()
+
+
+
 
     #now fix the cube
     if ((os.path.isfile(fixed)) & (noclobber)):
@@ -38,7 +63,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber):
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
 
-def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
+def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         
     """ 
  
@@ -106,7 +131,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None):
         print 'Create white image for ', skysub
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
-def cubex_driver(listob,last=False,highsn=None):
+def cubex_driver(listob,last=False,highsn=None,skymask=None):
     
     """
     Procedures that drives the loops of cubex within each OB folder
@@ -114,6 +139,7 @@ def cubex_driver(listob,last=False,highsn=None):
     listob -> the list of OBs to process
     last  -> set to True for final pass with high-sn cube 
     highsn -> name of the highsn cube used for masking 
+    skymask -> mask this region in source mask before running cubesharp
 
     """
     
@@ -149,7 +175,7 @@ def cubex_driver(listob,last=False,highsn=None):
                 pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask))
                 workers.append(p)
                 p.start()
    
@@ -171,7 +197,7 @@ def cubex_driver(listob,last=False,highsn=None):
                 pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,))
+                p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,skymask))
                 workers.append(p)
                 p.start()
    
@@ -191,7 +217,7 @@ def cubex_driver(listob,last=False,highsn=None):
                 pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask))
                 workers.append(p)
                 p.start()
    

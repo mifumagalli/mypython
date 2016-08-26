@@ -130,7 +130,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='./esocombine/'):
+    def cubex_process(self,refpath='./esocombine/',skymask=None):
 
         """
   
@@ -138,6 +138,8 @@ class Muse(object):
         CubEx is a privite code by S. Cantalupo and cannot be redistributed. Contact the author directly. 
         
         refpath -> where the reference cubes for wcs resempling are 
+        
+        skymask -> mask this region before running cubesharp
 
         """
 
@@ -163,7 +165,7 @@ class Muse(object):
         ex.individual_resample(listob,refpath=refpath)
 
         #now do the first two passes of cubex on each OB to prepare a temporary cube
-        cx.cubex_driver(listob)
+        cx.cubex_driver(listob,skymask=skymask)
        
         #prepare for intermediate combine 
         #dump to disk file lists
@@ -189,7 +191,7 @@ class Muse(object):
         os.chdir(topdir)
 
         #now do the final pass of cubex using the tmp combined cube for better masking
-        cx.cubex_driver(listob,last=True,highsn='../../cubexcombine/COMBINED_CUBE.fits')
+        cx.cubex_driver(listob,last=True,highsn='../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
 
         #make the final combined cube
         #dump to disk file lists
