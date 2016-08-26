@@ -26,19 +26,17 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     sharpmask=np.zeros((nx,ny))
     if(skymask):
         #construct the sky region mask
-        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
-        print ('OK??')
-        exit()
-        for ii in range(mysky.nreg):
-            mysky.fillmask(ii)
-            sharpmask=sharpmask+mysky.mask
+        #mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+        #print ('OK??')
+        #exit()
+        #for ii in range(mysky.nreg):
+        #    mysky.fillmask(ii)
+        #    sharpmask=sharpmask+mysky.mask
+        print ('Working on this!')
             
-    plt.imshow(sharpmask,origin='low')
-    plt.show()
-
-    exit()
-
-
+    #plt.imshow(sharpmask,origin='low')
+    #plt.show()
+    #exit()
 
 
     #now fix the cube
