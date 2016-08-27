@@ -21,6 +21,7 @@ import scipy
 from scipy.optimize import curve_fit
 from scipy.interpolate import interp1d
 from scipy import interpolate
+from scipy import signal
 from astropy.io import fits
 from astropy.table import Table
 
@@ -159,16 +160,19 @@ class zfitwin(Tkinter.Tk):
         #unpack
         self.fitwav1d=self.fits[2].data
         self.fitspe1d=self.fits[0].data
+        self.fitspe1d_original=np.copy(self.fitspe1d)
         self.fiterr1d=self.fits[1].data
         self.fitspe2d=self.fits[4].data
         self.fiterr2d=self.fits[5].data
         self.fitimg=self.fits[6].data
-
+        
         self.drawdata()
 
         #set tmpfitxcorr to None to avoid error or later init
         self.tmpfitxcorr=None
-
+        #set smoothwindow
+        self.smooth=3
+        
 
     def init_linecontrol(self):
         
@@ -284,6 +288,7 @@ class zfitwin(Tkinter.Tk):
         #unpack
         self.fitwav1d=self.fits[2].data
         self.fitspe1d=self.fits[0].data
+        self.fitspe1d_original=np.copy(self.fits[0].data)
         self.fiterr1d=self.fits[1].data
         self.fitspe2d=self.fits[4].data
         self.fiterr2d=self.fits[5].data
@@ -401,8 +406,9 @@ class zfitwin(Tkinter.Tk):
             self.spectrumPlot_prop["axis"].cla()
             
         #plot main data
-        self.spectrumPlot_prop["axis"].plot(self.fitwav1d,self.fitspe1d)
-        self.spectrumPlot_prop["axis"].plot(self.fitwav1d,self.fiterr1d,color='red',linestyle='--',zorder=1)
+        self.spectrumPlot_prop["axis"].step(self.fitwav1d,self.fitspe1d,where='mid')
+        self.spectrumPlot_prop["axis"].step(self.fitwav1d,self.fiterr1d,color='red',\
+                                            linestyle='--',zorder=1,where='mid')
         self.spectrumPlot_prop["axis"].set_xlim(self.spectrumPlot_prop["xmin"],self.spectrumPlot_prop["xmax"])
         self.spectrumPlot_prop["axis"].set_ylim(self.spectrumPlot_prop["ymin"],self.spectrumPlot_prop["ymax"])
         self.spectrumPlot_prop["axis"].set_xlabel('Wavelength')
@@ -1112,8 +1118,17 @@ class zfitwin(Tkinter.Tk):
              #update 2d spectra accordingly
              self.update_twodspec(update=True)
              self.update_twoderr(update=True)
-
-
+        #smooth plot
+         if(event.key == "S"):
+             self.fitspe1d=signal.medfilt(self.fitspe1d,self.smooth)
+             self.smooth=self.smooth+2
+             self.update_spectrum(update=True)
+            
+        #unsmooth smooth 
+         if(event.key == "U"):
+             self.fitspe1d=self.fitspe1d_original
+             self.smooth=3
+             self.update_spectrum(update=True)
 
          
     def lineselectorwidget(self,event):
