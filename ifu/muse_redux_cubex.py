@@ -3,7 +3,10 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     
     
     """ 
-    Take a cube and pixel table and fix the cube, then skysub and produce white image, using CubEx utils
+    Take a cube and pixel table and fix the cube, then skysub and produce white image,
+    using CubEx utils
+
+    is skymask is set, mask regions when computing normalisation 
 
     """
 
@@ -18,26 +21,24 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     fixed=cube.split('.fits')[0]+"_fix.fits"
     skysub=cube.split('.fits')[0]+"_skysub.fits"
     white=cube.split('.fits')[0]+"_white.fits"
+    sharpmsk=cube.split('.fits')[0]+"_sharpmask.fits"
 
     #if told to mask sky do it.. otherwise leave image empty
     cb=fits.open(cube)
     nx=cb[1].header['NAXIS1']
     ny=cb[1].header['NAXIS2']
-    sharpmask=np.zeros((nx,ny))
+    sharpmask=np.zeros((ny,nx))
     if(skymask):
         #construct the sky region mask
-        #mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
-        #print ('OK??')
-        #exit()
-        #for ii in range(mysky.nreg):
-        #    mysky.fillmask(ii)
-        #    sharpmask=sharpmask+mysky.mask
-        print ('Working on this!')
-            
-    #plt.imshow(sharpmask,origin='low')
-    #plt.show()
-    #exit()
-
+        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+        for ii in range(mysky.nreg):
+            mysky.fillmask(ii)
+            sharpmask=sharpmask+mysky.mask
+    #write mask
+    hdu = fits.PrimaryHDU(sharpmask)
+    hdulist = fits.HDUList([hdu])
+    hdulist.writeto(sharpmsk,clobber=True)
+    cb.close()
 
     #now fix the cube
     if ((os.path.isfile(fixed)) & (noclobber)):
@@ -51,7 +52,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
         print "Cube {0} already skysub".format(fixed)
     else:
         print 'Sky sub ', fixed
-        subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-lcheck",".false."])
+        subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-lcheck",".false."])
                                
     #create a white image
     if ((os.path.isfile(white)) & (noclobber)):
@@ -74,22 +75,27 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
       
     import os 
     import subprocess
+    import numpy as np
+    from astropy.io import fits
+    from mypython.fits import pyregmask as pmk
 
     if(highsn):
         #prepare final names
         fixed=cube.split('.fits')[0]+"_fixhsn.fits"
         skysub=cube.split('.fits')[0]+"_skysubhsn.fits"
         white=cube.split('.fits')[0]+"_whitehsn.fits"
+        sharpmsk=cube.split('.fits')[0]+"_sharpmasksn.fits"
     else:
         #prepare intermediate names
         fixed=cube.split('.fits')[0]+"_fix2.fits"
         skysub=cube.split('.fits')[0]+"_skysub2.fits"
         white=cube.split('.fits')[0]+"_white2.fits"
-        
+        sharpmsk=cube.split('.fits')[0]+"_sharpmask2.fits"
+
     #assign names for source mask 
     mask_source=cube.split('.fits')[0]+"_white.Objects_Id.fits"
     white_source=cube.split('.fits')[0]+"_white.fits"
-    
+
     #now fix the cube using masks
     if ((os.path.isfile(fixed)) & (noclobber)):
         print "Cube {0} already fixed".format(cube)
@@ -111,6 +117,28 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 
+    #if told to mask sky do it.. otherwise leave image empty
+    cb=fits.open(cube)
+    nx=cb[1].header['NAXIS1']
+    ny=cb[1].header['NAXIS2']
+    sharpmask=np.zeros((ny,nx))
+    if(skymask):
+        #construct the sky region mask
+        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+        for ii in range(mysky.nreg):
+            mysky.fillmask(ii)
+            sharpmask=sharpmask+mysky.mask
+    cb.close()
+
+    #inject src mask in sharpmask
+    srcmk=fits.open(mask_source)
+    sharpmask=sharpmask+srcmk[0].data
+
+    #write mask
+    hdu = fits.PrimaryHDU(sharpmask)
+    hdulist = fits.HDUList([hdu])
+    hdulist.writeto(sharpmsk,clobber=True)
+
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
         print "Cube {0} already skysub".format(fixed)
@@ -118,9 +146,9 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         print 'Sky sub ', fixed
         if(highsn):
             #now few more options to control sky sub 
-            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source,"-hsncube",highsn,"-lcheck",".false."])
+            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-hsncube",highsn,"-lcheck",".false."])
         else:
-            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",mask_source])
+            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk])
                                
     #create a white image
     if ((os.path.isfile(white)) & (noclobber)):

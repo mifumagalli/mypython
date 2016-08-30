@@ -139,7 +139,7 @@ class Muse(object):
         
         refpath -> where the reference cubes for wcs resempling are 
         
-        skymask -> mask this region before running cubesharp
+        skymask -> mask this region before running cubesharp (ds9 region in image units)
 
         """
 
@@ -273,7 +273,8 @@ class Muse(object):
         lmin -> the minimum wavelength to consider
         lmax -> the maximum wavelength to consider
         refpath -> where the reference cubes for wcs resempling are 
-        skymask -> a skymask to be used for identify good regions for skysubtraction
+        skymask -> a skymask to be used for identify good regions for skysubtraction 
+                   (expected in image coordinates)
         skymode -> internal: use good pixels (i.e. not containing sources or defined in skymask) to perform 
                    skysubtraction plus run ZAP on it.
         deepwhite -> if set to an image, this is used to mask sources during sky subtraction.

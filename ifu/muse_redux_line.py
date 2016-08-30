@@ -739,7 +739,8 @@ def internalskysub(listob,skymask,deepwhite=None):
     Perform sky-subtraction using pixels within the cube
 
     listob  -> OBs to loop on
-    skymask -> if defined to a ds9 region file, compute sky in these regions (excluding sources)
+    skymask -> if defined to a ds9 region file (iamge coordinate), 
+               compute sky in these regions (excluding sources)
                Otherwise mask sources and use all the pixels in the field.
 
     """
@@ -838,7 +839,8 @@ def internalskysub(listob,skymask,deepwhite=None):
                     mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cube[1].header)
                     for ii in range(mysky.nreg):
                         mysky.fillmask(ii)
-                        skybox=skybox-mysky.mask
+                        usepix=np.where(mysky.mask > 0)
+                        skybox[usepix]=0
                                             
                     #plt.imshow(skybox,origin='low')
                     #plt.show()
@@ -886,7 +888,6 @@ def internalskysub(listob,skymask,deepwhite=None):
                             skyimg[pixels_ifu]=skyimg[pixels_ifu]-medsky
                             cube[1].data[ww,:,:]=skyimg
             
-
                 #write final cube
                 cube.writeto(newcube,clobber=True)
             
@@ -914,7 +915,7 @@ def internalskysub(listob,skymask,deepwhite=None):
                 hdulist.writeto(source_mask,clobber=True)
                 
                 print('Running ZAP on exposure {}'.format(exp+1))           
-            
+                
                 #deal with masks
                 if(skymask):
                     #combine sky mask with source mask 

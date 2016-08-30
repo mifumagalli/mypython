@@ -129,6 +129,15 @@ cubexcombine/COMBINED_CUBE_MED_FINAL.fits
 using both mean and median statistics. 
 
 
+Optional: one can pass a ds9 region (image coordinates) containing regions to be masked when 
+	  computing the sky normalisation in cubesharp. This is useful in case there are 
+	  extended sources or extended line emission one wishes to mask
+
+	  The syntax in this case is 
+	  
+	  >> muse.cubex_process(skymask='cubexcombine/skymask.reg')
+
+
 C. LINE OPTIMISED REDUCTION
 ---------------------------
 
@@ -151,13 +160,24 @@ This perform illumination correction at IFU level as a function of coarse bins o
 Next, residual illumination correction on white images is performed at the stack level.
 
 Finally, a zeroth order sky model is subtracted from the data and residual corrections
-are perfomed with ZAP. A mask can be passed to avoid regions of extended flux emission.
+are perfomed with ZAP. 
+
+A mask can be passed to avoid regions of extended flux emission.
+The mask is passed in the form of a ds9 region file (image coordinate) that contains 
+**good** regions to be used in PCA analysis (note the opposite behaviour with cubex, 
+where a mask excludes pixels from sky normalisation).
+In this case the syntax becomes:
+
+   muse.line_process(skymask='linecombine/pca_region.reg')
+
+An optional deepwhite keyword can be used to pass a deep white image for better masking
+of continuum detected sources.
 
 Next, the code comabined exposures into final cubes. Masks with IFU edges are automatically
 propagated.
 
 If there are obvious large scale artifacts that should be mask, this can simply achieved by creating
-a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
+a ds9 region file inside the OB#/Proc folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate.
 
 In the end, a final coadded cube is reconstructed in 
