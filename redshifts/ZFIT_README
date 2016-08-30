@@ -25,7 +25,11 @@ o   zoom out
 W   reset window
 t   use mouse location to set top of window
 b   use mouse location to set bottom of window
+l   use mouse location to set left of window
+r   use mouse location to set right of window
 
+S   smooth spectrum with median filter
+U   unsmooth
 
 Line control
 ------------
