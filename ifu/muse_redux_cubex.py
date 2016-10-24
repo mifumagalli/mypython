@@ -106,11 +106,11 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         if(highsn):
             print 'Using high SN cube...'
             subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-            subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.','-SN_Threshold','3','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','3','-RescaleVar','.true.'])
         else:
             print 'Using white image from previous loop'
             #create source mask 
-            subprocess.call(["CubEx-1.5",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
             
         print 'Cubefix ', cube
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])
