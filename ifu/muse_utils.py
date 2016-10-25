@@ -362,7 +362,7 @@ def cubestat(cube,region=False,delta=10):
 
     import numpy as np
     import matplotlib.pyplot as plt
-
+    
     #read the cube
     cubdata,vardata,wcsc,wavec,reg=readcube(cube)
     
