@@ -8,7 +8,8 @@ Currently works only with FlatLambdaCDM
 import numpy as np
 from astropy import units as u
 from astropy.table import Table
-from scipy.interpolate import interp1d 
+from scipy.interpolate import interp1d
+from scipy.integrate import quad
 import matplotlib.pyplot as plt
 import os
 
@@ -87,14 +88,14 @@ class Cosmocal:
 
         return Dz
         
-    def dmC(self,mass,redshift):
+    def dmC(self,mass200,redshift):
 
         """
         
         Compute a concentration parameter using interpolation of results by
         http://adsabs.harvard.edu/abs/2016MNRAS.460.1214L
         
-        mass -> log10(M200[10^10 Msun/h])
+        mass200 -> log10(m200/Msun) 
         redshift -> redshift 
 
         """
@@ -110,37 +111,38 @@ class Cosmocal:
         else:
             raise ValueError('Not ready for this cosmology')
 
-        #load data
+        #convert in log (1e10 M/h)
+        mass=mass200+np.log10((self.cosmo.H(0)/100.).value)-10
         
-        #z=0 masses and concentrations
+        #load data
+        #col1: z=0 masses; col2: z=0 concentrations
         #The mass units are log10(M200 [10^10 Msun/h]); c=r200/r_s.
         cmz = Table.read(incmz,format='ascii')
 
         #mass variance extrapolated to z=0.
-        #mass are again [10^10 Msun/h], and sigma0(M,z=0) 
+        #col1: mass are again [10^10 Msun/h], col2: sigma0(M,z=0) 
         sigma0 = Table.read(insigma0,format='ascii')
 
-        #construct interpolation function M/sigma0 
-        fsigma0=interp1d(sigma0['col1'],sigma0['col2'])
-        #compute nu at z=0 matched to cz0
+        #construct interpolation function sigma0 vs Mass 
+        fsigma0=interp1d(sigma0['col1'],sigma0['col2'],bounds_error=False,fill_value='extrapolate')
+        #compute nu at z=0 matched to the mass in cz0
         nu0=1.686/fsigma0(cmz['col1'])
 
-        #construct M vs nu0 function
+        #construct concentration vs nu0 function
         fcnu0=interp1d(nu0,cmz['col2'])
 
-        #get D(z)
-        Dz=self.Dz(redshift)
-
-        #get nu at the redshift and mass of interest 
-        nuzM=1.686/(fsigma0(mass)*Dz)         
+         #get nu at the redshift and mass of interest 
+        nuzM=1.686/(fsigma0(mass)*self.Dz(redshift))         
         
         #get c at desired mass
         cMz=fcnu0(nuzM)
-        
+
+        #m=np.arange(-5,5,0.1)
         #plt.scatter(cmz['col1'],cmz['col2'])
         #plt.plot(m,fcnu0(1.686/(fsigma0(m)*self.Dz(0.))))
         #plt.show()
-
+        #exit()
+        
         return cMz
     
     def meandensity(self,redshift):
@@ -149,7 +151,7 @@ class Cosmocal:
         Compute the mean baryon density at a given redshift 
         following Bryan and Norman 1998
 
-        return values in g/cm^3
+        return values in g/cm^3 and 1/cm^3
 
         """
 
@@ -163,7 +165,7 @@ class Cosmocal:
         mp=1.67262e-24 #proton mass in g
         X=0.75
         Y=1-X
-        mu=1./(2*X+3./4*Y) #mean molecular w.
+        mu=1./(2.*X+3./4.*Y) #mean molecular w.
         nh_mean=rho_mean/(mu*mp)
         
         return rho_mean, nh_mean
@@ -173,13 +175,13 @@ class Cosmocal:
         """
         Compute R200 (in kpc) for a given redshift and mass (M200)
         
-        mass -> log M/Msun
+        mass -> log10(M/Msun)
         
         """
 
         #some constants
         msun=1.99e33 #sun mass in g
-        cm2pc=3.086e18
+        cm2pc=3.086e18 #pc in cm
 
         #desired overdensity
         Delta=200.
@@ -191,3 +193,37 @@ class Cosmocal:
         return r200
 
     
+    def getNFW(self,radius,mass,redshift):
+
+        """
+        
+        Evaluate a NFW profile given a mass and redshift (density g/cm^3)
+
+        mass -> log10(M200/Msun)
+        radius -> radius in kpc for evaluation
+
+        """
+
+        #get R200 in kpc
+        r200kpc=self.r200(mass,redshift)
+        
+        #get concetration
+        dmC=self.dmC(mass,redshift)
+        
+        #characteristic radius
+        rskpc=r200kpc/dmC        
+
+        #define x=r/rs
+        x=radius/rskpc
+
+        #now get the characteristic density
+        fMx=lambda x: 3.*x**2/(x*(1+x)**2)
+        fM200,efM200=quad(fMx,1e-8,dmC)
+        
+        rhos=(200.*self.cosmo.critical_density(redshift)*dmC**3/fM200).value
+  
+        #compute NFW
+        rhonfw=4*rhos/(x*(1+x)**2)
+        
+        return rhonfw
+        
