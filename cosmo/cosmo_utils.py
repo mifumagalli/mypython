@@ -18,8 +18,7 @@ class Cosmocal:
 
     def __init__(self,basic='Planck13'):
         
-        """ 
-        
+        """         
         Initilaize basic cosmology from astropy 
 
         basic -> defines the astropy flavor of FlatLambdaCDM
@@ -38,6 +37,7 @@ class Cosmocal:
         else:
             raise ValueError('Cosmology flavor not recognised')
 
+        #assing cosmology
         self.cosmotag=basic
         self.cosmo=apcosmo
 
@@ -45,7 +45,8 @@ class Cosmocal:
     def comovingvolume(self,zmax,zmin=False):
 
         """
-        Compute a volume in flat cosmology
+        Compute a comoving volume (Gpc^3) in given cosmology from zmax to zmin.
+        If zmin not set, zmin = 0
 
         zmax -> maximum redshift 
         zmin -> if set, compute volume between zmin/zmax
@@ -64,15 +65,13 @@ class Cosmocal:
             self.volume=VolCom-VolCom_min
         else:
             self.volume=VolCom
-
+            
         return self.volume
 
     def Dz(self,redshift):
 
         """
-
         Compute Dz at a given redshift
-
         """
 
         OmegaM=self.cosmo.Om0
@@ -131,7 +130,7 @@ class Cosmocal:
         #construct concentration vs nu0 function
         fcnu0=interp1d(nu0,cmz['col2'])
 
-         #get nu at the redshift and mass of interest 
+        #get nu at the redshift and mass of interest 
         nuzM=1.686/(fsigma0(mass)*self.Dz(redshift))         
         
         #get c at desired mass
@@ -142,13 +141,15 @@ class Cosmocal:
         #plt.plot(m,fcnu0(1.686/(fsigma0(m)*self.Dz(0.))))
         #plt.show()
         #exit()
+
+        cMz=11.4
         
         return cMz
     
     def meandensity(self,redshift):
 
         """
-        Compute the mean baryon density at a given redshift 
+        Compute the mean baryon density for a mixture of H+He at a given redshift 
         following Bryan and Norman 1998
 
         return values in g/cm^3 and 1/cm^3
@@ -166,9 +167,9 @@ class Cosmocal:
         X=0.75
         Y=1-X
         mu=1./(2.*X+3./4.*Y) #mean molecular w.
-        nh_mean=rho_mean/(mu*mp)
+        n_mean=rho_mean/(mu*mp)
         
-        return rho_mean, nh_mean
+        return rho_mean, n_mean
     
     def r200(self,mass,redshift):
 
@@ -187,43 +188,101 @@ class Cosmocal:
         Delta=200.
 
         #get R200 in kpc
+
+        #R200^3 in cm^3
         r200cube=3.*((10**mass)*msun)/(4.*np.pi*self.cosmo.critical_density(redshift).value*Delta)
+
+        #Unit conversion -> kpc
         r200=r200cube**(1./3)/cm2pc/1e3
         
         return r200
 
-    
-    def getNFW(self,radius,mass,redshift):
+    def getrhos(self,mass,redshift):
 
         """
         
+        Get characteristic density rho_s (g/cm^3) in a NFW profile
+        mass -> log10(M200/Msun)
+
+        """
+
+        #get concetration
+        dmC=self.dmC(mass,redshift)
+
+        #evaluate the mass integral at dm
+        fM200=3.*((1./(dmC+1))+np.log(dmC+1)-1)
+
+        Delta=200.
+        rhos=(Delta*self.cosmo.critical_density(redshift)*dmC**3/fM200).value
+        
+        return rhos
+        
+    def getNFW(self,radius,mass,redshift):
+
+        """        
         Evaluate a NFW profile given a mass and redshift (density g/cm^3)
 
         mass -> log10(M200/Msun)
         radius -> radius in kpc for evaluation
 
         """
-
+      
         #get R200 in kpc
         r200kpc=self.r200(mass,redshift)
         
         #get concetration
         dmC=self.dmC(mass,redshift)
         
-        #characteristic radius
+        #characteristic radius in kpc
         rskpc=r200kpc/dmC        
 
-        #define x=r/rs
+        #define x=r/rs [unitless]
         x=radius/rskpc
-
-        #now get the characteristic density
-        fMx=lambda x: 3.*x**2/(x*(1+x)**2)
-        fM200,efM200=quad(fMx,1e-8,dmC)
         
-        rhos=(200.*self.cosmo.critical_density(redshift)*dmC**3/fM200).value
-  
-        #compute NFW
-        rhonfw=4*rhos/(x*(1+x)**2)
+        #compute NFW g/cm^3
+        rhos=self.getrhos(mass,redshift)
+        rhonfw=rhos/(x*(1+x)**2)
         
         return rhonfw
+        
+    def getNFWacc(self,radius,mass,redshift):
+
+        """
+        
+        Evaluate the acceleration at r given an NFW profile for a set mass and redshift (acc cm/s^2)
+
+        mass -> log10(M200/Msun)
+        radius -> radius in kpc for evaluation
+
+        """
+        
+        #define constants in cgs
+        Ggrav=6.67259e-8
+        kpc2cm=3.086e18*1e3
+
+        #cosntant in front inclusding rhos
+        dmC=self.dmC(mass,redshift)
+        r200kpc=self.r200(mass,redshift)
+        rhos=self.getrhos(mass,redshift)
+        const=Ggrav*4.*np.pi*rhos*(r200kpc*kpc2cm)**3/dmC**3
+        
+        #radius/R200*conc
+        x=dmC*radius/r200kpc
+
+        #integral
+        integral=(1/(x+1)+np.log(x+1)-1)
+                
+        #all together
+        acc=const*integral/(radius*kpc2cm)**2
+
+        return acc
+    
+        
+
+        
+
+
+        
+        
+
         
