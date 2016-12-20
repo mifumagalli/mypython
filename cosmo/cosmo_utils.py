@@ -141,8 +141,6 @@ class Cosmocal:
         #plt.plot(m,fcnu0(1.686/(fsigma0(m)*self.Dz(0.))))
         #plt.show()
         #exit()
-
-        cMz=11.4
         
         return cMz
     
@@ -160,14 +158,14 @@ class Cosmocal:
         rho_crit_zero=self.cosmo.critical_density(0.)        
         #in baryon
         rho_mean_zero=rho_crit_zero*self.cosmo.Ob0
-        rho_mean=rho_mean_zero.value*(1+redshift)**3
+        rho_mean=rho_mean_zero.value*(1+redshift)**3 #g/cm^3
 
         #in number density (25% He, 75% H)
         mp=1.67262e-24 #proton mass in g
         X=0.75
         Y=1-X
         mu=1./(2.*X+3./4.*Y) #mean molecular w.
-        n_mean=rho_mean/(mu*mp)
+        n_mean=rho_mean/(mu*mp) #1/cm^3 for mixture of H+He
         
         return rho_mean, n_mean
     
