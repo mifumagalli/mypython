@@ -79,13 +79,16 @@ def parse_xml(path='./',nproc=12):
             times=np.array(grabtime(currentlist))
             delta_time=np.abs(times-reference_time)/3600.
             currentlist=np.array(currentlist)
-            #now handle by keyword
-            if((kk == 'SKYFLAT') or (kk == 'FLAT') or (kk == 'ARC') or (kk == 'DARK') or (kk == 'BIAS')):
-            #This is when you allow for multiple
+            #now handle by keyword according to calibration plan
+            if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
+                #grab daily calibrations 
+                recent=np.where(delta_time <= 1.1*24.)
+                xml_info[kk]=currentlist[recent[0]]
+                print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
+            elif((kk == 'SKYFLAT') or (kk == 'DARK')):
                 #grab within 20 days
                 recent=np.where(delta_time <= 20*24.)
                 xml_info[kk]=currentlist[recent[0]]
-                
                 print 'Found {0} {1} taken within 20 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
             else:
