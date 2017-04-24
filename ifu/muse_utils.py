@@ -347,7 +347,7 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
 
     return wavec, spec_flx, spec_err, spec_med
 
-def cubestat(cube,region=False,delta=10):
+def cubestat(cube,region=None,delta=10,mask=None):
 
     """
     Take the cube and measure the pixel rms in chunks of 10A
@@ -355,6 +355,8 @@ def cubestat(cube,region=False,delta=10):
 
     region -> False, use the entire cube
               or set to min x,y max x,y or region to be used
+    mask -> if set to a segmentation map, exclude soruces and 
+            gap 
 
     delta  -> wavelength window in A
 
@@ -372,11 +374,17 @@ def cubestat(cube,region=False,delta=10):
 
     #find blocks of lambda within the cube 
     nblocks=int(np.floor((np.max(wavec)-np.min(wavec))/delta))
-
+    
+    #make empty mask if not provided
+    if not(mask.any()):
+        nz,nx,ny=cubdata.shape
+        mask=np.zeros((nx,ny))
+        
     #carve out box if needed in spatial direction
     if(region):
         cubdata=cubdata[:,region[0]:region[2],region[1]:region[3]]
-
+        mask=mask[region[0]:region[2],region[1]:region[3]]
+            
     #init arrays
     rms=np.zeros(nblocks)
     wrms=np.zeros(nblocks)
@@ -388,11 +396,17 @@ def cubestat(cube,region=False,delta=10):
         wmin=np.min(wavec)+ii*delta
         wmax=wmin+delta
         wcent=wmin+0.5*delta
-        wpix=np.where((wavec >= wmin) & (wavec < wmax))
-
-        rms[ii]=np.std(cubdata[wpix,:,:])
+        wpix,=np.where((wavec >= wmin) & (wavec < wmax))
+        allpix=[]
+        #make stack of pixels
+        for ww in wpix:
+            pixgood=np.where(mask < 1)
+            layer=cubdata[ww,:,:]
+            allpix.append(layer[pixgood])
+            
+        rms[ii]=np.std(np.nan_to_num(allpix))
         wrms[ii]=wcent
-
+        
     #normalise units from pixel to as^2 and from pix to A
     rms=rms*1e-20/lambdabin/pixbin**2
     return wrms,rms

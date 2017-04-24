@@ -360,3 +360,188 @@ def combine_cubes(cubes,masks,regions=True,final=False):
         scr.write("Cube2Im -cube "+cmed+" -out "+imed)
         scr.close()
         subprocess.call(["sh",scriptname])
+
+def dataquality(cubeslist,maskslist):
+
+    
+    """
+    Perform bunch of QA checks to asses the final data quality of reduction
+    
+    """
+    
+    import os
+    import numpy as np
+    from astropy.io import fits
+    from mypython.fits import pyregmask as msk
+    from mypython.ifu import muse_utils as mutil
+    from mypython.ifu import muse_source as msrc
+    from matplotlib.backends.backend_pdf import PdfPages
+    import matplotlib.pyplot as plt
+    import matplotlib.cm as cm
+    from astropy.stats import sigma_clipped_stats
+    
+    try:
+        from photutils import CircularAperture, aperture_photometry,\
+            data_properties, properties_table, centroids
+    except:
+        print("To run checks need photutils package")
+        return
+
+    print("Perform QA checks...")
+
+    #make QA folder
+    if not os.path.exists('QA'):
+        os.makedirs('QA')
+
+    #cube names
+    cname="COMBINED_CUBE.fits"
+    iname="COMBINED_IMAGE.fits"
+   
+    #first identify bright sources in final white image 
+    catsrc=msrc.findsources(iname,cname,check=True,output='QA',nsig=5,minarea=20)
+
+    #make rsdss images
+    if not(os.path.isfile('QA/sdssr.fits')):
+        mutil.cube2img(cname,write='QA/sdssr.fits',wrange=None,helio=0,filt=129)
+    rsdssall=fits.open('QA/sdssr.fits')
+    segmask=fits.open('QA/segmap.fits')
+    whiteref=fits.open(iname)
+
+    #select round and bright objects 
+    shapesrc=catsrc['a']/catsrc['b']
+    roundsrc=catsrc[np.where((shapesrc < 1.1) & (catsrc['cflux'] > 50))]
+    imgfield=fits.open(iname)
+    rms=np.std(imgfield[0].data)
+
+    #perform aperture photometry on rband image - data already skysub
+    positions = [roundsrc['x'],roundsrc['y']]
+    apertures = CircularAperture(positions, r=10.)
+    phot_table = aperture_photometry(rsdssall[1].data, apertures)
+    phot_table_white = aperture_photometry(whiteref[0].data, apertures)
+    rmag=-2.5*np.log10(phot_table['aperture_sum'])+rsdssall[0].header['ZPAB']
+    wmag=-2.5*np.log10(phot_table_white['aperture_sum'])
+
+
+    #find FWHM on rband image
+    fwhm=np.zeros(len(rmag))
+    for ii in range(len(rmag)):
+        subdata=rsdssall[1].data[roundsrc['y'][ii]-10:roundsrc['y'][ii]+10,\
+                                     roundsrc['x'][ii]-10:roundsrc['x'][ii]+10]
+        tdfit=centroids.fit_2dgaussian(subdata, error=None, mask=None)
+        fwhm[ii]=2.3548*0.5*(tdfit.x_stddev+tdfit.y_stddev)*rsdssall[0].header['PC2_2']*3600.
+
+    #find rms of cube - mask sources and add edge buffer
+    maskwbuffer=np.copy(segmask[1].data)
+    maskwbuffer[0:30,:]=9999
+    maskwbuffer[-31:-1,:]=9999
+    maskwbuffer[:,0:30]=9999
+    maskwbuffer[:,-31:-1]=9999
+    cwrms,crms=mutil.cubestat(cname,mask=maskwbuffer)
+
+    #open diagnostic output
+    with PdfPages('QA/QAfile.pdf') as pdf:
+
+        ###########################
+        #display field with r mag #
+        ###########################
+
+        plt.figure(figsize=(10,10))
+        plt.imshow(imgfield[0].data,origin='low',clim=[-0.5*rms,0.5*rms],cmap='gray_r')
+        #mark round soruces
+        plt.scatter(roundsrc['x'],roundsrc['y'],color='red')
+        for ii in range(len(rmag)):
+            plt.text(roundsrc['x'][ii],roundsrc['y'][ii]," "+str(rmag[ii]),color='red')
+        plt.title('Round sources with SDSS r mag')
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
+
+
+
+        ###########################
+        #display FWHM             #
+        ###########################
+        plt.figure(figsize=(10,10))
+        plt.scatter(rmag,fwhm,color='red')
+        plt.xlabel('Source rmag')
+        plt.ylabel('FWHM (arcsec)')
+        plt.title('Median FWHM {}'.format(np.median(fwhm)))
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
+
+        ###########################
+        #check centroid           #
+        ###########################
+        plt.figure(figsize=(10,10))
+        
+        #loop on exposures
+        for tmpc in open(cubeslist,'r'):
+            thisob=tmpc.split('/')[1]
+            thisexp=tmpc.split('_')[3]
+            wname='../{}/Proc/DATACUBE_FINAL_LINEWCS_{}_white2.fits'.format(thisob,thisexp)
+            wfits=fits.open(wname)
+            
+            #now loop on sources
+            delta_x=np.zeros(len(rmag))
+            delta_y=np.zeros(len(rmag))
+            for ii in range(len(rmag)):
+                subdata=wfits[0].data[roundsrc['y'][ii]-10:roundsrc['y'][ii]+10,\
+                                          roundsrc['x'][ii]-10:roundsrc['x'][ii]+10]
+                x1,y1=centroids.centroid_2dg(subdata)
+                delta_x[ii]=10.5-x1
+                delta_y[ii]=10.5-y1
+                
+            #plot for this subunit
+            plt.scatter(delta_x*rsdssall[0].header['PC2_2']*3600.,delta_y*rsdssall[0].header['PC2_2']*3600.)
+
+        plt.xlabel('Delta x (arcsec)')
+        plt.ylabel('Delta y (arcsec)')
+        plt.title('Check exposure aligment')
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
+        
+        ###########################
+        #check fluxing            #
+        ###########################
+   
+        #make a check on fluxing 
+        plt.figure(figsize=(10,10))
+                   
+        #loop on exposures
+        for tmpc in open(cubeslist,'r'):
+            thisob=tmpc.split('/')[1]
+            thisexp=tmpc.split('_')[3]
+            wname='../{}/Proc/DATACUBE_FINAL_LINEWCS_{}_white2.fits'.format(thisob,thisexp)
+            wfits=fits.open(wname)
+            
+            phot_this_white = aperture_photometry(wfits[0].data, apertures)
+            wmag_this=-2.5*np.log10(phot_this_white['aperture_sum'])
+
+            #plot for this subunit
+            ii=np.argsort(rmag)
+            dd=wmag-wmag_this
+            plt.plot(rmag[ii],dd[ii],label=thisob+thisexp)
+
+        plt.xlabel('SDSS R mag')
+        plt.ylabel('Delta White Mag')
+        plt.title('Check exposure photometry')
+        plt.legend()
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
+
+        #display rms stats + compute stats over cubes
+        plt.figure(figsize=(10,10))
+        plt.semilogy(cwrms,crms,label='Coadd')
+        
+        for tmpc in open(cubeslist,'r'):
+            cwrms_this,crms_this=mutil.cubestat(tmpc.strip(),mask=maskwbuffer)
+            plt.semilogy(cwrms_this,crms_this,label=tmpc.split('/')[1]+tmpc.split('_')[3])
+
+        plt.xlabel('Wave (A)')
+        plt.ylabel('RMS (SB units)')
+        plt.legend()
+        plt.title('RMS in cubex')
+        pdf.savefig()  # saves the current figure into a pdf page
+        plt.close()
+        
+        
+

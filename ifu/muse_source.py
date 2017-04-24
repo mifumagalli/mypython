@@ -46,12 +46,15 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
         #white cubex images
         data=img[0].data
     data=data.byteswap(True).newbyteorder()
+    #grab effective dimension
+    nex,ney=data.shape
+
     #close fits
     img.close()
 
     #create bad pixel mask
     if(regmask):
-        Mask=msk.PyMask(header["NAXIS1"],header["NAXIS2"],regmask)
+        Mask=msk.PyMask(nex,ney,regmask)
         for ii in range(Mask.nreg):
             Mask.fillmask(ii)
             if(ii == 0):
@@ -60,7 +63,7 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
                 badmask+=Mask.mask
             badmask=1.*badmask
     else:
-        badmask=np.zeros((header["NAXIS1"],header["NAXIS2"]))
+        badmask=np.zeros((nex,ney))
 
     if(check):
         print('Dumping badmask')

@@ -178,11 +178,11 @@ class Muse(object):
         #loop over OBs
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
+            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(oob+1,ll+1))
-                fl2.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(oob+1,ll+1))
+                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
         fl1.close()
         fl2.close()
         
@@ -204,18 +204,23 @@ class Muse(object):
         #loop over OBs
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
+            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(oob+1,ll+1))
-                fl2.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(oob+1,ll+1))
+                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
         fl1.close()
         fl2.close()
         
         #make the temp combine
         cx.combine_cubes("cubes_final.lst","masks_final.lst",final=True)
-        os.chdir(topdir)
 
+        #now run quality checks on final redux products
+        #Typically one uses first pass, so check those
+        cx.dataquality("cubes.lst","masks.lst")
+
+        #back to top level
+        os.chdir(topdir)
         print 'All done with cubex redux'
         
 
@@ -324,11 +329,11 @@ class Muse(object):
         #loop over OBs
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../OB{}/Proc/OBJECT_RED_0*.fits*".format(oob+1)))
+            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../OB{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(oob+1,ll+1))
-                fl2.write('../OB{}/Proc/MASK_EXP{}_ILLCORR_edges.fits\n'.format(oob+1,ll+1))
+                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/MASK_EXP{}_ILLCORR_edges.fits\n'.format(listob[oob],ll+1))
         fl1.close()
         fl2.close()
         
