@@ -455,8 +455,6 @@ def dataquality(cubeslist,maskslist):
         pdf.savefig()  # saves the current figure into a pdf page
         plt.close()
 
-
-
         ###########################
         #display FWHM             #
         ###########################

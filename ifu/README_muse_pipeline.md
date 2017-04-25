@@ -176,9 +176,9 @@ of continuum detected sources.
 Next, the code comabined exposures into final cubes. Masks with IFU edges are automatically
 propagated.
 
-If there are obvious large scale artifacts that should be mask, this can simply achieved by creating
-a ds9 region file inside the OB#/Proc folder, with same name as the mask from the pipeline but
-extension .reg. The region file should be in ds9 format, with image coordinate.
+If there are obvious large scale artifacts that should be masked, this can simply achieved by creating a ds9 region file inside the OB#/Proc folder, with same name as the mask from the pipeline but
+extension .reg. The region file should be in ds9 format, with image coordinate. In case no masks are found, as a rule, the code also searches for masks from the cubex reduction (above). These masks are not used if new masks are found. 
+
 
 In the end, a final coadded cube is reconstructed in 
 

@@ -1005,13 +1005,23 @@ def combine_cubes(listcubes,listmasks,regions=True):
         for i,cmask in enumerate(clistmask):
             
             #create region name
-            regname=(cmask.split(".fits")[0])+".reg"
-                
+            regname_line=(cmask.split(".fits")[0])+".reg"
+            #reconstruct cubex region name 
+            rnpath=(cmask.split("MASK")[0])
+            rnexp=(cmask.split("_")[1])
+            regname_cubex=rnpath+"DATACUBE_FINAL_LINEWCS_"+rnexp+"_fix2_SliceEdgeMask.reg"
+          
             #search if file exist
-            if(os.path.isfile(regname)):
-                
+            if(os.path.isfile(regname_line)):
+                regname=regname_line
+            elif(os.path.isfile(regname_cubex)):
+                regname=regname_cubex
+            else: 
+                regname=None
+
+            if(regname):
                 #update the mask 
-                print ("Updating mask for {}".format(regname))
+                print ("Updating mask using {}".format(regname))
                 
                 #open fits
                 cfits=fits.open(cmask)
