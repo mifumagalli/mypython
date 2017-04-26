@@ -82,7 +82,7 @@ def parse_xml(path='./',nproc=12):
             #now handle by keyword according to calibration plan
             if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
                 #grab daily calibrations 
-                recent=np.where(delta_time <= 12.)
+                recent=np.where(delta_time <= 17.)
                 xml_info[kk]=currentlist[recent[0]]
                 print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
