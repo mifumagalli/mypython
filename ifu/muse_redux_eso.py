@@ -155,6 +155,8 @@ def manual_align(listimg):
     from astropy import wcs
     import numpy as np
     import PyGuide
+    import os
+    from shutil import copyfile
 
     ##define the widget class here
     class align_tk(Tkinter.Tk):
@@ -217,7 +219,13 @@ def manual_align(listimg):
             self.mouse_position=Tkinter.StringVar()
             self.mouse_position.set('Mouse:(None,None)')
             self.mouse_position_w=Tkinter.Label(self.menuframe,textvariable = self.mouse_position)
-            self.mouse_position_w.grid(column=0,row=4,columnspan=3)
+            self.mouse_position_w.grid(column=0,row=0,columnspan=3)
+
+            self.help=Tkinter.StringVar()
+            self.help.set('Mark stars with "c"; save and exit with "q"')
+            self.help_w=Tkinter.Label(self.menuframe,textvariable = self.help)
+            self.help_w.grid(column=0,row=1,columnspan=3)
+
 
         def init_dataframe(self):
 
@@ -396,13 +404,24 @@ def manual_align(listimg):
             id_ref=np.copy(starid)
             first=False
         else:
+            pass
             ##main loop 
             app = align_tk(name,None,refra=ra_ref,refdec=dec_ref,refid=id_ref)
             app.title('Align {}'.format(name))
             app.mainloop()
-            ra_off.append(np.mean(ra_ref-starra))
-            dec_off.append(np.mean(dec_ref-stardec))
+            ra_off.append(np.mean(-ra_ref+starra))
+            dec_off.append(np.mean(-dec_ref+stardec))
         
+        
+        #save in fits after making backup copy 
+        copyfile('OFFSET_LIST.fits','OFFSET_LIST.fits.bck')
+        strcut=fits.open('OFFSET_LIST.fits',mode='update')
+       
+        for xx in range(len(dec_off)):
+            strcut[1].data[xx]['RA_OFFSET']=ra_off[xx]
+            strcut[1].data[xx]['DEC_OFFSET']=dec_off[xx]
 
-        #save in fits
+        strcut.flush()
+        strcut.close()
+
         #print ra_off, dec_off
