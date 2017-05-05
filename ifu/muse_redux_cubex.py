@@ -113,7 +113,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
             subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
             
         print 'Cubefix ', cube
-        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])
+        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source]) 
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 

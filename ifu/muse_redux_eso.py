@@ -239,8 +239,10 @@ def manual_align(listimg):
             self.wcs=wcs.WCS(self.fits[1].header)
 
             #init vmin/vmax and variables 
-            self.vmin=1.
-            self.vmax=10.
+            self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
+            if(self.vmin <= 0):
+                self.vmin=0.1
+            self.vmax=np.median(self.fitimg)+1.*np.std(self.fitimg)
             self.centx=[]
             self.centy=[]
             self.nstars=1
@@ -338,9 +340,14 @@ def manual_align(listimg):
             #rescale image when mouse 3 down
             if(event.button == 3):
                 
-                #update vmin vmax and send to update                
-                self.vmin=1*(1.-(self.preferwinwidth-event.x)/(1.*self.preferwinwidth))
-                self.vmax=10*(1.-(self.preferwinheight-event.y)/(1.*self.preferwinheight))
+                #update vmin vmax and send to update  
+                minstarts=np.median(self.fitimg)-1.*np.std(self.fitimg)
+                if(minstarts <= 0):
+                    minstarts=0.1
+                maxstart=np.median(self.fitimg)+1.*np.std(self.fitimg)
+                
+                self.vmin=minstarts*(1.-(self.preferwinwidth-event.x)/(1.*self.preferwinwidth))
+                self.vmax=maxstart*(1.-(self.preferwinheight-event.y)/(1.*self.preferwinheight))
                 if(self.vmin <= 0):
                     self.vmin = 1e-5
                 elif(self.vmin > self.vmax):
