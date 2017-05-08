@@ -2,6 +2,10 @@
 global starra
 global stardec
 global starid
+global boxlx
+global boxly
+global boxrx
+global boxry
 
 def reduxgui(listimg,mode='align'):
 
@@ -26,7 +30,7 @@ def reduxgui(listimg,mode='align'):
          . 'c': mark star
          . 'q': quit and save
          . RMB: hold and move: stretch image scaling
-         . LMB: hold and move: mark region to mask
+         . l/r: mark region to mask by selecting left-bottom and top-right corner
 
     """
 
@@ -43,6 +47,7 @@ def reduxgui(listimg,mode='align'):
     import PyGuide
     import os
     from shutil import copyfile
+    import math
 
     ##define the widget class here
     class align_tk(Tkinter.Tk):
@@ -130,6 +135,12 @@ def reduxgui(listimg,mode='align'):
             self.apply=Tkinter.Button(self.menuframe,text="Apply",command=self.setscale)
             self.apply.grid(column=3,row=3)
 
+            
+            self.warning=Tkinter.StringVar()
+            self.warning.set('STATUS: All good!')
+            self.warning_w=Tkinter.Label(self.menuframe,textvariable = self.warning)
+            self.warning_w.grid(column=0,row=4,sticky='W',columnspan=4)
+
         def init_dataframe(self):
 
             #work out dimensions for twod image
@@ -138,8 +149,12 @@ def reduxgui(listimg,mode='align'):
            
             #now open image
             self.fits=fits.open(self.filename)
-            self.fitimg=np.nan_to_num(self.fits[1].data)+0.1
-            self.wcs=wcs.WCS(self.fits[1].header)
+            try:
+                self.fitimg=np.nan_to_num(self.fits[1].data)+0.1
+                self.wcs=wcs.WCS(self.fits[1].header)
+            except:
+                self.fitimg=np.nan_to_num(self.fits[0].data)+0.1
+                self.wcs=wcs.WCS(self.fits[0].header)
 
             #init vmin/vmax and variables 
             self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
@@ -152,15 +167,23 @@ def reduxgui(listimg,mode='align'):
             self.centx=[]
             self.centy=[]
             self.nstars=1
+            self.nbox=1
             global starra
             global stardec
             global starid
+            global boxlx
+            global boxly
+            global boxrx
+            global boxry
             starra=[]
             stardec=[]
             starid=[]
+            boxlx=[]
+            boxly=[]
+            boxrx=[]
+            boxry=[]
             self.drawdata()
             
-
         def drawdata(self,refresh=False):
                 
             if(refresh):
@@ -225,7 +248,14 @@ def reduxgui(listimg,mode='align'):
             
             if(len(self.centx) > 0):
                 self.twodimagePlot_prop["axis"].plot(self.centx,self.centy,'o',color='red')
-        
+            
+            for ii in range(len(boxrx)):
+                self.twodimagePlot_prop["axis"].plot([boxlx[ii],boxrx[ii]],[boxly[ii],boxly[ii]],color='red')
+                self.twodimagePlot_prop["axis"].plot([boxrx[ii],boxrx[ii]],[boxly[ii],boxry[ii]],color='red')
+                self.twodimagePlot_prop["axis"].plot([boxlx[ii],boxrx[ii]],[boxry[ii],boxry[ii]],color='red')
+                self.twodimagePlot_prop["axis"].plot([boxlx[ii],boxlx[ii]],[boxly[ii],boxry[ii]],color='red')
+                self.twodimagePlot_prop["axis"].text(boxrx[ii],boxry[ii],\
+                                                         "{}".format(ii+1),color='red')
             if(len(self.refid) > 0):
                 for ii,ll in enumerate(self.refid):
                     rx,ry=self.wcs.wcs_world2pix(self.refra[ii],self.refdec[ii],1)
@@ -291,7 +321,26 @@ def reduxgui(listimg,mode='align'):
                 starid.append(self.nstars)
                 self.nstars=self.nstars+1
                 self.update_twodimage(update=True)
-                
+            #store bottom left corner on L 
+            elif(event.key == "l"):
+                try:
+                    check=float(event.xdata)+float(event.ydata)
+                    boxlx.append(event.xdata)
+                    boxly.append(event.ydata)
+                    self.warning.set("STATUS: Now mark top/right corner!")
+                except:
+                    self.warning.set("STATUS: Missed data region... try again!")
+            elif(event.key == "r"):
+                try:
+                    check=float(event.xdata)+float(event.ydata)
+                    boxrx.append(event.xdata)
+                    boxry.append(event.ydata)
+                    self.nbox=self.nbox+1
+                    self.update_twodimage(update=True)
+                    self.warning.set("STATUS: All good!")
+                except:
+                    self.warning.set("STATUS: Missed data region... try again!")
+
 
         def OnExit(self):
             """ Quit all on exit """
@@ -304,7 +353,10 @@ def reduxgui(listimg,mode='align'):
     global starid
     global starra
     global stardec
-
+    global boxlx
+    global boxly
+    global boxrx
+    global boxry
 
     #check modes and run accordingly:
     
@@ -352,6 +404,26 @@ def reduxgui(listimg,mode='align'):
         strcut.flush()
         strcut.close()
     elif(mode is 'maskcubex'): 
-        pass
+        print('REDUXGUI: Run in maskcubex mode')
+        for ii in open(listimg):
+            whiteimg="_".join(ii.split("_")[0:-1])+"_white2.fits"
+            region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
+
+            #run gui
+            app = align_tk(whiteimg,None,mode=mode)
+            app.title('Mask {}'.format(whiteimg))
+            app.mainloop()
+        
+            #on exit, dump to region file
+            if(len(boxrx) > 0):
+                rfl=open(region,'w')
+                rfl.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
+                rfl.write('image\n')
+                for bb in range(len(boxrx)):
+                    dx=(boxrx[bb]-boxlx[bb])/2.
+                    dy=(boxry[bb]-boxly[bb])/2.
+                    rfl.write('box({},{},{},{},0)\n'.format(boxlx[bb]+dx,boxly[bb]+dy,2.*dx,2*dy))
+                rfl.close()
+                    
     else:
         print ('Mode {} not found!'.format(mode))
