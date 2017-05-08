@@ -52,14 +52,13 @@ It performs sky subtraction using ESO recipies, aligns exposures, and coadd them
 
 Possible points of failure are bad aligment of the exposures before coadding.
 That may require manual interaction with the algnment step in muse_exp_align
-such as tweaking the threshold. If all attempts fail, run muse_redux_eso.manual_align
+such as tweaking the threshold. If all attempts fail, run muse_redux_gui.reduxgui
 for manual aligment.
 
 E.g.
 
->> from mypython.ifu import muse_redux_eso as eso
->> eso.manual_align('align.sof')
-
+>> from mypython.ifu import muse_redux_gui as gui
+>> gui.reduxgui('align.sof',mode='align')
 
 Finally, one can register the absolute calibrations with code in muse_utils.py, 
 where a procedure adjust_wcsoffset allows to reset the WCS zero point for cube and image.
