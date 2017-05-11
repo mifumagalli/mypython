@@ -1,9 +1,8 @@
 Some info on muse redux [MF, March 2016]
 ---------------------------------------
 
-> Tested with eso muse pipeline 1.2.1
-> Tested with eso muse pipeline 1.6.2
-> Tested with Cubex 1.5
+> Tested with eso muse pipeline 1.2.1, 1.6.2, 2.0.1
+> Tested with Cubex 1.5, 1.6
 > Tested with ZAP v1
 
 * Step 1
@@ -123,6 +122,13 @@ cubexcombine/COMBINED_CUBE.fits
 If there are obvious large scale artifact that should be mask, this can simply achieved by creating
 a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate.
+To aid the preparation of masks, run muse_redux_gui in 'maskcubex' mode.
+
+E.g.
+
+>> from mypython.ifu import muse_redux_gui as gui
+>> gui.reduxgui('cubes.lst',mode='maskcubex')
+
 
 Once the coadded cube is finally ready, the pipeline proceeds to perform a third iteration of 
 cubex with illumination correction and skysubtraction that uses source masking from the high SN cubes.
@@ -142,6 +148,7 @@ Optional: one can pass a ds9 region (image coordinates) containing regions to be
 	  The syntax in this case is 
 	  
 	  >> muse.cubex_process(skymask='cubexcombine/skymask.reg')
+
 
 
 C. LINE OPTIMISED REDUCTION

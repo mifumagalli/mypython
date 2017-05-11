@@ -172,22 +172,29 @@ def make_dark(xml_info,nproc=12):
     #grab the dark
     dark_list=xml_info["DARK"]
 
-    #Write the sof file 
-    sof=open("../Script/dark.sof","w")
-    for ii in dark_list:
-        sof.write("../Raw/{0}.fits.fz DARK\n".format(ii)) 
-    sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
-    sof.close()
+    #handle nicels case of no dark
+    if(len(dark_list) > 0):
 
-    #Write the command file 
-    scr=open("../Script/make_dark.sh","w")
-    scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=dark.log muse_dark --nifu=-1 --merge ../Script/dark.sof")
-    scr.close()
+        #Write the sof file 
+        sof=open("../Script/dark.sof","w")
+        for ii in dark_list:
+            sof.write("../Raw/{0}.fits.fz DARK\n".format(ii)) 
+        sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
+        sof.close()
+
+        #Write the command file 
+        scr=open("../Script/make_dark.sh","w")
+        scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+        scr.write("esorex --log-file=dark.log muse_dark --nifu=-1 --merge ../Script/dark.sof")
+        scr.close()
+
+        #Run pipeline 
+        subprocess.call(["sh", "../Script/make_dark.sh"])
     
-    #Run pipeline 
-    subprocess.call(["sh", "../Script/make_dark.sh"])
-   
+    else:
+        print ("No DARK found... return!")
+        return
+
 def make_flat(xml_info,nproc=12):
 
     #grab the flat
