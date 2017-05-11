@@ -376,7 +376,7 @@ def cubestat(cube,region=None,delta=10,mask=None):
     nblocks=int(np.floor((np.max(wavec)-np.min(wavec))/delta))
     
     #make empty mask if not provided
-    if not(mask.any()):
+    if(mask == None):
         nz,nx,ny=cubdata.shape
         mask=np.zeros((nx,ny))
         
