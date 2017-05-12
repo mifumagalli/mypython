@@ -247,7 +247,11 @@ def make_twiflat(xml_info,nproc=12):
     #grab the twiflat
     flat_list=xml_info["SKYFLAT"]
     geom_cat=xml_info["GEOMETRY_TABLE"][0]
-    
+
+    #check time stamp for vignetting
+    time_flat=grabtime(flat_list)
+    vignetting_cat=xml_info["VIGNETTING_MASK"][0]
+
     #Write the sof file 
     sof=open("../Script/twilight.sof","w")
     for ii in flat_list:
@@ -256,7 +260,13 @@ def make_twiflat(xml_info,nproc=12):
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
-    sof.write("WAVECAL_TABLE.fits WAVECAL_TABLE\n") 
+    sof.write("WAVECAL_TABLE.fits WAVECAL_TABLE\n")
+
+    #add vignetting as appropriate before March 2017
+    legacy_time=time.mktime(time.strptime("11 Mar 17", "%d %b %y"))       
+    if(time_flat[0] < legacy_time):
+        sof.write("{0} VIGNETTING_MASK\n".format(vignetting_cat)) 
+
     sof.close()
 
     #Write the command file 
