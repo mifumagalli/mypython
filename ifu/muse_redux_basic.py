@@ -322,7 +322,10 @@ def make_stdflux(xml_info,nproc=12):
 def make_objects(xml_info,nproc=12):
 
     #grab the objects
-    obj_list=xml_info["OBJECT"]
+    obj_list=list(xml_info["OBJECT"])
+    #sort by time - useful is offsets fields available
+    obj_list.sort()
+    
     ill=xml_info["ILLUM"][0]
     geom_cat=xml_info["GEOMETRY_TABLE"][0]
     pix_tab=xml_info["BADPIX_TABLE"][0]
@@ -352,34 +355,44 @@ def make_objects(xml_info,nproc=12):
     subprocess.call(["sh", "../Script/make_scibasic.sh"])
 
 
-def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None):
+def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
 
     import shutil
     from astropy.io import fits
 
-    #Now process the science     
-    #Search how many exposures are there
-    scils=glob.glob("OBJECT_RED_0*.fits*")
+    #Now process the science
+
+    #if scilist not provided, create manaully
+    if not (scilist):
+        #Search how many exposures are there
+        scils=glob.glob("OBJECT_RED_0*.fits*")
+        scilist = np.arange(len(scils))+1
+
+    #how many exposures
     nsci=len(scils)
 
+    #create suffixes as needed
+    suffix = ''
+    if(refcube):
+        print 'Using external WCS structure for cube output'
+        suffix += '_pos'
+    if(wcsoff):
+        suffix += '_off'  
+    
     #loop on exposures and reduce frame without sky subtraction 
     for exp in range(nsci):
-        
-        if(wcsoff):
-            cname="DATACUBE_FINAL_EXP{0:d}_off.fits".format(exp+1)
-            pname="PIXTABLE_REDUCED_EXP{0:d}_off.fits".format(exp+1)
-            iname="IMAGE_FOV_EXP{0:d}_off.fits".format(exp+1)
-        else:
-            cname="DATACUBE_FINAL_EXP{0:d}.fits".format(exp+1)
-            pname="PIXTABLE_REDUCED_EXP{0:d}.fits".format(exp+1)
-            iname="IMAGE_FOV_EXP{0:d}.fits".format(exp+1)
 
+        #reconstruct names
+        cname="DATACUBE_FINAL_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
+        pname="PIXTABLE_REDUCED_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
+        iname="IMAGE_FOV_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
+            
         if not os.path.isfile(cname):
 
             print "Processing exposure {0:d}".format(exp+1)
             
             #Write the sof file 
-            sof=open("../Script/scipost_{0:d}.sof".format(exp+1),"w")
+            sof=open("../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
             sof.write("{0} ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
             sof.write("../Raw/{0}.fits SKY_LINES\n".format(xml_info["SKY_LINES"][0])) 
             sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(xml_info["EXTINCT_TABLE"][0])) 
@@ -392,10 +405,11 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None):
 
             for ifu in range(24):
                 if(wcsoff):
-                    #check if RA/Dec corrected pix tab exists
-                    oldpixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(exp+1,ifu+1)
-                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}_off.fits".format(exp+1,ifu+1)
                     
+                    #check if RA/Dec corrected pix tab exists
+                    oldpixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
+                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}_off.fits".format(scilist[exp],ifu+1)
+                 
                     if not os.path.isfile(ifupixtab):
                         print 'Correcting RA/Dec in pix table for ifu ', ifu+1
                         #make a copy
@@ -410,7 +424,8 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None):
                         print 'Using existing corrected pixel tables for ifu', ifu+1
                 else:
                     #handle case of no offset
-                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(exp+1,ifu+1)
+                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
+
                 #now write the pix tab in sof
                 sof.write("{} PIXTABLE_OBJECT\n".format(ifupixtab)) 
                 
@@ -423,11 +438,11 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None):
             scr=open("../Script/make_scipost_{0:d}.sh".format(exp+1),"w")
             scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-            scr.write('esorex --log-file=scipost_{0:d}.log muse_scipost --skymethod="none" --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(exp+1))
+            scr.write('esorex --log-file=scipost_{0:d}.log muse_scipost --skymethod="none" --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(scilist[exp]))
             scr.close()
     
             #Run pipeline 
-            subprocess.call(["sh", "../Script/make_scipost_{0:d}.sh".format(exp+1)])    
+            subprocess.call(["sh", "../Script/make_scipost_{0:d}.sh".format(scilist[exp])])    
             subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
             subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
             subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
