@@ -255,7 +255,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
         #back to top
         os.chdir(topdir)
 
-def combine_cubes(cubes,masks,regions=True,final=False):
+def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
 
     """
     Combine a bunch of cubes using masks with CubeCombine
@@ -265,6 +265,8 @@ def combine_cubes(cubes,masks,regions=True,final=False):
     regions  -> if True, code searches for ds9 region files inside path with same name as 
                 pipeline mask (.reg), to mask additional area that one wants to clip
     final    -> is True, append final tag to name and prepare median cubes
+    
+    halfset  -> if set to tag name, append/uses suffix for coadding indepenent halfs 
 
     """
     import subprocess
@@ -280,11 +282,20 @@ def combine_cubes(cubes,masks,regions=True,final=False):
         iname="COMBINED_IMAGE_FINAL.fits"
         cmed="COMBINED_CUBE_MED_FINAL.fits"
         imed="COMBINED_IMAGE_MED_FINAL.fits"
+        scriptname='runcombine_final.sh'
+    elif(halfset):
+        cname="COMBINED_CUBE_{}.fits".format(halfset)
+        iname="COMBINED_IMAGE_{}.fits".format(halfset)
+        cmed="COMBINED_CUBE_MED_{}.fits".format(halfset)
+        imed="COMBINED_IMAGE_MED_{}.fits".format(halfset)
+        scriptname='runcombine_{}.sh'.format(halfset)
     else:
         cname="COMBINED_CUBE.fits"
         iname="COMBINED_IMAGE.fits"
         cmed="COMBINED_CUBE_MED.fits"
         imed="COMBINED_IMAGE_MED.fits"
+        scriptname='runcombine.sh'
+
 
     if(os.path.isfile(cname)):
         print ('Cube {} already exists... skip!'.format(cname))
@@ -347,11 +358,6 @@ def combine_cubes(cubes,masks,regions=True,final=False):
         print 'Combine the cube...'    
       
         #make mean cube - write this as script that can be ran indepedently 
-        if(final):
-            scriptname='runcombine_final.sh'
-        else:
-            scriptname='runcombine.sh'
-        
         scr=open(scriptname,'w')
         scr.write("export OMP_NUM_THREADS=1\n")
         scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+"\n")
