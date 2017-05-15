@@ -30,7 +30,8 @@ def reduxgui(listimg,mode='align'):
          . 'c': mark star
          . 'q': quit and save
          . RMB: hold and move: stretch image scaling
-         . l/r: mark region to mask by selecting left-bottom and top-right corner
+         . n/m: mark region to mask by selecting left-bottom and top-right corner
+         . d  : delete last region
 
     """
 
@@ -112,7 +113,7 @@ def reduxgui(listimg,mode='align'):
             self.mouse_position_w=Tkinter.Label(self.menuframe,textvariable = self.mouse_position)
             self.mouse_position_w.grid(column=0,row=2,sticky='W',columnspan=4)
 
-            self.helpm=Tkinter.Label(self.menuframe, text='Mark stars with "c"; save and exit with "q"; draw boxes with LMB')
+            self.helpm=Tkinter.Label(self.menuframe, text='Mark stars with "c"; save and exit with "q"; draw boxes with n/m; d to delete last')
             self.helpm.grid(column=0,row=0,sticky='W',columnspan=4)
 
             self.modev=Tkinter.Label(self.menuframe,text='Running in mode "{}"'.format(self.mode))
@@ -322,15 +323,21 @@ def reduxgui(listimg,mode='align'):
                 self.nstars=self.nstars+1
                 self.update_twodimage(update=True)
             #store bottom left corner on L 
-            elif(event.key == "l"):
+            elif(event.key == "n"):
+                global boxlx
+                global boxly
                 try:
                     check=float(event.xdata)+float(event.ydata)
                     boxlx.append(event.xdata)
                     boxly.append(event.ydata)
                     self.warning.set("STATUS: Now mark top/right corner!")
                 except:
+                    boxlx.append(event.xdata)
+                    boxly.append(event.ydata)
                     self.warning.set("STATUS: Missed data region... try again!")
-            elif(event.key == "r"):
+            elif(event.key == "m"):
+                global boxrx
+                global boxry
                 try:
                     check=float(event.xdata)+float(event.ydata)
                     boxrx.append(event.xdata)
@@ -340,8 +347,18 @@ def reduxgui(listimg,mode='align'):
                     self.warning.set("STATUS: All good!")
                 except:
                     self.warning.set("STATUS: Missed data region... try again!")
-
-
+            elif(event.key == "d"):
+                global boxrx
+                global boxry
+                global boxlx
+                global boxly
+                boxlx=boxlx[0:-1]
+                boxly=boxly[0:-1]
+                boxrx=boxrx[0:-1]
+                boxry=boxry[0:-1]
+                self.nbox=self.nbox-1
+                self.update_twodimage(update=True)
+                
         def OnExit(self):
             """ Quit all on exit """
             self.quit()
