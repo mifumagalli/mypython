@@ -265,7 +265,7 @@ def make_twiflat(xml_info,nproc=12):
     #add vignetting as appropriate before March 2017
     legacy_time=time.mktime(time.strptime("11 Mar 17", "%d %b %y"))       
     if(time_flat[0] < legacy_time):
-        sof.write("{0} VIGNETTING_MASK\n".format(vignetting_cat)) 
+        sof.write("../Raw/{0}.fits VIGNETTING_MASK\n".format(vignetting_cat)) 
 
     sof.close()
 
