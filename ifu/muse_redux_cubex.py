@@ -312,10 +312,11 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
             mask_new="new_"+masks
             llms=open(mask_new,"w")
             
-            #loop over and update with regions
-            for i,cmask in enumerate(listmask):
-            
-                #create region name
+             #check more than one mask                      Ruari 24/05/17 to deal with data with only 1 OB
+            if listmask.shape == ():
+                i=0
+                cmask=np.array([listmask])[0]
+               #create region name
                 regname=(cmask.split(".fits")[0])+".reg"
                 
                 #search if file exist
@@ -346,6 +347,42 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
                 else:
                     #keep current mask 
                     llms.write(cmask+'\n')
+            else:
+                #loop over and update with regions
+                for i,cmask in enumerate(listmask):
+                
+                    #create region name
+                    regname=(cmask.split(".fits")[0])+".reg"
+                    
+                    #search if file exist
+                    if(os.path.isfile(regname)):
+                        
+                        #update the mask 
+                        print ("Updating mask for {}".format(regname))
+
+                        #open fits
+                        cfits=fits.open(cmask)
+                 
+                        #init reg mask
+                        Mask = msk.PyMask(cfits[0].header["NAXIS1"],cfits[0].header["NAXIS2"],regname)
+                        for ii in range(Mask.nreg):
+                            Mask.fillmask(ii)
+                            if(ii == 0):
+                                totmask=Mask.mask
+                            else:
+                                totmask+=Mask.mask
+                
+                        #update the mask
+                        cfits[0].data=cfits[0].data*1*np.logical_not(totmask)   
+                        savename=cmask.split(".fits")[0]+'_wreg.fits'
+                        cfits.writeto(savename,clobber=True)
+                        llms.write(savename+'\n')
+                    
+                    
+                    else:
+                        #keep current mask 
+                        llms.write(cmask+'\n')
+
 
             #done with new masks
             llms.close()
