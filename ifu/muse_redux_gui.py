@@ -42,7 +42,9 @@ def reduxgui(listimg,mode='align'):
     matplotlib.use("TkAgg")
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
     from matplotlib.figure import Figure
-    from matplotlib.colors import LogNorm
+    #from matplotlib.colors import LogNorm
+    from matplotlib.colors import Normalize
+    from astropy.visualization import ZScaleInterval
     from astropy import wcs
     import numpy as np
     import PyGuide
@@ -71,8 +73,8 @@ def reduxgui(listimg,mode='align'):
             self.minsize(width=self.minwinwidth, height=self.minwinheight)
             self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
             #tweak the aspect ratio of the menu and data gui
-            self.menuaspect=[1.,0.15]
-            self.dataaspect=[1.,1.-0.15]
+            self.menuaspect=[1.,0.24*(screen_height/1080.0)]
+            self.dataaspect=[1.,1.-0.24*(screen_height/1080.0)]
             self.dpi=80
         
 
@@ -158,10 +160,12 @@ def reduxgui(listimg,mode='align'):
                 self.wcs=wcs.WCS(self.fits[0].header)
 
             #init vmin/vmax and variables 
-            self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
-            if(self.vmin <= 0):
-                self.vmin=0.05
-            self.vmax=np.median(self.fitimg)+1.*np.std(self.fitimg)
+            zscale = ZScaleInterval()
+            self.vmin, self.vmax = zscale.get_limits(self.fitimg)
+            #self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
+            #if(self.vmin <= 0):
+            #    self.vmin=0.05
+            #self.vmax=np.median(self.fitimg)+1.*np.std(self.fitimg)
             self.vminv.set('{}'.format(self.vmin))
             self.vmaxv.set('{}'.format(self.vmax))
 
@@ -243,8 +247,12 @@ def reduxgui(listimg,mode='align'):
                 self.twodimagePlot_prop["axis"].cla()
                 self.vminv.set('{}'.format(self.vmin))
                 self.vmaxv.set('{}'.format(self.vmax))
-
-            self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fitimg,origin='lower',norm=LogNorm(vmin=self.vmin,vmax=self.vmax),aspect='auto')
+            #upgraded to zscale
+            #zscale = ZScaleInterval()
+            #zmin, zmax = scale.get_limits(self.fitimg)
+            self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fitimg,origin='lower', norm=Normalize(vmin=self.vmin,vmax=self.vmax) ,aspect='auto') 
+            #norm=SymLogNorm(linthresh=2.0, linscale=0.2, vmin=self.vmin,vmax=self.vmax)
+            #norm=LogNorm(vmin=self.vmin,vmax=self.vmax)
             self.twodimagePlot_prop["image"].set_cmap('gray')
             
             if(len(self.centx) > 0):
@@ -429,6 +437,24 @@ def reduxgui(listimg,mode='align'):
             #run gui
             app = align_tk(whiteimg,None,mode=mode)
             app.title('Mask {}'.format(whiteimg))
+
+            #if region file exists then load and used for inital start
+            if (os.path.isfile(region)):
+                for reg_line_cur in open(region):
+                    print(reg_line_cur)
+                    if (reg_line_cur.startswith('box')):
+                        box_boxlx_dx, boxly_dy, dx_2, dy_2, junk = reg_line_cur.split(",")
+                        dx = float(dx_2)/2.0
+                        dy = float(dy_2)/2.0
+                        boxlx_cur = (float(box_boxlx_dx[4:-1])-dx)
+                        boxly_cur = (float(boxly_dy)-dy)
+                        boxrx.append(dx*2.0+boxlx_cur)
+                        boxry.append(dy*2.0+boxly_cur)
+                        boxlx.append(boxlx_cur)
+                        boxly.append(boxly_cur)
+                        app.nbox=app.nbox+1
+                        app.update_twodimage(update=True)
+
             app.mainloop()
         
             #on exit, dump to region file
@@ -436,6 +462,25 @@ def reduxgui(listimg,mode='align'):
                 rfl=open(region,'w')
                 rfl.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
                 rfl.write('image\n')
+                for bb in range(len(boxrx)):
+                    dx=(boxrx[bb]-boxlx[bb])/2.
+                    dy=(boxry[bb]-boxly[bb])/2.
+                    rfl.write('box({},{},{},{},0)\n'.format(boxlx[bb]+dx,boxly[bb]+dy,2.*dx,2*dy))
+                rfl.close()
+                    
+    elif(mode is 'finalmask'): 
+        print('REDUXGUI: Run in finalmask mode')                #RUari 25/05/17 added to do final step where the field is finally cropped, this runs off the cubexCOMBINED_IMAGE.fits and appends the regions to all exopsures
+
+        app = align_tk('COMBINED_IMAGE.fits',None,mode='maskcubex')
+        app.title('Mask {}'.format('COMBINED_IMAGE.fits'))
+        app.mainloop()
+
+        for ii in open(listimg):
+            region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
+
+            #if region file exists then load and used for inital start
+            if (os.path.isfile(region)):
+                rfl=open(region,'a')
                 for bb in range(len(boxrx)):
                     dx=(boxrx[bb]-boxlx[bb])/2.
                     dy=(boxry[bb]-boxly[bb])/2.
