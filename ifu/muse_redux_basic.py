@@ -379,7 +379,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
         scilist = np.arange(len(scils))+1
 
     #how many exposures
-    nsci=len(scils)
+    nsci=len(scilist)
 
     #create suffixes as needed
     suffix = ''
@@ -396,7 +396,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
         cname="DATACUBE_FINAL_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
         pname="PIXTABLE_REDUCED_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
         iname="IMAGE_FOV_EXP{0:d}{1}.fits".format(scilist[exp],suffix)
-            
+        
         if not os.path.isfile(cname):
 
             print "Processing exposure {0:d}".format(exp+1)
@@ -413,28 +413,32 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             if(refcube):
                 sof.write("{0} OUTPUT_WCS\n".format(refcube)) 
 
-            for ifu in range(24):
-                if(wcsoff):
-                    
-                    #check if RA/Dec corrected pix tab exists
-                    oldpixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
-                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}_off.fits".format(scilist[exp],ifu+1)
-                 
-                    if not os.path.isfile(ifupixtab):
-                        print 'Correcting RA/Dec in pix table for ifu ', ifu+1
-                        #make a copy
-                        shutil.copyfile(oldpixtab,ifupixtab)
-                        #update header with RA/Dec
-                        pixtabfits=fits.open(ifupixtab, mode='update')
-                        pixtabfits[0].header['RA']=pixtabfits[0].header['RA']-wcsoff[0][exp]
-                        pixtabfits[0].header['DEC']=pixtabfits[0].header['DEC']-wcsoff[1][exp]
-                        pixtabfits.flush()
-                        pixtabfits.close()
-                    else:
-                        print 'Using existing corrected pixel tables for ifu', ifu+1
-                else:
-                    #handle case of no offset
-                    ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
+            if(wcsoff):
+	        sof.write("OFFSET_LIST.fits OFFSET_LIST\n") 
+	    
+	    for ifu in range(24):
+            #	  if(wcsoff):
+            #	      
+            #	      #check if RA/Dec corrected pix tab exists
+            #	      oldpixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
+            #	      ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}_off.fits".format(scilist[exp],ifu+1)
+            #	   
+            #	      if not os.path.isfile(ifupixtab):
+            #		  print 'Correcting RA/Dec in pix table for ifu ', ifu+1
+            #		  #make a copy
+            #		  shutil.copyfile(oldpixtab,ifupixtab)
+            #		  #update header with RA/Dec
+            #		  pixtabfits=fits.open(ifupixtab, mode='update')
+            #		  pixtabfits[0].header['RA']=pixtabfits[0].header['RA']-wcsoff[0][exp]
+            #		  pixtabfits[0].header['DEC']=pixtabfits[0].header['DEC']-wcsoff[1][exp]
+            #		  pixtabfits.flush()
+            #		  pixtabfits.close()
+            #	      else:
+            #		  print 'Using existing corrected pixel tables for ifu', ifu+1
+            #	  else:
+            #	      #handle case of no offset
+                
+		ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
 
                 #now write the pix tab in sof
                 sof.write("{} PIXTABLE_OBJECT\n".format(ifupixtab)) 
@@ -445,7 +449,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             sof.close()
 
             #Write the command file 
-            scr=open("../Script/make_scipost_{0:d}.sh".format(exp+1),"w")
+            scr=open("../Script/make_scipost_{0:d}.sh".format(scilist[exp]),"w")
             scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
             scr.write('esorex --log-file=scipost_{0:d}.log muse_scipost --skymethod="none" --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(scilist[exp]))
