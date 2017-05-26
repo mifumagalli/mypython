@@ -105,7 +105,7 @@ def reduxgui(listimg,mode='align',refcat='None'):
             self.menuframe.grid_propagate(0)
             self.menuframe.grid()
             
-            #create a data framemuse_redux_gui.py
+            #create a data frame
             self.dataframe=Tkinter.Frame(self,width=int(self.preferwinwidth*self.dataaspect[0]), 
                                          height=int(self.preferwinheight*self.dataaspect[1]))
             self.dataframe.grid_propagate(0)
