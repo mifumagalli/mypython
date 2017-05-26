@@ -21,8 +21,8 @@ def reduxgui(listimg,mode='align',refcat='None'):
     
     refcat (optional) --> an ascii file containing a list of RA and DEC of 
                           reference objects (stars) which acts as an absolute 
-		          reference for each frame
-		 
+                          reference for each frame
+                 
     Interactive behaviour: 
 
          . 'c': mark star
@@ -54,21 +54,21 @@ def reduxgui(listimg,mode='align',refcat='None'):
        
        def __init__(self):
         
-	self.mjd     = []
-	self.starra  = []
-	self.stardec = []
-	self.starid  = []
-	self.boxlx   = []
-	self.boxly   = []
-	self.boxrx   = []
-	self.boxry   = []
+        self.mjd     = []
+        self.starra  = []
+        self.stardec = []
+        self.starid  = []
+        self.boxlx   = []
+        self.boxly   = []
+        self.boxrx   = []
+        self.boxry   = []
     
     
     class align_tk(Tkinter.Tk):
      
         def __init__(self,filename,parent,guivalues,mode='align',refra=[],refdec=[],refid=[]):
             
-	    self.root=Tkinter.Tk.__init__(self,parent)
+            self.root=Tkinter.Tk.__init__(self,parent)
             self.parent = parent
             self.filename=filename
             self.refra=refra
@@ -76,8 +76,8 @@ def reduxgui(listimg,mode='align',refcat='None'):
             self.refid=refid
             self.mode=mode
             self.guivalues=guivalues
-	    
-	    #set min and preferred size of main gui
+            
+            #set min and preferred size of main gui
             self.minwinwidth=300
             self.minwinheight=300
             screen_width = self.winfo_screenwidth()
@@ -161,7 +161,7 @@ def reduxgui(listimg,mode='align',refcat='None'):
            
             #now open image
             self.fits=fits.open(self.filename)
-	    self.mjd=self.fits[0].header['MJD-OBS'] 
+            self.mjd=self.fits[0].header['MJD-OBS'] 
             try:
                 self.fitimg=np.nan_to_num(self.fits[1].data)+0.1
                 self.wcs=wcs.WCS(self.fits[1].header)
@@ -234,7 +234,7 @@ def reduxgui(listimg,mode='align',refcat='None'):
             self.vmax=float(self.vmaxv.get())
 
             #trigger update
-	    self.update_twodimage(update=True)
+            self.update_twodimage(update=True)
 
         def update_twodimage(self,update=False):
         
@@ -261,12 +261,12 @@ def reduxgui(listimg,mode='align',refcat='None'):
                 self.twodimagePlot_prop["axis"].plot([self.boxlx[ii],self.boxlx[ii]],[self.boxly[ii],self.boxry[ii]],color='red')
                 self.twodimagePlot_prop["axis"].text(self.boxrx[ii],self.boxry[ii],"{}".format(ii+1),color='red')
             
-	    if(len(self.refid) > 0):
+            if(len(self.refid) > 0):
                 for ii in range(len(self.refid)):
                     rx,ry=self.wcs.wcs_world2pix(self.refra[ii],self.refdec[ii],1)
-                    if rx>0 and ry>0 and rx<=np.shape(self.fitimg)[1] and ry<=np.shape(self.fitimg)[0]:
-		       self.twodimagePlot_prop["axis"].text(rx,ry,"{}".format(self.refid[ii]),color='red', ha='center', va='center')
-		       self.twodimagePlot_prop["axis"].scatter(rx,ry,s=200,facecolors='none',edgecolors='red')
+                    if(rx>0 and ry>0 and rx<=np.shape(self.fitimg)[1] and ry<=np.shape(self.fitimg)[0]):
+                       self.twodimagePlot_prop["axis"].text(rx,ry,"{}".format(self.refid[ii]),color='red', ha='center', va='center')
+                       self.twodimagePlot_prop["axis"].scatter(rx,ry,s=200,facecolors='none',edgecolors='red')
 
             xmax,ymax=self.fitimg.shape
             self.twodimagePlot_prop["axis"].set_xlim(0,ymax)
@@ -280,11 +280,11 @@ def reduxgui(listimg,mode='align',refcat='None'):
             
             """ Do stuff when  mouse moves """
             
-	    try:
+            try:
                 ra,dec=self.wcs.wcs_pix2world(event.xdata,event.ydata,1)
-		x = event.xdata
-		y = event.ydata
-	        self.mouse_position.set('Cursor: xy=({0:7.2f},{1:7.2f}); radec=({2},{3})'.format(x,y,ra,dec))
+                x = event.xdata
+                y = event.ydata
+                self.mouse_position.set('Cursor: xy=({0:7.2f},{1:7.2f}); radec=({2},{3})'.format(x,y,ra,dec))
             except:
                 ra=0
                 dec=0
@@ -308,25 +308,25 @@ def reduxgui(listimg,mode='align',refcat='None'):
                  
                 self.update_twodimage(update=True)
         
-	def find_id(self,ra,dec):
-	    
-	    #Distance squared
-	    try:
-	      dist = (self.refra-ra)**2 + (self.refdec-dec)**2
-	      return self.refid[np.argmin(dist)]
-	    except:
-	      return self.nstars
-	     
-	        
+        def find_id(self,ra,dec):
+            
+            #Distance squared
+            try:
+              dist = (self.refra-ra)**2 + (self.refdec-dec)**2
+              return self.refid[np.argmin(dist)]
+            except:
+              return self.nstars
+             
+                
         def presskey(self,event):
             
             """ Do stuff when press  key  """
             
             #quit on q
-            if(event.key == "q")muse_redux_gui.py:
+            if(event.key == "q"):
                 self.OnExit()
             
-	    #centroid on c
+            #centroid on c
             elif(event.key == "c"):
                 ccd=PyGuide.CCDInfo(0,0,1)
                 centroid=PyGuide.centroid(self.fitimg,None,None,[event.xdata,event.ydata],20,ccd)
@@ -339,7 +339,7 @@ def reduxgui(listimg,mode='align',refcat='None'):
                 self.nstars=self.nstars+1
                 self.update_twodimage(update=True)
             
-	    #store bottom left corner on L 
+            #store bottom left corner on L 
             elif(event.key == "n"):
                 try:
                     check=float(event.xdata)+float(event.ydata)
@@ -360,19 +360,19 @@ def reduxgui(listimg,mode='align',refcat='None'):
                     self.warning.set("STATUS: All good!")
                 except:
                     self.warning.set("STATUS: Missed data region... try again!")
-	    
-	    elif(event.key == "d"):
-                if self.nbox > 0:
-		  self.boxlx=self.boxlx[0:-1]
+            
+            elif(event.key == "d"):
+                if(self.nbox > 0):
+                  self.boxlx=self.boxlx[0:-1]
                   self.boxly=self.boxly[0:-1]
                   self.boxrx=self.boxrx[0:-1]
                   self.boxry=self.boxry[0:-1]
                   self.nbox=self.nbox-1
-		if self.nstars > 0:
-		  self.starra=self.starra[0:-1] 
+                if(self.nstars > 0):
+                  self.starra=self.starra[0:-1] 
                   self.stardec=self.stardec[0:-1]
                   self.starid=self.starid[0:-1]
-		  self.starx=self.starx[0:-1] 
+                  self.starx=self.starx[0:-1] 
                   self.stary=self.stary[0:-1] 
                   self.nstars=self.nstars-1
                 self.update_twodimage(update=True)
@@ -380,19 +380,19 @@ def reduxgui(listimg,mode='align',refcat='None'):
         def OnExit(self):
             """ Quit all on exit """
             
-	    #Sort star IDs before return
-	    ind = np.argsort(np.array(self.starid))
-	    
-	    self.guivalues.starra  = np.array(self.starra)[ind]  
-	    self.guivalues.stardec = np.array(self.stardec)[ind]
-	    self.guivalues.starid  = np.array(self.starid)[ind] 
-	    self.guivalues.boxlx = self.boxlx
-	    self.guivalues.boxly = self.boxly
-	    self.guivalues.boxrx = self.boxrx
-	    self.guivalues.boxry = self.boxry
-	    self.guivalues.mjd   = self.mjd
-	    
-	    self.quit()
+            #Sort star IDs before return
+            ind = np.argsort(np.array(self.starid))
+            
+            self.guivalues.starra  = np.array(self.starra)[ind]  
+            self.guivalues.stardec = np.array(self.stardec)[ind]
+            self.guivalues.starid  = np.array(self.starid)[ind] 
+            self.guivalues.boxlx = self.boxlx
+            self.guivalues.boxly = self.boxly
+            self.guivalues.boxrx = self.boxrx
+            self.guivalues.boxry = self.boxry
+            self.guivalues.mjd   = self.mjd
+            
+            self.quit()
             self.destroy()
 
 
@@ -402,39 +402,39 @@ def reduxgui(listimg,mode='align',refcat='None'):
     
     if(mode is 'align'): 
         
-	#Check if an external star catalogue exists and is readable
-	if refcat != 'None':
-	  if not os.path.isfile(refcat):
-	     print('File {0} not found. Abort!'.format(refcat))
-	     return
+        #Check if an external star catalogue exists and is readable
+        if refcat != 'None':
+          if not os.path.isfile(refcat):
+             print('File {0} not found. Abort!'.format(refcat))
+             return
           
-	  print('REDUXGUI: Run in align mode with external catalogue')
-	  ra_ref = []
-	  dec_ref = []
-	  id_ref= []
-	  first=False
-	  
-	  with open(refcat) as f:
-	     for ii, line in enumerate(f):
-		if line[0] not in ['#',' ','','\n']:
-          	  temp = string.strip(line).split(None)
-	  	  ra_ref.append(float(temp[0])) 
-          	  dec_ref.append(float(temp[1])) 
-	  	  id_ref.append(ii)
+          print('REDUXGUI: Run in align mode with external catalogue')
+          ra_ref = []
+          dec_ref = []
+          id_ref= []
+          first=False
           
-	  ra_ref  = np.array(ra_ref)
-	  dec_ref = np.array(dec_ref)
-	  id_ref  = np.array(id_ref)
-	   
-	else:
-	  print('REDUXGUI: Run in align mode with first exp as reference')
+          with open(refcat) as f:
+             for ii, line in enumerate(f):
+                if(line[0] not in ['#',' ','','\n']):
+                  temp = string.strip(line).split(None)
+                  ra_ref.append(float(temp[0])) 
+                  dec_ref.append(float(temp[1])) 
+                  id_ref.append(ii)
+          
+          ra_ref  = np.array(ra_ref)
+          dec_ref = np.array(dec_ref)
+          id_ref  = np.array(id_ref)
+           
+        else:
+          print('REDUXGUI: Run in align mode with first exp as reference')
           first=True
         
-	ra_off=[]
+        ra_off=[]
         dec_off=[]
-	mjd=[]
+        mjd=[]
         
-	print('REDUXGUI: Loop over images to align')
+        print('REDUXGUI: Loop over images to align')
         for ii in open(listimg):
             name=ii.split(" ")[0]
             GUIvalues = guivalues()
@@ -448,35 +448,35 @@ def reduxgui(listimg,mode='align',refcat='None'):
                 ra_ref=np.copy(GUIvalues.starra)
                 dec_ref=np.copy(GUIvalues.stardec)
                 id_ref=np.copy(GUIvalues.starid)
-		mjd.append(GUIvalues.mjd)
+                mjd.append(GUIvalues.mjd)
                 first=False
             else:
                 ##main loop for other exposures
-		app = align_tk(name,None,GUIvalues,mode=mode,refra=ra_ref,refdec=dec_ref,refid=id_ref)
+                app = align_tk(name,None,GUIvalues,mode=mode,refra=ra_ref,refdec=dec_ref,refid=id_ref)
                 app.title('Align {}'.format(name))
                 app.mainloop()
-		thisraoff = np.mean(-ra_ref[np.in1d(id_ref,GUIvalues.starid)]+GUIvalues.starra)
+                thisraoff = np.mean(-ra_ref[np.in1d(id_ref,GUIvalues.starid)]+GUIvalues.starra)
                 thisdecoff = np.mean(-dec_ref[np.in1d(id_ref,GUIvalues.starid)]+GUIvalues.stardec)
                 print('REDUXGUI: offset derived for {0}: RA = {1:6.4f}" DEC = {2:6.4f}"'.format(name,thisraoff*3600,thisdecoff*3600))
-		ra_off.append(thisraoff)
-		dec_off.append(thisdecoff)
-		mjd.append(GUIvalues.mjd)
+                ra_off.append(thisraoff)
+                dec_off.append(thisdecoff)
+                mjd.append(GUIvalues.mjd)
         
         #save in fits after making backup copy 
         print('REDUXGUI: write offsets to OFFSET_LIST.fits')
         copyfile('OFFSET_LIST.fits','OFFSET_LIST.fits.bck')
         strcut=fits.open('OFFSET_LIST.fits',mode='update')
         
-	mjdfile = (strcut[1].data[:]['MJD_OBS'])
-	 
+        mjdfile = (strcut[1].data[:]['MJD_OBS'])
+         
         for xx in range(len(dec_off)):
             offlistind = np.argmin(abs(mjdfile-mjd[xx]))
-	    strcut[1].data[offlistind]['RA_OFFSET']=ra_off[xx]
+            strcut[1].data[offlistind]['RA_OFFSET']=ra_off[xx]
             strcut[1].data[offlistind]['DEC_OFFSET']=dec_off[xx]
 
         strcut.flush()
         strcut.close()
-	
+        
     elif(mode is 'maskcubex'): 
         print('REDUXGUI: Run in maskcubex mode')
         for ii in open(listimg):
@@ -484,7 +484,7 @@ def reduxgui(listimg,mode='align',refcat='None'):
             region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
             GUIvalues = guivalues()
             
-	    #run gui
+            #run gui
             app = align_tk(whiteimg,None,GUIvalues,mode=mode)
             app.title('Mask {}'.format(whiteimg))
             app.mainloop()
