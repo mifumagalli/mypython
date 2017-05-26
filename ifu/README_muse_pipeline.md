@@ -8,6 +8,10 @@ Some info on muse redux [MF, March 2016]
 * Step 1
 
 To run the eso pipeline, download data with calibrations from the ESO archive.
+Make folders called OBXX, where XX is a number that IDs OBSs. Make one 
+folder of each set of OBs taken in a single run (i.e. those that share the same 
+calibrations)
+
 Dump all the data in folder ./Raw, including the *xml file.
 
 If data require legacy calibrations, make sure there is a folder containing them. 
@@ -30,9 +34,8 @@ few days apart. The calibrations used are stored in calplan.txt for inspection.
 Typical failures arise if not all calibrations are included or if Raw data are missing.
 Also there are problems with old calibrations.
 
-At the end, there should be a IMAGE_FOV and DATACUBE_FINAL for each science 
+At the end, there should be a IMAGE_FOV, a pixel table, and DATACUBE_FINAL for each science 
 exposure in Proc. Check if they look ok. 
-
 
 A. ESO REDUCTION
 ----------------
@@ -46,7 +49,7 @@ At top level (above OB#) folders, run the following script
 muse=mp.ifu.muse.Muse()
 muse.eso_process()
 
-This script crawls through the OB# folders, findings science frames.
+This script crawls through the OB# folders, finding science frames.
 It performs sky subtraction using ESO recipies, aligns exposures, and coadd them.
 
 Possible points of failure are bad aligment of the exposures before coadding.
@@ -73,7 +76,6 @@ E.g.
 >> mut.adjust_wcsoffset(data,x,y,ra,dec)
 >> data='esocombine/DATACUBE_FINAL.fits'
 >> mut.adjust_wcsoffset(data,x,y,ra,dec)
-
 
 
 B. CUBEX_REDUCTION
@@ -184,7 +186,10 @@ In this case the syntax becomes:
    muse.line_process(skymask='linecombine/pca_region.reg')
 
 An optional deepwhite keyword can be used to pass a deep white image for better masking
-of continuum detected sources.
+of continuum detected sources. This will run like this:
+
+   muse.line_process(deepwhite='cubexcombine/COMBINED_IMAGE_MED.fits')
+
 
 Next, the code comabined exposures into final cubes. Masks with IFU edges are automatically
 propagated.
