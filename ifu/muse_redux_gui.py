@@ -161,7 +161,10 @@ def reduxgui(listimg,mode='align',refcat='None'):
            
             #now open image
             self.fits=fits.open(self.filename)
-            self.mjd=self.fits[0].header['MJD-OBS'] 
+            try:
+                self.mjd=self.fits[0].header['MJD-OBS'] 
+            except:
+                self.mjd=None
             try:
                 self.fitimg=np.nan_to_num(self.fits[1].data)+0.1
                 self.wcs=wcs.WCS(self.fits[1].header)
