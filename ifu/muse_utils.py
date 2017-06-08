@@ -486,22 +486,37 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg):
     #open 
     fithdu=fits.open(data,mode='update')
     
-    #save old 
-    fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1'] 
-    fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
-    fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
-    fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
+    try:
 
-    #write new 
-    fithdu[1].header['CRVAL1']=rag 
-    fithdu[1].header['CRVAL2']=deg
-    fithdu[1].header['CRPIX1']=xpix 
-    fithdu[1].header['CRPIX2']=ypix
+        #save old 
+        fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1']
+        fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
+        fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
+        fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
+
+        #write new 
+        fithdu[1].header['CRVAL1']=rag 
+        fithdu[1].header['CRVAL2']=deg
+        fithdu[1].header['CRPIX1']=xpix 
+        fithdu[1].header['CRPIX2']=ypix
+        
+    except:
+
+        #save old
+        fithdu[0].header['OLDCRV1']=fithdu[0].header['CRVAL1'] 
+        fithdu[0].header['OLDCRV2']=fithdu[0].header['CRVAL2'] 
+        fithdu[0].header['OLDCPX1']=fithdu[0].header['CRPIX1'] 
+        fithdu[0].header['OLDCPX2']=fithdu[0].header['CRPIX2'] 
+        
+        #write new 
+        fithdu[0].header['CRVAL1']=rag 
+        fithdu[0].header['CRVAL2']=deg
+        fithdu[0].header['CRPIX1']=xpix 
+        fithdu[0].header['CRPIX2']=ypix
 
     #save 
     fithdu.flush()
     fithdu.close()
-
 
 
 def unpack_pixtab(flag):
