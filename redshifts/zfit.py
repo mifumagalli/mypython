@@ -25,8 +25,6 @@ from scipy import signal
 from astropy.io import fits
 from astropy.table import Table
 
-
-
 class zfitwin(Tkinter.Tk):
     
     """ The basic class of the widget """

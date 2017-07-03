@@ -309,10 +309,13 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
         twoderr=np.sqrt(twoderr)
 
     #mean in aperture
+    #totpix=len(xpix)
+    #spec_flx=spec_flx/totpix
+    #spec_err=np.sqrt(spec_var/totpix)
+
+    #keep total spectrum and not mean
     totpix=len(xpix)
-    spec_flx=spec_flx/totpix
-    spec_err=np.sqrt(spec_var/totpix)
- 
+    spec_err=np.sqrt(spec_var)
     
     #if set, convert to vacuum using airtovac.pro conversion
     if(tovac):
@@ -332,7 +335,9 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
 
     #if write, write
     if(write):
-        hduflx  = fits.PrimaryHDU(spec_flx) #mean in region
+        prihdr = fits.Header()
+        prihdr['NPIX'] = totpix
+        hduflx  = fits.PrimaryHDU(spec_flx,header=prihdr) #total in region
         hduerr  = fits.ImageHDU(spec_err) #associated errors
         hduwav  = fits.ImageHDU(wavec)    #wave
         hdumed  = fits.ImageHDU(spec_med) #median spectrum 
