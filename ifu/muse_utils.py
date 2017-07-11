@@ -435,9 +435,12 @@ def readcube(cube, helio=0):
     cfits=fits.open(cube)
     
     #grab the data
-    cubdata=cfits['DATA'].data
-    vardata=cfits['STAT'].data
-
+    try:
+        cubdata=cfits['DATA'].data
+        vardata=cfits['STAT'].data
+    except:
+        cubdata=cfits[1].data
+        vardata=cfits[2].data
     #compute the helio correction on the fly
     if(helio != 0):
         hel_corr = np.sqrt( (1. + helio/299792.458) / (1. - helio/299792.458) )
