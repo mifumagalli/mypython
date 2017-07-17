@@ -41,7 +41,7 @@ def individual_resample(listob,refpath='./',nproc=12):
         #Search how many exposures are there
         scils=glob.glob("OBJECT_RED_0*.fits*")
         nsci=len(scils)
-
+        
         #loop on exposures and reduce frame with sky subtraction 
         for exp in range(nsci):
             

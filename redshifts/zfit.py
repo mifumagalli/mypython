@@ -26,7 +26,6 @@ from astropy.io import fits
 from astropy.table import Table
 import sys, getopt
 
-
 class zfitwin(Tkinter.Tk):
     
     """ The basic class of the widget """

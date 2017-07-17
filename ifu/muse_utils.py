@@ -309,10 +309,13 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
         twoderr=np.sqrt(twoderr)
 
     #mean in aperture
+    #totpix=len(xpix)
+    #spec_flx=spec_flx/totpix
+    #spec_err=np.sqrt(spec_var/totpix)
+
+    #keep total spectrum and not mean
     totpix=len(xpix)
-    spec_flx=spec_flx/totpix
-    spec_err=np.sqrt(spec_var/totpix)
- 
+    spec_err=np.sqrt(spec_var)
     
     #if set, convert to vacuum using airtovac.pro conversion
     if(tovac):
@@ -332,7 +335,9 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
 
     #if write, write
     if(write):
-        hduflx  = fits.PrimaryHDU(spec_flx) #mean in region
+        prihdr = fits.Header()
+        prihdr['NPIX'] = totpix
+        hduflx  = fits.PrimaryHDU(spec_flx,header=prihdr) #total in region
         hduerr  = fits.ImageHDU(spec_err) #associated errors
         hduwav  = fits.ImageHDU(wavec)    #wave
         hdumed  = fits.ImageHDU(spec_med) #median spectrum 
@@ -489,22 +494,37 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg):
     #open 
     fithdu=fits.open(data,mode='update')
     
-    #save old 
-    fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1'] 
-    fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
-    fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
-    fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
+    try:
 
-    #write new 
-    fithdu[1].header['CRVAL1']=rag 
-    fithdu[1].header['CRVAL2']=deg
-    fithdu[1].header['CRPIX1']=xpix 
-    fithdu[1].header['CRPIX2']=ypix
+        #save old 
+        fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1']
+        fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
+        fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
+        fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
+
+        #write new 
+        fithdu[1].header['CRVAL1']=rag 
+        fithdu[1].header['CRVAL2']=deg
+        fithdu[1].header['CRPIX1']=xpix 
+        fithdu[1].header['CRPIX2']=ypix
+        
+    except:
+
+        #save old
+        fithdu[0].header['OLDCRV1']=fithdu[0].header['CRVAL1'] 
+        fithdu[0].header['OLDCRV2']=fithdu[0].header['CRVAL2'] 
+        fithdu[0].header['OLDCPX1']=fithdu[0].header['CRPIX1'] 
+        fithdu[0].header['OLDCPX2']=fithdu[0].header['CRPIX2'] 
+        
+        #write new 
+        fithdu[0].header['CRVAL1']=rag 
+        fithdu[0].header['CRVAL2']=deg
+        fithdu[0].header['CRPIX1']=xpix 
+        fithdu[0].header['CRPIX2']=ypix
 
     #save 
     fithdu.flush()
     fithdu.close()
-
 
 
 def unpack_pixtab(flag):
