@@ -24,14 +24,14 @@ from scipy import interpolate
 from scipy import signal
 from astropy.io import fits
 from astropy.table import Table
-
+import sys, getopt
 
 
 class zfitwin(Tkinter.Tk):
     
     """ The basic class of the widget """
 
-    def __init__(self,parent):
+    def __init__(self,parent, startfile=None, z_start=0.0):
         
         """ My constructor """
         
@@ -62,9 +62,9 @@ class zfitwin(Tkinter.Tk):
         default_font.configure(size=14)
 
         #init gui frame
-        self.initialize()
+        self.initialize(startfile, z_start)
 
-    def initialize(self):
+    def initialize(self, startfile, z_start):
         """ This init the basic gui """ 
         
         #create a menu frame
@@ -88,7 +88,8 @@ class zfitwin(Tkinter.Tk):
         #now initialise the menu frame
         self.init_menuframe()
         #now initialise the data frame
-        self.init_dataframe()
+        self.init_dataframe(startfile)
+        self.redshiftline.set("{}".format(z_start))
 
     def init_menuframe(self):
 
@@ -131,7 +132,7 @@ class zfitwin(Tkinter.Tk):
         self.init_templcontrol()
 
 
-    def init_dataframe(self):
+    def init_dataframe(self, startfile):
 
         """ This init the data specific part """ 
 
@@ -154,8 +155,12 @@ class zfitwin(Tkinter.Tk):
         self.twodimg_height=self.imgframe.winfo_height()
 
         #now open with default spectrum and plot
-        self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits"
-        self.fits=fits.open(self.filename)
+        #self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits" RUari Jul 17 17
+        if startfile==None:
+            self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits"
+        else:
+            self.filename=startfile
+        self.fits=fits.open(self.filename) 
        
         #unpack
         self.fitwav1d=self.fits[2].data
@@ -198,7 +203,7 @@ class zfitwin(Tkinter.Tk):
         self.redshiftline = Tkinter.StringVar()
         self.redlinecntr = Tkinter.Entry(self.menuframe,textvariable=self.redshiftline)
         self.redlinecntr.grid(column=2,row=2)
-        self.redshiftline.set("0.0000")
+        self.redshiftline.set("1.0000")
         #set the redshift in a trace state
         self.redshiftline.trace("w",self.displaylines)
 
@@ -1189,13 +1194,24 @@ class zfitwin(Tkinter.Tk):
     
 
 
-def zfit():
+def zfit(startfile="/obs/r1/dxwj64/Python/mypython/redshifts/test_spectrum.fits", z_start=0.0):
 
     """ Mains that runs the gui """
-    app = zfitwin(None)
+    app = zfitwin(None, startfile=startfile, z_start=z_start)
     app.title('Fit your redshift!')
     app.mainloop()
 
 if __name__ == "__main__": 
-    zfit()
+    opts, args = getopt.getopt(sys.argv[1:],"i:z:",["ifile=","redshift="])
+    startfile = None
+    z_start = 0.0
+    #cube_range = None
+    for opt, arg in opts:
+        if opt in ("-i", "--ifile"):
+            startfile = arg
+        elif opt in ("-z", "--redshift"):
+            z_start = float(arg)
+        #elif opt in ("-c", "--cube"):
+        #    cube = float(arg)
+    zfit(startfile=startfile, z_start=z_start)
 
