@@ -47,8 +47,8 @@ class zfitwin(Tkinter.Tk):
         self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
         
         #tweak the aspect ratio of the menu and data gui
-        self.menuaspect=[1,0.24*(screen_height/1080.0)]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
-        self.dataaspect=[1,1-0.24*(screen_height/1080.0)]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
+        self.menuaspect=[1,0.24]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
+        self.dataaspect=[1,1-0.24]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
         self.dpi=80
 
         #find exect dir
@@ -58,7 +58,8 @@ class zfitwin(Tkinter.Tk):
             
         #Fiddle with font
         default_font = tkFont.nametofont("TkDefaultFont")
-        default_font.configure(size=14)
+        scalefont = int(screen_height/1080.0*14)
+        default_font.configure(size=scalefont)
 
         #init gui frame
         self.initialize(startfile, z_start)
@@ -97,6 +98,7 @@ class zfitwin(Tkinter.Tk):
         #exit button
         self.menu_exit = Tkinter.Button(self.menuframe,text=u"EXIT",command=self.OnExit)
         self.menu_exit.grid(column=0,row=0)
+
       
         #save button
         self.menu_save = Tkinter.Button(self.menuframe,text=u"Save",command=self.OnSave)
@@ -147,7 +149,7 @@ class zfitwin(Tkinter.Tk):
 
         #canvas for twod err
         self.twoderr_width=self.dataframe.winfo_width()
-        self.twoderr_height=int((self.dataframe.winfo_height()-self.pltspec_height)*0.4)
+        self.twoderr_height=int((self.dataframe.winfo_height()-self.pltspec_height)*0.5)
         
         #work out dimensions for twod image
         self.twodimg_width=self.imgframe.winfo_width()
