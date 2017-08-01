@@ -24,13 +24,14 @@ from scipy import interpolate
 from scipy import signal
 from astropy.io import fits
 from astropy.table import Table
-import sys, getopt
+
+
 
 class zfitwin(Tkinter.Tk):
     
     """ The basic class of the widget """
 
-    def __init__(self,parent, startfile=None, z_start=0.0):
+    def __init__(self,parent):
         
         """ My constructor """
         
@@ -47,8 +48,8 @@ class zfitwin(Tkinter.Tk):
         self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
         
         #tweak the aspect ratio of the menu and data gui
-        self.menuaspect=[1,0.24]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
-        self.dataaspect=[1,1-0.24]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
+        self.menuaspect=[1,0.24*(screen_height/1080.0)]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
+        self.dataaspect=[1,1-0.24*(screen_height/1080.0)]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
         self.dpi=80
 
         #find exect dir
@@ -58,13 +59,12 @@ class zfitwin(Tkinter.Tk):
             
         #Fiddle with font
         default_font = tkFont.nametofont("TkDefaultFont")
-        scalefont = int(screen_height/1080.0*14)
-        default_font.configure(size=scalefont)
+        default_font.configure(size=14)
 
         #init gui frame
-        self.initialize(startfile, z_start)
+        self.initialize()
 
-    def initialize(self, startfile, z_start):
+    def initialize(self):
         """ This init the basic gui """ 
         
         #create a menu frame
@@ -88,8 +88,7 @@ class zfitwin(Tkinter.Tk):
         #now initialise the menu frame
         self.init_menuframe()
         #now initialise the data frame
-        self.init_dataframe(startfile)
-        self.redshiftline.set("{}".format(z_start))
+        self.init_dataframe()
 
     def init_menuframe(self):
 
@@ -98,7 +97,6 @@ class zfitwin(Tkinter.Tk):
         #exit button
         self.menu_exit = Tkinter.Button(self.menuframe,text=u"EXIT",command=self.OnExit)
         self.menu_exit.grid(column=0,row=0)
-
       
         #save button
         self.menu_save = Tkinter.Button(self.menuframe,text=u"Save",command=self.OnSave)
@@ -133,7 +131,7 @@ class zfitwin(Tkinter.Tk):
         self.init_templcontrol()
 
 
-    def init_dataframe(self, startfile):
+    def init_dataframe(self):
 
         """ This init the data specific part """ 
 
@@ -149,19 +147,15 @@ class zfitwin(Tkinter.Tk):
 
         #canvas for twod err
         self.twoderr_width=self.dataframe.winfo_width()
-        self.twoderr_height=int((self.dataframe.winfo_height()-self.pltspec_height)*0.5)
+        self.twoderr_height=int((self.dataframe.winfo_height()-self.pltspec_height)*0.4)
         
         #work out dimensions for twod image
         self.twodimg_width=self.imgframe.winfo_width()
         self.twodimg_height=self.imgframe.winfo_height()
 
         #now open with default spectrum and plot
-        #self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits" RUari Jul 17 17
-        if startfile==None:
-            self.filename=os.path.abspath(self.execdir)+"/test_spectrum.fits"
-        else:
-            self.filename=startfile
-        self.fits=fits.open(self.filename) 
+        self.filename="temp_check_spec.fits"#os.path.abspath(self.execdir)+"/test_spectrum.fits"
+        self.fits=fits.open(self.filename)
        
         #unpack
         self.fitwav1d=self.fits[2].data
@@ -204,7 +198,7 @@ class zfitwin(Tkinter.Tk):
         self.redshiftline = Tkinter.StringVar()
         self.redlinecntr = Tkinter.Entry(self.menuframe,textvariable=self.redshiftline)
         self.redlinecntr.grid(column=2,row=2)
-        self.redshiftline.set("1.0000")
+        self.redshiftline.set("0.0000")
         #set the redshift in a trace state
         self.redshiftline.trace("w",self.displaylines)
 
@@ -1195,24 +1189,13 @@ class zfitwin(Tkinter.Tk):
     
 
 
-def zfit(startfile="/obs/r1/dxwj64/Python/mypython/redshifts/test_spectrum.fits", z_start=0.0):
+def zfit():
 
     """ Mains that runs the gui """
-    app = zfitwin(None, startfile=startfile, z_start=z_start)
+    app = zfitwin(None)
     app.title('Fit your redshift!')
     app.mainloop()
 
 if __name__ == "__main__": 
-    opts, args = getopt.getopt(sys.argv[1:],"i:z:",["ifile=","redshift="])
-    startfile = None
-    z_start = 0.0
-    #cube_range = None
-    for opt, arg in opts:
-        if opt in ("-i", "--ifile"):
-            startfile = arg
-        elif opt in ("-z", "--redshift"):
-            z_start = float(arg)
-        #elif opt in ("-c", "--cube"):
-        #    cube = float(arg)
-    zfit(startfile=startfile, z_start=z_start)
+    zfit()
 

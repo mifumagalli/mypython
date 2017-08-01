@@ -6,7 +6,7 @@ but with extended line emission
 """
 from __future__ import print_function
 
-def individual_resample(listob,refpath='./',nproc=24):
+def individual_resample(listob,refpath='./',nproc=12):
 
     """
     Loop over each OB and re-run scipost using a final coadded cube as
@@ -132,7 +132,7 @@ def individual_resample(listob,refpath='./',nproc=24):
 
 
 
-def make_ifumasks(listob,refpath='./',nproc=24):
+def make_ifumasks(listob,refpath='./',nproc=12):
 
     """
     Loop over each OB and run scipost_make_cube on the reduced pixel tables
