@@ -1,7 +1,7 @@
 Some info on muse redux [MF, March 2016]
 ---------------------------------------
 
-> Tested with eso muse pipeline 1.2.1, 1.6.2, 2.0.1
+> Tested with eso muse pipeline 1.2.1, 1.6.2, 2.0.1, 2.1.1
 > Tested with Cubex 1.5, 1.6
 > Tested with ZAP v1
 
@@ -32,7 +32,8 @@ Step 1 is best run is data from a single OB or group of OBs taken within a
 few days apart. The calibrations used are stored in calplan.txt for inspection. 
 
 Typical failures arise if not all calibrations are included or if Raw data are missing.
-Also there are problems with old calibrations.
+Also there are problems with old calibrations. The use of static calibrations 
+distributed with the pipeline can be forced with pipecal keyword set to True
 
 At the end, there should be a IMAGE_FOV, a pixel table, and DATACUBE_FINAL for each science 
 exposure in Proc. Check if they look ok. 

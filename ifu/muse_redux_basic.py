@@ -19,9 +19,10 @@ def grabtime(namelist):
     #return time in seconds
     return timelist
         
-def parse_xml(path='./',nproc=12):
+def parse_xml(path='./',nproc=12,pipecal=False):
     
     import glob
+    from astropy.io import fits
 
     #Parse the xml file to extract all that is needed
     xmllist=glob.glob("{0}/Raw/*.xml".format(path))
@@ -136,13 +137,63 @@ def parse_xml(path='./',nproc=12):
     xml_info['ASTROMETRY_WCS']=[astrostatic]
     xml_info['GEOMETRY_TABLE']=[geometrystatic]
 
+
+    #if so desired, force the use of calibrations provided in the pipeline package
+    if(pipecal):
+        print('Switch to static calibrations provided by pipeline!')
+        #find path
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
+        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+      
+        #update
+        xml_info['ASTROMETRY_WCS']=[staticalpath+'astrometry_wcs_wfm.fits']
+        xml_info['VIGNETTING_MASK']=[staticalpath+'vignetting_mask.fits']
+        xml_info['SKY_LINES']=[staticalpath+'sky_lines.fits']
+        xml_info['ASTROMETRY_REFERENCE']=[staticalpath+'astrometry_reference.fits']
+        xml_info['EXTINCT_TABLE']=[staticalpath+'extinct_table.fits']
+        xml_info['GEOMETRY_TABLE']=[staticalpath+'geometry_table_wfm.fits']
+        xml_info['FILTER_LIST']=[staticalpath+'filter_list.fits']
+        xml_info['STD_FLUX_TABLE']=[staticalpath+'std_flux_table.fits']
+        xml_info['BADPIX_TABLE']=[staticalpath+'badpix_table.fits']
+        xml_info['LINE_CATALOG']=[staticalpath+'line_catalog.fits']
+        #find out mode used for science - up to you not to mix them up!
+        #ESO-INS-MODE: WFM-AO-E WFM-AO-N WFM-NOAO-E WFM-NOAO-N
+        objheader=fits.open("Raw/"+(list(xml_info['OBJECT'])[0])+".fits.fz")
+        mode=(objheader[0].header['ESO INS MODE']).strip()
+        if(('WFM-AO-N' in mode)|('WFM-NOAO-N' in mode)):
+            xml_info['LSF_PROFILE']=[staticalpath+'lsf_profile_slow_wfm-n.fits']
+        elif(('WFM-AO-E' in mode)|('WFM-NOAO-E' in mode)):
+            xml_info['LSF_PROFILE']=[staticalpath+'lsf_profile_slow_wfm-e.fits']
+        else:
+            raise ValueError("Instrument mode {} is not know for calibration selection".format(mode))
+        
+    #now perform healthy checks for calibrations with AO mode
+    objheader=fits.open("Raw/"+(list(xml_info['OBJECT'])[0])+".fits.fz")
+    scimode=(objheader[0].header['ESO INS MODE']).strip()
+    if('WFM-AO-' in mode):
+        #loop over standards and check
+        for std in list(xml_info['STD']):
+            objheader=fits.open("Raw/"+std+".fits.fz")
+            thismode=(objheader[0].header['ESO INS MODE']).strip()
+            if(thismode not in scimode):
+                raise ValueError("AO objects require AO standards! Using {} and {}".format(scimode,thismode))
+        #now loop over flats
+        for flt in list(xml_info['FLAT']):
+            objheader=fits.open("Raw/"+flt+".fits.fz")
+            thismode=(objheader[0].header['ESO INS MODE']).strip()
+            if(thismode not in scimode):
+                raise ValueError("AO objects require AO flats! Using {} and {}".format(scimode,thismode))
+            
     #now dump cal plan
-    print 'Writing calibration plan in calplan.txt'            
+    print('Writing calibration plan in calplan.txt')
     cl=open('calplan.txt','w')
     for kk in xml_info.keys():
         for ll in xml_info[kk]:
             cl.write('{0} {1}\n'.format(kk,ll))
     cl.close()
+
     return xml_info  
 
 

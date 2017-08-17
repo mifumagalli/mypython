@@ -14,7 +14,7 @@ class Muse(object):
         self.musepip=1.0
         
 
-    def redux_basic(self,path='./',nproc=12):
+    def redux_basic(self,path='./',nproc=12,pipecal=False):
         
         """ 
 
@@ -29,6 +29,9 @@ class Muse(object):
                provided by eso archive. 
         
         nproc - the number of processors to use during the reduction 
+
+        pipecal - if set to true, static calibrations provided with the pipeline
+                  will be used. This pplies to ALL static calibrations
 
         This code is designed to handle a single OB or groups of OBs that share the same sets of calibrations
  
@@ -49,7 +52,7 @@ class Muse(object):
             os.makedirs(path+"Proc")
 
         #parse the xml file(s) 
-        xml_info=rdx.parse_xml(path=path,nproc=nproc)
+        xml_info=rdx.parse_xml(path=path,nproc=nproc,pipecal=pipecal)
         
         #now start reduction. Enter the proc folder
         currdir=os.getcwd()
