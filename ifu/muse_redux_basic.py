@@ -28,9 +28,9 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     xmllist=glob.glob("{0}/Raw/*.xml".format(path))
     
     if (len(xmllist) < 1):
-        print "xml file not found!"
+        print("xml file not found!")
     elif(len(xmllist) > 1):
-        print "I found multiple xml files! Merging them..."
+        print("I found multiple xml files! Merging them...")
 
     #prepare space
     xml_info={}
@@ -42,7 +42,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         #loop over files
         for line in xml:
             #mark valid data
-            if "<file category=" in line:
+            if("<file category=" in line):
                 tmptype=(line.split('"'))[1]
                 tmpname=(line.split('"'))[3]
                 #if new kew make a new set:
@@ -54,7 +54,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                     xml_info[tmptype].add(tmpname)                   
         xml.close()
 
-    print 'xml files loaded'
+    print('xml files loaded')
 
     #now try to pick the best calib files available based on matches of dates etc...
  
@@ -65,9 +65,9 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     #check max time lag between observations
     if(len(xml_info['OBJECT']) > 1):
         delta_time=np.max(abs(np.roll(time_obj,1)-time_obj)/3600.)
-        print 'Object observations are taken {0} h apart'.format(delta_time)
+        print('Object observations are taken {0} h apart'.format(delta_time))
         if(delta_time > 4):
-            print 'Large time lag bewteen observations! Check!'
+            print('Large time lag bewteen observations! Check!')
 
     #now loop over calibrations and grab the best 
     allkey=xml_info.keys()
@@ -98,14 +98,25 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 xml_info[kk]=[currentlist[mintm]]
                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
 
+    #set the calibration path relative and suffix
+    xml_info["PATHCAL"]='../Raw/'
+    xml_info["SUFFIXCAL"]='.fits'
 
-    #here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
-
+    #grab some info on executable dir
+    esorexpath=find_executable('esorex')
+    staticalpath=esorexpath.split('/bin')[0]
+    pipeversion=staticalpath.split('/')[-1]
+    #handle special case of pipe version 2.1.1
+    if('2.1.1-1' in pipeversion):
+        pipeversion='muse-2.1.1' 
+    staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+    
+    #Here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
     #This is the largest time at one should worry about legacy products 
     legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
 
     if(reference_time < legacy_time):
-        print 'Using legacy static calibrations'
+        print('Using legacy static calibrations')
         #pick the right one
         #Static cal are assume dto be top levl dir in reduction folder
         tedge1=time.mktime(time.strptime("01 Dec 14", "%d %b %y"))
@@ -124,15 +135,12 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         else:
             geometrystatic='../staticcal/geometry_table_wfm_2015-09-10.fits'
             astrostatic='../staticcal/astrometry_wcs_wfm_2015-09-10.fits'
+
     else:
-        print 'Using pipeline static calibrations'
-        esorexpath=find_executable('esorex')
-        staticalpath=esorexpath.split('/bin')[0]
-        pipeversion=staticalpath.split('/')[-1]
-        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+        print('Using pipeline static calibrations for astrometry and geometry')
         astrostatic=staticalpath+'astrometry_wcs_wfm.fits'
         geometrystatic=staticalpath+'geometry_table_wfm.fits'
-        
+    
     #update from default
     xml_info['ASTROMETRY_WCS']=[astrostatic]
     xml_info['GEOMETRY_TABLE']=[geometrystatic]
@@ -141,12 +149,10 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     #if so desired, force the use of calibrations provided in the pipeline package
     if(pipecal):
         print('Switch to static calibrations provided by pipeline!')
-        #find path
-        esorexpath=find_executable('esorex')
-        staticalpath=esorexpath.split('/bin')[0]
-        pipeversion=staticalpath.split('/')[-1]
-        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
-      
+        #reset calibration path and suffix to absolute
+        xml_info["PATHCAL"]=''
+        xml_info["SUFFIXCAL"]=''
+
         #update
         xml_info['ASTROMETRY_WCS']=[staticalpath+'astrometry_wcs_wfm.fits']
         xml_info['VIGNETTING_MASK']=[staticalpath+'vignetting_mask.fits']
@@ -256,7 +262,7 @@ def make_flat(xml_info,nproc=12):
     sof=open("../Script/flat.sof","w")
     for ii in flat_list:
         sof.write("../Raw/{0}.fits.fz FLAT\n".format(ii)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
     sof.close()
               
@@ -279,7 +285,7 @@ def make_arcs(xml_info,nproc=12):
     sof=open("../Script/wavecal.sof","w")
     for ii in arc_list:
         sof.write("../Raw/{0}.fits.fz ARC\n".format(ii))
-    sof.write("../Raw/{0}.fits LINE_CATALOG\n".format(line_cat)) 
+    sof.write("{}{}{} LINE_CATALOG\n".format(xml_info["PATHCAL"],line_cat,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
     sof.close()
@@ -339,7 +345,7 @@ def make_stdstar(xml_info,nproc=12):
     sof=open("../Script/object_std.sof","w")
     sof.write("../Raw/{0}.fits.fz STD\n".format(std_list)) 
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
@@ -364,8 +370,8 @@ def make_stdflux(xml_info,nproc=12):
     
     #Write the sof file 
     sof=open("../Script/std.sof","w")
-    sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(ext_tab))
-    sof.write("../Raw/{0}.fits STD_FLUX_TABLE\n".format(flx_tab)) 
+    sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],ext_tab,xml_info["SUFFIXCAL"]))
+    sof.write("{}{}{} STD_FLUX_TABLE\n".format(xml_info["PATHCAL"],flx_tab,xml_info["SUFFIXCAL"])) 
     for ifu in range(24):
         sof.write("PIXTABLE_STD_0001-{0:02d}.fits PIXTABLE_STD\n".format(ifu+1)) 
     sof.close()
@@ -398,7 +404,7 @@ def make_objects(xml_info,nproc=12):
         sof.write("../Raw/{0}.fits.fz OBJECT\n".format(ii))
     sof.write("../Raw/{0}.fits.fz ILLUM\n".format(ill))
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
@@ -455,10 +461,10 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             #Write the sof file 
             sof=open("../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
             sof.write("{0} ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
-            sof.write("../Raw/{0}.fits SKY_LINES\n".format(xml_info["SKY_LINES"][0])) 
-            sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(xml_info["EXTINCT_TABLE"][0])) 
-            sof.write("../Raw/{0}.fits FILTER_LIST\n".format(xml_info["FILTER_LIST"][0])) 
-            sof.write("../Raw/{0}.fits LSF_PROFILE\n".format(xml_info["LSF_PROFILE"][0])) 
+            sof.write("{}{}{} SKY_LINES\n".format(xml_info["PATHCAL"],xml_info["SKY_LINES"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],xml_info["EXTINCT_TABLE"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} FILTER_LIST\n".format(xml_info["PATHCAL"],xml_info["FILTER_LIST"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} LSF_PROFILE\n".format(xml_info["PATHCAL"],xml_info["LSF_PROFILE"][0],xml_info["SUFFIXCAL"])) 
 
             #if using reference set it
             if(refcube):
