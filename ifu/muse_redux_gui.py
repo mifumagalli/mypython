@@ -186,11 +186,11 @@ def reduxgui(listimg,mode='align',refcat='None'):
             self.stardec=[]
             self.starid=[]
             self.nstars=0
-            self.boxlx=[]
-            self.boxly=[]
-            self.boxrx=[]
-            self.boxry=[]
-            self.nbox=0
+            self.boxlx=self.guivalues.boxlx
+            self.boxly=self.guivalues.boxly
+            self.boxrx=self.guivalues.boxrx
+            self.boxry=self.guivalues.boxry
+            self.nbox=len(self.guivalues.boxry)
             self.drawdata()
             
         def drawdata(self,refresh=False):
@@ -487,6 +487,20 @@ def reduxgui(listimg,mode='align',refcat='None'):
             region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
             GUIvalues = guivalues()
             
+            #if region file exists load it back 
+            if os.path.isfile(region):
+                print('Loading existing region file')
+                regload=open(region,'r')
+                for line in regload:
+                    if('box' in line):
+                        segment=line.split('(')[1].split(')')[0]
+                        xcent,ycent,twodx,twody,zero=segment.split(',')
+                        GUIvalues.boxlx.append(float(xcent)-float(twodx)/2.)
+                        GUIvalues.boxly.append(float(ycent)-float(twody)/2.)
+                        GUIvalues.boxrx.append(float(xcent)+float(twodx)/2.)
+                        GUIvalues.boxry.append(float(ycent)+float(twody)/2.)
+                regload.close()      
+                
             #run gui
             app = align_tk(whiteimg,None,GUIvalues,mode=mode)
             app.title('Mask {}'.format(whiteimg))
