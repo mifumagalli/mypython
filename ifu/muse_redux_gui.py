@@ -1,6 +1,6 @@
 #Redux gui
 
-def reduxgui(listimg,mode='align',refcat='None'):
+def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
 
     """
 
@@ -23,6 +23,8 @@ def reduxgui(listimg,mode='align',refcat='None'):
                           reference objects (stars) which acts as an absolute 
                           reference for each frame
                  
+    cubexsuffix  --> the suffix that specifies the cycle of cubex reduction 
+
     Interactive behaviour: 
 
          . 'c': mark star
@@ -483,13 +485,13 @@ def reduxgui(listimg,mode='align',refcat='None'):
     elif(mode is 'maskcubex'): 
         print('REDUXGUI: Run in maskcubex mode')
         for ii in open(listimg):
-            whiteimg="_".join(ii.split("_")[0:-1])+"_white2.fits"
-            region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
+            whiteimg="_".join(ii.split("_")[0:-1])+"_white{}.fits".format(cubexsuffix)
+            region="_".join(ii.split("_")[0:-1])+"_fix{}_SliceEdgeMask.reg".format(cubexsuffix)
             GUIvalues = guivalues()
             
             #if region file exists load it back 
             if os.path.isfile(region):
-                print('Loading existing region file')
+                print('Loading existing region file {}'.format(region))
                 regload=open(region,'r')
                 for line in regload:
                     if('box' in line):
