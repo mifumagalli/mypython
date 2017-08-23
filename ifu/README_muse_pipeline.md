@@ -53,6 +53,8 @@ muse.eso_process()
 This script crawls through the OB# folders, finding science frames.
 It performs sky subtraction using ESO recipies, aligns exposures, and coadd them.
 
+Routines are able to also handle external sky frames. 
+
 Possible points of failure are bad aligment of the exposures before coadding.
 That may require manual interaction with the algnment step in muse_exp_align
 such as tweaking the threshold. If all attempts fail, run muse_redux_gui.reduxgui

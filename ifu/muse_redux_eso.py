@@ -4,6 +4,7 @@ Collection of procedures that drive the creation of final cubes using
 eso recipies. Check out the MUSE reduction manual for details. 
 
 """
+    
 
 def individual_skysub(listob,nproc=12):
 
@@ -21,6 +22,8 @@ def individual_skysub(listob,nproc=12):
     import os
     import glob
     import subprocess
+    from astropy.io import fits
+    import numpy as np
 
     #grab top dir
     topdir=os.getcwd()
@@ -36,40 +39,114 @@ def individual_skysub(listob,nproc=12):
         scils=glob.glob("OBJECT_RED_0*.fits*")
         nsci=len(scils)
 
-        #loop on exposures and reduce frame with sky subtraction 
-        for exp in range(nsci):
+        #Search if there are sky models from emtpy regions
+        skyls=glob.glob("SKY_SPECTRUM*.fits")
+        nsky=len(skyls)
+
+        #collect sky tags and sky times 
+        skytags=[]
+        skytimes=[]
+        for skyframes in skyls:
+            skytags.append(skyframes.split('SPECTRUM_')[1].split('.fits')[0])
+            thissk=fits.open(skyframes)
+            skytimes.append(float(thissk[0].header['MJD-OBS']))
             
-            #use sof file written for basic reduction
-            sof_name="../Script/scipost_{0:d}.sof".format(exp+1)
-           
-            #define some output names
-            cname="DATACUBE_FINAL_ESOSKY_EXP{0:d}.fits".format(exp+1)
-            pname="PIXTABLE_REDUCED_ESOSKY_EXP{0:d}.fits".format(exp+1)
-            iname="IMAGE_FOV_ESOSKY_EXP{0:d}.fits".format(exp+1)
- 
-            if not os.path.isfile(cname):
-                print("Processing exposure {0:d}".format(exp+1))
-                
-                #Write the command file 
-                scr=open("../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
-                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-                
-                scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(exp+1))
-                scr.close()
-    
-                #Run pipeline 
-                subprocess.call(["sh", "../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
-                subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
-                subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
-                subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
-                                
-            else:
-                print("Exposure {0:d} exists.. skip! ".format(exp+1))
+        skytimes=np.array(skytimes)
+
+        #handle the case of sky offsets separately
+        if(nsky > 0):
+            #sky offsets are present
+            print('Use sky offsets for sky subtraction')
+            #loop on exposures and reduce frame with closest sky model 
+            for exp in range(nsci):
+
+                #check if true science and not sky 
+                thisframe=scils[exp]
+                thisid=thisframe.split('RED_')[1].split('.fits')[0]
+                if not (thisid in skytags):
+                    #you are science - proceed
+                    thissc=fits.open(thisframe)
+                    scitimes=float(thissc[0].header['MJD-OBS'])
+                    #Find closest sky - works ok for OSOOSOOS.. 
+                    #would be better to compute mid point rather than start of exposure
+                    matchsky=skytags[np.argmin(abs(skytimes-scitimes))]
+
+                    #update sof file written for basic reduction
+                    sof_old=open("../Script/scipost_{0:d}.sof".format(exp+1),"r")
+                    sof_name="../Script/scipost_{0:d}_sky.sof".format(exp+1)
+                    sof=open(sof_name,"w")
+                    for ll in sof_old:
+                        if('SKY_LINES' in ll):
+                            sof.write("SKY_LINES_{}.fits SKY_LINES\n".format(matchsky))
+                        else:
+                            #copy
+                            sof.write(ll)
+                    #append other stuff
+                    sof.write("SKY_CONTINUUM_{}.fits SKY_CONTINUUM\n".format(matchsky))
+                    sof.write("SKY_MASK_{}.fits SKY_MASK\n".format(matchsky))
+                    sof.close()
+
+                    #define some output names
+                    cname="DATACUBE_FINAL_ESOSKY_EXP{0:d}.fits".format(exp+1)
+                    pname="PIXTABLE_REDUCED_ESOSKY_EXP{0:d}.fits".format(exp+1)
+                    iname="IMAGE_FOV_ESOSKY_EXP{0:d}.fits".format(exp+1)
+                    
+                    if not os.path.isfile(cname):
+                        print("Processing exposure {0:d}".format(exp+1))
+
+                        #Write the command file 
+                        scr=open("../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
+                        scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+
+                        scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --skymethod=subtract-model ../Script/scipost_{0:d}_sky.sof'.format(exp+1))
+                        scr.close()
+
+                        #Run pipeline 
+                        subprocess.call(["sh", "../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
+                        subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                        subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                        subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+
+                    else:
+                        print("Exposure {0:d} exists.. skip! ".format(exp+1))
+                        
+            
+        else:
+            
+            #loop on exposures and reduce frame with internal sky subtraction 
+            for exp in range(nsci):
+                print('Perform internal sky subtraction')
+                #use sof file written for basic reduction
+                sof_name="../Script/scipost_{0:d}.sof".format(exp+1)
+
+                #define some output names
+                cname="DATACUBE_FINAL_ESOSKY_EXP{0:d}.fits".format(exp+1)
+                pname="PIXTABLE_REDUCED_ESOSKY_EXP{0:d}.fits".format(exp+1)
+                iname="IMAGE_FOV_ESOSKY_EXP{0:d}.fits".format(exp+1)
+
+                if not os.path.isfile(cname):
+                    print("Processing exposure {0:d}".format(exp+1))
+
+                    #Write the command file 
+                    scr=open("../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
+                    scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+
+                    scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(exp+1))
+                    scr.close()
+
+                    #Run pipeline 
+                    subprocess.call(["sh", "../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
+                    subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                    subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                    subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+
+                else:
+                    print("Exposure {0:d} exists.. skip! ".format(exp+1))
             
 
         #back to top
         os.chdir(topdir)
-    
+        exit()
 
 def coaddall(listob,nproc=24):
 

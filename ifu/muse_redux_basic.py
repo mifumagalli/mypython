@@ -517,3 +517,74 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
             subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
             subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+
+
+def make_skymodel(xml_info,nproc=12):
+
+
+    """
+
+    Check if sky exposures are present - if so, handle them before moving to the 
+    next stage 
+    
+    """
+
+    from astropy.io import fits
+    import glob
+    import os
+    
+    #grab object list and build a objs time dictionary 
+    allobjs=glob.glob('OBJECT_RED*')
+    timedic={}
+    for obj in allobjs:
+        tagobj=obj.split("RED_")[1].split(".fits")[0]
+        objheader=fits.open(obj)
+        time=(objheader[0].header['DATE-OBS']).strip()
+        timedic[time]=tagobj
+    
+        
+    #now loop and find sky 
+    for exp in list(xml_info['OBJECT']):
+        objheader=fits.open("../Raw/"+exp+".fits.fz")
+        objorsky=(objheader[0].header['HIERARCH ESO DPR TYPE']).strip()
+    
+        #process sky exposure if exists
+        if('SKY' in objorsky):
+            #first identify the ID of the sky exposures
+            skytime=(objheader[0].header['DATE-OBS']).strip()
+            currentid=timedic[skytime]
+          
+            #run if needed
+            if not os.path.isfile("IMAGE_FOV_{}.fits".format(currentid)):
+  
+                #Write the sof file 
+                sof=open("../Script/sky_{}.sof".format(currentid),"w")
+                for ii in range(24):
+                    sof.write("PIXTABLE_OBJECT_{0}-{1:02d}.fits PIXTABLE_SKY\n".format(currentid,ii+1)) 
+                sof.write("STD_RESPONSE_0001.fits STD_RESPONSE\n")
+                sof.write("STD_TELLURIC_0001.fits STD_TELLURIC\n")
+                sof.write("{}{}{} LSF_PROFILE\n".format(xml_info["PATHCAL"],xml_info["LSF_PROFILE"][0],xml_info["SUFFIXCAL"]))
+                sof.write("{}{}{} SKY_LINES\n".format(xml_info["PATHCAL"],xml_info["SKY_LINES"][0],xml_info["SUFFIXCAL"]))
+                sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],xml_info["EXTINCT_TABLE"][0],xml_info["SUFFIXCAL"]))
+                sof.close()
+
+                #Write the command file 
+                scr=open("../Script/make_sky_{}.sh".format(currentid),"w")
+                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+                scr.write("esorex --log-file=sky_{}.log muse_create_sky ../Script/sky_{}.sof".format(currentid,currentid))
+                scr.close()
+
+                #Run pipeline 
+                subprocess.call(["sh", "../Script/make_sky_{}.sh".format(currentid)])
+
+                #Rename outputs
+                subprocess.call(["mv","IMAGE_FOV.fits","IMAGE_FOV_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_CONTINUUM.fits","SKY_CONTINUUM_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_LINES.fits","SKY_LINES_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_MASK.fits","SKY_MASK_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_SPECTRUM.fits","SKY_SPECTRUM_{}.fits".format(currentid)])
+
+            
+    print('All done with sky models!')
+    
+            
