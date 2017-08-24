@@ -14,7 +14,7 @@ class Muse(object):
         self.musepip=1.0
         
 
-    def redux_basic(self,path='./',nproc=12):
+    def redux_basic(self,path='./',nproc=12,pipecal=False):
         
         """ 
 
@@ -29,6 +29,9 @@ class Muse(object):
                provided by eso archive. 
         
         nproc - the number of processors to use during the reduction 
+
+        pipecal - if set to true, static calibrations provided with the pipeline
+                  will be used. This pplies to ALL static calibrations
 
         This code is designed to handle a single OB or groups of OBs that share the same sets of calibrations
  
@@ -49,7 +52,7 @@ class Muse(object):
             os.makedirs(path+"Proc")
 
         #parse the xml file(s) 
-        xml_info=rdx.parse_xml(path=path,nproc=nproc)
+        xml_info=rdx.parse_xml(path=path,nproc=nproc,pipecal=pipecal)
         
         #now start reduction. Enter the proc folder
         currdir=os.getcwd()
@@ -121,11 +124,15 @@ class Muse(object):
             print 'Objects already processed'
 
         #Finally, process science
-        print 'Preparing intermediate data cubes...'
+        print('Preparing intermediate data cubes...')
         rdx.make_cubes(xml_info,nproc=nproc)
         
+        #In the end, handle sky offsets if present
+        print('Checking if sky offsets are present and preparing sky model')
+        rdx.make_skymodel(xml_info,nproc=nproc)
+
         #Done - back to original directory!
-        print 'All done with basic redux...'
+        print('All done with basic redux...')
         os.chdir(currdir)
         
         return xml_info
@@ -248,6 +255,38 @@ class Muse(object):
         #make the temp combine
         cx.combine_cubes("cubes_final.lst","masks_final.lst",final=True)
 
+
+        #now make two independent halves 
+        fl1cube=open('cubes_final_half1.lst','w')
+        fl1mask=open('masks_final_half1.lst','w')
+        fl2cube=open('cubes_final_half2.lst','w')
+        fl2mask=open('masks_final_half2.lst','w')
+
+        #loop over OBs
+        counter=0
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
+            #reconstruct names 
+            for ll in range(nsci):
+                counter=counter+1
+                if(counter % 2 == 0):
+                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                else:
+                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                    
+        #close files
+        fl1cube.close()
+        fl1mask.close()
+        fl2cube.close()      
+        fl2mask.close()
+
+        #now combine
+        cx.combine_cubes("cubes_final_half1.lst","masks_final_half1.lst",halfsetfinal='half1')
+        cx.combine_cubes("cubes_final_half2.lst","masks_final_half2.lst",halfsetfinal='half2')
+
         #now run quality checks on final redux products
         #Typically one uses first pass, so check those
         cx.dataquality("cubes.lst","masks.lst")
@@ -276,7 +315,7 @@ class Muse(object):
         listob.sort()
         nobs=len(listob)
         print('Process {} OBs'.format(nobs))
-        
+
         #rerun pipe enabling skysubtraction and 
         #dumping fully reduced pixel table 
         ex.individual_skysub(listob)

@@ -19,17 +19,18 @@ def grabtime(namelist):
     #return time in seconds
     return timelist
         
-def parse_xml(path='./',nproc=12):
+def parse_xml(path='./',nproc=12,pipecal=False):
     
     import glob
+    from astropy.io import fits
 
     #Parse the xml file to extract all that is needed
     xmllist=glob.glob("{0}/Raw/*.xml".format(path))
     
     if (len(xmllist) < 1):
-        print "xml file not found!"
+        print("xml file not found!")
     elif(len(xmllist) > 1):
-        print "I found multiple xml files! Merging them..."
+        print("I found multiple xml files! Merging them...")
 
     #prepare space
     xml_info={}
@@ -41,7 +42,7 @@ def parse_xml(path='./',nproc=12):
         #loop over files
         for line in xml:
             #mark valid data
-            if "<file category=" in line:
+            if("<file category=" in line):
                 tmptype=(line.split('"'))[1]
                 tmpname=(line.split('"'))[3]
                 #if new kew make a new set:
@@ -53,7 +54,7 @@ def parse_xml(path='./',nproc=12):
                     xml_info[tmptype].add(tmpname)                   
         xml.close()
 
-    print 'xml files loaded'
+    print('xml files loaded')
 
     #now try to pick the best calib files available based on matches of dates etc...
  
@@ -64,9 +65,9 @@ def parse_xml(path='./',nproc=12):
     #check max time lag between observations
     if(len(xml_info['OBJECT']) > 1):
         delta_time=np.max(abs(np.roll(time_obj,1)-time_obj)/3600.)
-        print 'Object observations are taken {0} h apart'.format(delta_time)
+        print('Object observations are taken {0} h apart'.format(delta_time))
         if(delta_time > 4):
-            print 'Large time lag bewteen observations! Check!'
+            print('Large time lag bewteen observations! Check!')
 
     #now loop over calibrations and grab the best 
     allkey=xml_info.keys()
@@ -97,14 +98,25 @@ def parse_xml(path='./',nproc=12):
                 xml_info[kk]=[currentlist[mintm]]
                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
 
+    #set the calibration path relative and suffix
+    xml_info["PATHCAL"]='../Raw/'
+    xml_info["SUFFIXCAL"]='.fits'
 
-    #here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
-
+    #grab some info on executable dir
+    esorexpath=find_executable('esorex')
+    staticalpath=esorexpath.split('/bin')[0]
+    pipeversion=staticalpath.split('/')[-1]
+    #handle special case of pipe version 2.1.1
+    if('2.1.1-1' in pipeversion):
+        pipeversion='muse-2.1.1' 
+    staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+    
+    #Here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
     #This is the largest time at one should worry about legacy products 
     legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
 
     if(reference_time < legacy_time):
-        print 'Using legacy static calibrations'
+        print('Using legacy static calibrations')
         #pick the right one
         #Static cal are assume dto be top levl dir in reduction folder
         tedge1=time.mktime(time.strptime("01 Dec 14", "%d %b %y"))
@@ -123,26 +135,71 @@ def parse_xml(path='./',nproc=12):
         else:
             geometrystatic='../staticcal/geometry_table_wfm_2015-09-10.fits'
             astrostatic='../staticcal/astrometry_wcs_wfm_2015-09-10.fits'
+
     else:
-        print 'Using pipeline static calibrations'
-        esorexpath=find_executable('esorex')
-        staticalpath=esorexpath.split('/bin')[0]
-        pipeversion=staticalpath.split('/')[-1]
-        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+        print('Using pipeline static calibrations for astrometry and geometry')
         astrostatic=staticalpath+'astrometry_wcs_wfm.fits'
         geometrystatic=staticalpath+'geometry_table_wfm.fits'
-        
+    
     #update from default
     xml_info['ASTROMETRY_WCS']=[astrostatic]
     xml_info['GEOMETRY_TABLE']=[geometrystatic]
 
+
+    #if so desired, force the use of calibrations provided in the pipeline package
+    if(pipecal):
+        print('Switch to static calibrations provided by pipeline!')
+        #reset calibration path and suffix to absolute
+        xml_info["PATHCAL"]=''
+        xml_info["SUFFIXCAL"]=''
+
+        #update
+        xml_info['ASTROMETRY_WCS']=[staticalpath+'astrometry_wcs_wfm.fits']
+        xml_info['VIGNETTING_MASK']=[staticalpath+'vignetting_mask.fits']
+        xml_info['SKY_LINES']=[staticalpath+'sky_lines.fits']
+        xml_info['ASTROMETRY_REFERENCE']=[staticalpath+'astrometry_reference.fits']
+        xml_info['EXTINCT_TABLE']=[staticalpath+'extinct_table.fits']
+        xml_info['GEOMETRY_TABLE']=[staticalpath+'geometry_table_wfm.fits']
+        xml_info['FILTER_LIST']=[staticalpath+'filter_list.fits']
+        xml_info['STD_FLUX_TABLE']=[staticalpath+'std_flux_table.fits']
+        xml_info['BADPIX_TABLE']=[staticalpath+'badpix_table.fits']
+        xml_info['LINE_CATALOG']=[staticalpath+'line_catalog.fits']
+        #find out mode used for science - up to you not to mix them up!
+        #ESO-INS-MODE: WFM-AO-E WFM-AO-N WFM-NOAO-E WFM-NOAO-N
+        objheader=fits.open("Raw/"+(list(xml_info['OBJECT'])[0])+".fits.fz")
+        mode=(objheader[0].header['ESO INS MODE']).strip()
+        if(('WFM-AO-N' in mode)|('WFM-NOAO-N' in mode)):
+            xml_info['LSF_PROFILE']=[staticalpath+'lsf_profile_slow_wfm-n.fits']
+        elif(('WFM-AO-E' in mode)|('WFM-NOAO-E' in mode)):
+            xml_info['LSF_PROFILE']=[staticalpath+'lsf_profile_slow_wfm-e.fits']
+        else:
+            raise ValueError("Instrument mode {} is not know for calibration selection".format(mode))
+        
+    #now perform healthy checks for calibrations with AO mode
+    objheader=fits.open("Raw/"+(list(xml_info['OBJECT'])[0])+".fits.fz")
+    scimode=(objheader[0].header['ESO INS MODE']).strip()
+    if('WFM-AO-' in mode):
+        #loop over standards and check
+        for std in list(xml_info['STD']):
+            objheader=fits.open("Raw/"+std+".fits.fz")
+            thismode=(objheader[0].header['ESO INS MODE']).strip()
+            if(thismode not in scimode):
+                raise ValueError("AO objects require AO standards! Using {} and {}".format(scimode,thismode))
+        #now loop over flats
+        for flt in list(xml_info['FLAT']):
+            objheader=fits.open("Raw/"+flt+".fits.fz")
+            thismode=(objheader[0].header['ESO INS MODE']).strip()
+            if(thismode not in scimode):
+                raise ValueError("AO objects require AO flats! Using {} and {}".format(scimode,thismode))
+            
     #now dump cal plan
-    print 'Writing calibration plan in calplan.txt'            
+    print('Writing calibration plan in calplan.txt')
     cl=open('calplan.txt','w')
     for kk in xml_info.keys():
         for ll in xml_info[kk]:
             cl.write('{0} {1}\n'.format(kk,ll))
     cl.close()
+
     return xml_info  
 
 
@@ -205,7 +262,7 @@ def make_flat(xml_info,nproc=12):
     sof=open("../Script/flat.sof","w")
     for ii in flat_list:
         sof.write("../Raw/{0}.fits.fz FLAT\n".format(ii)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
     sof.close()
               
@@ -228,7 +285,7 @@ def make_arcs(xml_info,nproc=12):
     sof=open("../Script/wavecal.sof","w")
     for ii in arc_list:
         sof.write("../Raw/{0}.fits.fz ARC\n".format(ii))
-    sof.write("../Raw/{0}.fits LINE_CATALOG\n".format(line_cat)) 
+    sof.write("{}{}{} LINE_CATALOG\n".format(xml_info["PATHCAL"],line_cat,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
     sof.close()
@@ -288,7 +345,7 @@ def make_stdstar(xml_info,nproc=12):
     sof=open("../Script/object_std.sof","w")
     sof.write("../Raw/{0}.fits.fz STD\n".format(std_list)) 
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
@@ -313,8 +370,8 @@ def make_stdflux(xml_info,nproc=12):
     
     #Write the sof file 
     sof=open("../Script/std.sof","w")
-    sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(ext_tab))
-    sof.write("../Raw/{0}.fits STD_FLUX_TABLE\n".format(flx_tab)) 
+    sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],ext_tab,xml_info["SUFFIXCAL"]))
+    sof.write("{}{}{} STD_FLUX_TABLE\n".format(xml_info["PATHCAL"],flx_tab,xml_info["SUFFIXCAL"])) 
     for ifu in range(24):
         sof.write("PIXTABLE_STD_0001-{0:02d}.fits PIXTABLE_STD\n".format(ifu+1)) 
     sof.close()
@@ -347,7 +404,7 @@ def make_objects(xml_info,nproc=12):
         sof.write("../Raw/{0}.fits.fz OBJECT\n".format(ii))
     sof.write("../Raw/{0}.fits.fz ILLUM\n".format(ill))
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
-    sof.write("../Raw/{0}.fits BADPIX_TABLE\n".format(pix_tab)) 
+    sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
@@ -404,10 +461,10 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             #Write the sof file 
             sof=open("../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
             sof.write("{0} ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
-            sof.write("../Raw/{0}.fits SKY_LINES\n".format(xml_info["SKY_LINES"][0])) 
-            sof.write("../Raw/{0}.fits EXTINCT_TABLE\n".format(xml_info["EXTINCT_TABLE"][0])) 
-            sof.write("../Raw/{0}.fits FILTER_LIST\n".format(xml_info["FILTER_LIST"][0])) 
-            sof.write("../Raw/{0}.fits LSF_PROFILE\n".format(xml_info["LSF_PROFILE"][0])) 
+            sof.write("{}{}{} SKY_LINES\n".format(xml_info["PATHCAL"],xml_info["SKY_LINES"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],xml_info["EXTINCT_TABLE"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} FILTER_LIST\n".format(xml_info["PATHCAL"],xml_info["FILTER_LIST"][0],xml_info["SUFFIXCAL"])) 
+            sof.write("{}{}{} LSF_PROFILE\n".format(xml_info["PATHCAL"],xml_info["LSF_PROFILE"][0],xml_info["SUFFIXCAL"])) 
 
             #if using reference set it
             if(refcube):
@@ -460,3 +517,74 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
             subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
             subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+
+
+def make_skymodel(xml_info,nproc=12):
+
+
+    """
+
+    Check if sky exposures are present - if so, handle them before moving to the 
+    next stage 
+    
+    """
+
+    from astropy.io import fits
+    import glob
+    import os
+    
+    #grab object list and build a objs time dictionary 
+    allobjs=glob.glob('OBJECT_RED*')
+    timedic={}
+    for obj in allobjs:
+        tagobj=obj.split("RED_")[1].split(".fits")[0]
+        objheader=fits.open(obj)
+        time=(objheader[0].header['DATE-OBS']).strip()
+        timedic[time]=tagobj
+    
+        
+    #now loop and find sky 
+    for exp in list(xml_info['OBJECT']):
+        objheader=fits.open("../Raw/"+exp+".fits.fz")
+        objorsky=(objheader[0].header['HIERARCH ESO DPR TYPE']).strip()
+    
+        #process sky exposure if exists
+        if('SKY' in objorsky):
+            #first identify the ID of the sky exposures
+            skytime=(objheader[0].header['DATE-OBS']).strip()
+            currentid=timedic[skytime]
+          
+            #run if needed
+            if not os.path.isfile("IMAGE_FOV_{}.fits".format(currentid)):
+  
+                #Write the sof file 
+                sof=open("../Script/sky_{}.sof".format(currentid),"w")
+                for ii in range(24):
+                    sof.write("PIXTABLE_OBJECT_{0}-{1:02d}.fits PIXTABLE_SKY\n".format(currentid,ii+1)) 
+                sof.write("STD_RESPONSE_0001.fits STD_RESPONSE\n")
+                sof.write("STD_TELLURIC_0001.fits STD_TELLURIC\n")
+                sof.write("{}{}{} LSF_PROFILE\n".format(xml_info["PATHCAL"],xml_info["LSF_PROFILE"][0],xml_info["SUFFIXCAL"]))
+                sof.write("{}{}{} SKY_LINES\n".format(xml_info["PATHCAL"],xml_info["SKY_LINES"][0],xml_info["SUFFIXCAL"]))
+                sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],xml_info["EXTINCT_TABLE"][0],xml_info["SUFFIXCAL"]))
+                sof.close()
+
+                #Write the command file 
+                scr=open("../Script/make_sky_{}.sh".format(currentid),"w")
+                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+                scr.write("esorex --log-file=sky_{}.log muse_create_sky ../Script/sky_{}.sof".format(currentid,currentid))
+                scr.close()
+
+                #Run pipeline 
+                subprocess.call(["sh", "../Script/make_sky_{}.sh".format(currentid)])
+
+                #Rename outputs
+                subprocess.call(["mv","IMAGE_FOV.fits","IMAGE_FOV_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_CONTINUUM.fits","SKY_CONTINUUM_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_LINES.fits","SKY_LINES_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_MASK.fits","SKY_MASK_{}.fits".format(currentid)])
+                subprocess.call(["mv","SKY_SPECTRUM.fits","SKY_SPECTRUM_{}.fits".format(currentid)])
+
+            
+    print('All done with sky models!')
+    
+            

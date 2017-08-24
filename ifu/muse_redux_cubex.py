@@ -255,7 +255,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
         #back to top
         os.chdir(topdir)
 
-def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
+def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfinal=False):
 
     """
     Combine a bunch of cubes using masks with CubeCombine
@@ -266,7 +266,8 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
                 pipeline mask (.reg), to mask additional area that one wants to clip
     final    -> is True, append final tag to name and prepare median cubes
     
-    halfset  -> if set to tag name, append/uses suffix for coadding indepenent halfs 
+    halfset       -> if set to tag name, append/uses suffix for coadding indepenent halfs 
+    halfsetfinal  -> if set to tag name in final loop, append/uses suffix for coadding indepenent halfs 
 
     """
     import subprocess
@@ -275,7 +276,6 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
     from astropy.io import fits
     from mypython.fits import pyregmask as msk
     
-
     #define some names for the cubes
     if(final):
         cname="COMBINED_CUBE_FINAL.fits"
@@ -289,6 +289,12 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False):
         cmed="COMBINED_CUBE_MED_{}.fits".format(halfset)
         imed="COMBINED_IMAGE_MED_{}.fits".format(halfset)
         scriptname='runcombine_{}.sh'.format(halfset)
+    elif(halfsetfinal):
+        cname="COMBINED_CUBE_FINAL_{}.fits".format(halfsetfinal)
+        iname="COMBINED_IMAGE_FINAL_{}.fits".format(halfsetfinal)
+        cmed="COMBINED_CUBE_MED_FINAL_{}.fits".format(halfsetfinal)
+        imed="COMBINED_IMAGE_MED_FINAL_{}.fits".format(halfsetfinal)
+        scriptname='runcombine_final_{}.sh'.format(halfsetfinal)
     else:
         cname="COMBINED_CUBE.fits"
         iname="COMBINED_IMAGE.fits"
