@@ -146,7 +146,6 @@ def individual_skysub(listob,nproc=12):
 
         #back to top
         os.chdir(topdir)
-        exit()
 
 def coaddall(listob,nproc=24):
 
