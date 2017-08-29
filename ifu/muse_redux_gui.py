@@ -18,6 +18,10 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                 maskcubex -> take a list of cubex (generally from cubes.lst) and 
                              enable masking of boxes which are written in format 
                              that can be handled by cubex combine procedure. 
+
+                finalmask -> let's you select a region on the coadded file 
+                             and applies this mask to all the region files. Useful to trim the 
+                             edges of all the exposures to look the same. Works as maskcubex.
     
     refcat (optional) --> an ascii file containing a list of RA and DEC of 
                           reference objects (stars) which acts as an absolute 
@@ -515,24 +519,6 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
             #run gui
             app = align_tk(whiteimg,None,GUIvalues,mode=mode)
             app.title('Mask {}'.format(whiteimg))
-
-            #if region file exists then load and used for inital start
-            if (os.path.isfile(region)):
-                for reg_line_cur in open(region):
-                    print(reg_line_cur)
-                    if (reg_line_cur.startswith('box')):
-                        box_boxlx_dx, boxly_dy, dx_2, dy_2, junk = reg_line_cur.split(",")
-                        dx = float(dx_2)/2.0
-                        dy = float(dy_2)/2.0
-                        boxlx_cur = (float(box_boxlx_dx[4:-1])-dx)
-                        boxly_cur = (float(boxly_dy)-dy)
-                        boxrx.append(dx*2.0+boxlx_cur)
-                        boxry.append(dy*2.0+boxly_cur)
-                        boxlx.append(boxlx_cur)
-                        boxly.append(boxly_cur)
-                        app.nbox=app.nbox+1
-                        app.update_twodimage(update=True)
-
             app.mainloop()
         
             #on exit, dump to region file

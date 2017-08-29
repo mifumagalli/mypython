@@ -210,7 +210,7 @@ class zfitwin(Tkinter.Tk):
         self.redshiftline = Tkinter.StringVar()
         self.redlinecntr = Tkinter.Entry(self.menuframe,textvariable=self.redshiftline)
         self.redlinecntr.grid(column=2,row=2)
-        self.redshiftline.set("1.0000")
+        self.redshiftline.set("0.0000")
         #set the redshift in a trace state
         self.redshiftline.trace("w",self.displaylines)
 
@@ -1199,11 +1199,11 @@ class zfitwin(Tkinter.Tk):
 
 
     
-
-
-def zfit(startfile="/obs/r1/dxwj64/Python/mypython/redshifts/test_spectrum.fits", z_start=0.0):
+def zfit(startfile=None, z_start=0.0):
 
     """ Mains that runs the gui """
+
+    
     app = zfitwin(None, startfile=startfile, z_start=z_start)
     app.title('Fit your redshift!')
     app.mainloop()
