@@ -1002,6 +1002,10 @@ def combine_cubes(listcubes,listmasks,regions=True):
         llms=open(mask_new,"w")
         
         #loop over and update with regions
+        #if scalar, make it 1 element list
+        if(clistmask.shape == ()):
+            clistmask=[clistmask]
+       
         for i,cmask in enumerate(clistmask):
             
             #create region name

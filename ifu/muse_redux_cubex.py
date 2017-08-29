@@ -318,7 +318,11 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
             mask_new="new_"+masks
             llms=open(mask_new,"w")
             
-            #loop over and update with regions
+            #if scalar, make it 1 element list
+            if(listmask.shape == ()):
+                listmask=[listmask]
+                
+            #loop over and update with regions    
             for i,cmask in enumerate(listmask):
             
                 #create region name
