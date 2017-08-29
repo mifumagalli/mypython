@@ -18,6 +18,10 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                 maskcubex -> take a list of cubex (generally from cubes.lst) and 
                              enable masking of boxes which are written in format 
                              that can be handled by cubex combine procedure. 
+
+                finalmask -> let's you select a region on the coadded file 
+                             and applies this mask to all the region files. Useful to trim the 
+                             edges of all the exposures to look the same. Works as maskcubex.
     
     refcat (optional) --> an ascii file containing a list of RA and DEC of 
                           reference objects (stars) which acts as an absolute 
@@ -42,7 +46,9 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
     matplotlib.use("TkAgg")
     from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
     from matplotlib.figure import Figure
-    from matplotlib.colors import LogNorm
+    #from matplotlib.colors import LogNorm
+    from matplotlib.colors import Normalize
+    from astropy.visualization import ZScaleInterval
     from astropy import wcs
     import numpy as np
     import PyGuide
@@ -89,13 +95,14 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
             self.minsize(width=self.minwinwidth, height=self.minwinheight)
             self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
             #tweak the aspect ratio of the menu and data gui
-            self.menuaspect=[1.,0.15]
-            self.dataaspect=[1.,1.-0.15]
+            self.menuaspect=[1.,0.24]
+            self.dataaspect=[1.,1.-0.24]
             self.dpi=80
         
             #Fiddle with font
             default_font = tkFont.nametofont("TkDefaultFont")
-            default_font.configure(size=14)
+            scalefont = int(screen_height/1080.0*14)     #Ruari 29/08 fixes bug where different resolutions cause the menu to be cut off 
+            default_font.configure(size=scalefont)
             
             self.initialize()
             
@@ -175,10 +182,12 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                 self.wcs=wcs.WCS(self.fits[0].header)
 
             #init vmin/vmax and variables 
-            self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
-            if(self.vmin <= 0):
-                self.vmin=0.05
-            self.vmax=np.median(self.fitimg)+1.*np.std(self.fitimg)
+            zscale = ZScaleInterval()
+            self.vmin, self.vmax = zscale.get_limits(self.fitimg)
+            #self.vmin=np.median(self.fitimg)-1.*np.std(self.fitimg)
+            #if(self.vmin <= 0):
+            #    self.vmin=0.05
+            #self.vmax=np.median(self.fitimg)+1.*np.std(self.fitimg)
             self.vminv.set('{}'.format(self.vmin))
             self.vmaxv.set('{}'.format(self.vmax))
 
@@ -252,8 +261,12 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                 self.twodimagePlot_prop["axis"].cla()
                 self.vminv.set('{}'.format(self.vmin))
                 self.vmaxv.set('{}'.format(self.vmax))
-
-            self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fitimg,origin='lower',norm=LogNorm(vmin=self.vmin,vmax=self.vmax),aspect='auto')
+            #upgraded to zscale
+            #zscale = ZScaleInterval()
+            #zmin, zmax = scale.get_limits(self.fitimg)
+            self.twodimagePlot_prop["image"] =self.twodimagePlot_prop["axis"].imshow(self.fitimg,origin='lower', norm=Normalize(vmin=self.vmin,vmax=self.vmax) ,aspect='auto') 
+            #norm=SymLogNorm(linthresh=2.0, linscale=0.2, vmin=self.vmin,vmax=self.vmax)
+            #norm=LogNorm(vmin=self.vmin,vmax=self.vmax)
             self.twodimagePlot_prop["image"].set_cmap('gray')
             
             if(len(self.starx) > 0):
@@ -517,6 +530,25 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                     dx=(GUIvalues.boxrx[bb]-GUIvalues.boxlx[bb])/2.
                     dy=(GUIvalues.boxry[bb]-GUIvalues.boxly[bb])/2.
                     rfl.write('box({},{},{},{},0)\n'.format(GUIvalues.boxlx[bb]+dx,GUIvalues.boxly[bb]+dy,2.*dx,2*dy))
+                rfl.close()
+                    
+    elif(mode is 'finalmask'): 
+        print('REDUXGUI: Run in finalmask mode')                #RUari 25/05/17 added to do final step where the field is finally cropped, this runs off the cubexCOMBINED_IMAGE.fits and appends the regions to all exopsures
+
+        app = align_tk('COMBINED_IMAGE.fits',None,mode='maskcubex')
+        app.title('Mask {}'.format('COMBINED_IMAGE.fits'))
+        app.mainloop()
+
+        for ii in open(listimg):
+            region="_".join(ii.split("_")[0:-1])+"_fix2_SliceEdgeMask.reg"
+
+            #if region file exists then load and used for inital start
+            if (os.path.isfile(region)):
+                rfl=open(region,'a')
+                for bb in range(len(boxrx)):
+                    dx=(boxrx[bb]-boxlx[bb])/2.
+                    dy=(boxry[bb]-boxly[bb])/2.
+                    rfl.write('box({},{},{},{},0)\n'.format(boxlx[bb]+dx,boxly[bb]+dy,2.*dx,2*dy))
                 rfl.close()
                     
     else:
