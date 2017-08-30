@@ -178,6 +178,15 @@ class zfitwin(Tkinter.Tk):
         self.fiterr2d=self.fits[5].data
         self.fitimg=self.fits[6].data
         
+        #load sky model and normalise to source flux
+        skyspe=fits.open('{}/templates/sky/SKY_SPECTRUM_0001.fits'.format(self.execdir))
+        skycnt=fits.open('{}/templates/sky/SKY_CONTINUUM_0001.fits'.format(self.execdir))
+        #compute continuum subtracted sky model 
+        self.wavesky=np.array(skyspe[1].data['LAMBDA'])
+        cont_resampled=interp1d(skycnt[1].data['LAMBDA'],skycnt[1].data['FLUX'],bounds_error=False,fill_value=0)(skyspe[1].data['LAMBDA'])
+        self.fluxsky=np.array(skyspe[1].data['DATA'])-cont_resampled
+        self.fluxsky=self.fluxsky/np.max(self.fluxsky)*0.5*np.max(self.fitspe1d)
+
         self.drawdata()
 
         #set tmpfitxcorr to None to avoid error or later init
@@ -274,6 +283,12 @@ class zfitwin(Tkinter.Tk):
         #fit template
         self.template_fit = Tkinter.Button(self.menuframe,text=u"FitTemplate",command=self.fittemplate)
         self.template_fit.grid(column=5,row=2)
+
+        #toggle sky      
+        self.shwskystate=Tkinter.IntVar()
+        self.template_sky=Tkinter.Button(self.menuframe,text=u"Sky On/Off",command=self.togglesky)
+        self.template_sky.grid(column=5,row=4)
+
     
     def OnExit(self):
         """ Quit all on exit """
@@ -425,6 +440,10 @@ class zfitwin(Tkinter.Tk):
         self.spectrumPlot_prop["axis"].set_ylim(self.spectrumPlot_prop["ymin"],self.spectrumPlot_prop["ymax"])
         self.spectrumPlot_prop["axis"].set_xlabel('Wavelength')
         #self.spectrumPlot_prop["axis"].set_ylabel('Flux')
+
+        #if needed plot sky
+        if(self.shwskystate.get()):
+            self.spectrumPlot_prop["axis"].step(self.wavesky,self.fluxsky,where='mid',color='darkgray')
 
         #if needed, plot lines
         if(self.shwlinstate.get()):
@@ -698,6 +717,17 @@ class zfitwin(Tkinter.Tk):
         #apply normalisation
         self.templatedata_current=intflx(self.fitwav1d)*float(self.magtemp.get())
     
+    def togglesky(self,*args):
+
+        """ Switch on/off sky """
+        if(self.shwskystate.get()):
+            self.shwskystate.set(0)
+        else:
+            self.shwskystate.set(1)
+        
+        #refresh plot
+        self.update_spectrum(update=True)
+
 
     def fitlines(self):
 
