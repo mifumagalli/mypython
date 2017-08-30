@@ -283,7 +283,7 @@ class zfitwin(Tkinter.Tk):
 
     def OnSave(self):
         """ Save screen """
-        print 'Placeholder'
+        print('Placeholder')
 
 
     def SelectFile(self):
@@ -805,7 +805,7 @@ class zfitwin(Tkinter.Tk):
         #realdata={'wave':self.templatedata['wave']*(1+0.4329),'flux':self.templatedata['flux'], 
         #          'error':self.templatedata['flux']}
         
-        print 'Computing correlation... be patient!'
+        print('Computing correlation... be patient!')
             
         #find the wavelength range covering the min/max extent 
         absmin=np.min([np.min(self.templatedata['wave']),np.min(realdata['wave'])])
