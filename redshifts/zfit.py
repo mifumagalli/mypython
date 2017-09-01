@@ -443,7 +443,7 @@ class zfitwin(Tkinter.Tk):
 
         #if needed plot sky
         if(self.shwskystate.get()):
-            self.spectrumPlot_prop["axis"].step(self.wavesky,self.fluxsky,where='mid',color='darkgray')
+            self.spectrumPlot_prop["axis"].step(self.wavesky,self.fluxsky,where='mid',color='black')
 
         #if needed, plot lines
         if(self.shwlinstate.get()):

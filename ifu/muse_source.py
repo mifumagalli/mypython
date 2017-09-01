@@ -227,7 +227,11 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     #grab detection and seg mask 
     detflx=np.nan_to_num(det[0].data.byteswap(True).newbyteorder())
     #go back to 1d
-    segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))[0,:,:]
+    if(len(seg[0].data.shape)):
+        segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))[0,:,:]
+    else:
+        segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))
+
 
     #if needed, map the segmap to new image with transformation
     if('MUSE' not in instrument):
@@ -668,3 +672,98 @@ def forcephot(image,x,y,rad,skyreg=[10,20],show=False,mask=None):
 
 
     return mag, errmag
+
+
+def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspecs'):
+
+    
+    """
+
+    This code takes one (cube) or more cubes together with a 3D segmentation 
+    map produced by cubex and generates images and spectra for inspection 
+    
+    Cube2Im need to be installed and in the path
+
+    cubes      -> list of short cubes (matched to objid dimenion) for image extraction
+    tags       -> name tags to be used for *_imf.fits output
+    objidmask  -> the 3d segmentation map used for extraction
+    specube -> if set, used to extract spectrum (e.g. full cube). If not 
+                available, use first cube in the list of spectrum generation
+    vacuum  -> if true, convert wave to wacuum 
+    outpath -> where to store products
+
+    """
+    
+    from astropy.io import fits 
+    import os
+    import numpy as np
+    import subprocess
+    from mypython.ifu import muse_utils as mutl
+
+    
+    #sanity checks 
+    #turn lists what should be a list
+    if(isinstance(cubes, basestring)):
+        cubes=[cubes]
+        tags=[tags]
+    #check tags go nicely with names
+    if(len(cubes) != len(tags)):
+        raise ValueError("Cubes and tags do not match in size!")
+
+    #set cube for spectrum
+    if(specube):
+        cubespec=specube
+    else:
+        cubespec=cubes[0]
+
+    #make output folder
+    if not os.path.exists(outpath):
+        os.makedirs(outpath)
+
+    #grab the indexes
+    segmap=fits.open(objidmask)
+    objid=np.max(segmap[0].data)
+
+    for ii in range(objid):
+        #make outfolder
+        if not os.path.exists(outpath+'/id{}'.format(ii+1)):
+            os.makedirs(outpath+'/id{}'.format(ii+1))
+        currentpath=outpath+'/id{}'.format(ii+1)
+        #next generate image
+        for cc,thiscube in enumerate(cubes):
+            subprocess.call(["Cube2Im","-cube",thiscube,"-out","{}/{}_img.fits".format(currentpath,tags[cc]),"-id","{}".format(ii+1),"-idcube",objidmask,"-nl","-1","-idpad","20","-sbscale",".true."])
+        #finally call spectrum generation
+        print('Extracting 1d spectrum from {}'.format(cubespec))
+        mutl.cube2spec(cubespec,0,0,0,shape='mask',tovac=vacuum,idsource=ii+1,mask=segmap[0].data,\
+                           write='{}/spectrum.fits'.format(currentpath))
+        
+
+    segmap.close()
+     
+    
+
+    
+    
+    
+
+    
+
+
+
+
+
+    
+    
+
+
+
+
+    
+    
+
+
+
+
+    
+
+    
