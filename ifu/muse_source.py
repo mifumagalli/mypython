@@ -674,8 +674,9 @@ def forcephot(image,x,y,rad,skyreg=[10,20],show=False,mask=None):
     return mag, errmag
 
 
-def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspecs'):
-
+def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspecs',\
+                     variance=None, scalevar=None):
+    
     
     """
 
@@ -692,6 +693,12 @@ def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspec
     vacuum  -> if true, convert wave to wacuum 
     outpath -> where to store products
 
+    variance -> if set to a list of variance cubes [1st extension], propagate variance inside the 
+                projected 2D images
+
+    scalevar -> if set to cubex variance rescale file (z,scalefactor), 
+                apply variance scaling before propagating variance 
+
     """
     
     from astropy.io import fits 
@@ -699,22 +706,44 @@ def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspec
     import numpy as np
     import subprocess
     from mypython.ifu import muse_utils as mutl
+    from astropy.table import Table
 
     
     #sanity checks 
-    #turn lists what should be a list
+    #turn in list what should be list and not string
     if(isinstance(cubes, basestring)):
         cubes=[cubes]
         tags=[tags]
-    #check tags go nicely with names
+    #check tags match size of cubes
     if(len(cubes) != len(tags)):
         raise ValueError("Cubes and tags do not match in size!")
 
-    #set cube for spectrum
+    #set cube to be used for spectrum extraction
     if(specube):
         cubespec=specube
     else:
         cubespec=cubes[0]
+
+    #stash the variance if needed
+    allvar=[]
+    if(variance):
+        print('Prepare variance data...')
+        #check if need to rescale
+        if(scalevar):
+            #read scaling factor
+            vscale=Table.read(scalevar,format='ascii')
+            #grab cube dimension and construct rescaled variance
+            thisv=fits.open(variance[0])
+            nl,nx,ny=thisv[0].data.shape
+            scale=np.transpose(np.tile(vscale['rescaling_fact'],(ny,nx,1)))
+        else:
+            scale=1.0
+        #now store with scaling
+        for varname in variance:
+            thisv=fits.open(varname)
+            allvar.append(thisv[0].data*scale)
+            thisv.close()
+            
 
     #make output folder
     if not os.path.exists(outpath):
@@ -723,20 +752,72 @@ def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspec
     #grab the indexes
     segmap=fits.open(objidmask)
     objid=np.max(segmap[0].data)
+    
+    print('Loop over IDs...')
 
     for ii in range(objid):
-        #make outfolder
-        if not os.path.exists(outpath+'/id{}'.format(ii+1)):
-            os.makedirs(outpath+'/id{}'.format(ii+1))
-        currentpath=outpath+'/id{}'.format(ii+1)
-        #next generate image
-        for cc,thiscube in enumerate(cubes):
-            subprocess.call(["Cube2Im","-cube",thiscube,"-out","{}/{}_img.fits".format(currentpath,tags[cc]),"-id","{}".format(ii+1),"-idcube",objidmask,"-nl","-1","-idpad","20","-sbscale",".true."])
-        #finally call spectrum generation
-        print('Extracting 1d spectrum from {}'.format(cubespec))
-        mutl.cube2spec(cubespec,0,0,0,shape='mask',tovac=vacuum,idsource=ii+1,mask=segmap[0].data,\
-                           write='{}/spectrum.fits'.format(currentpath))
-        
+        #first check if index is legit
+        inside=np.where(segmap[0].data == ii+1)
+        if(len(inside[0]) > 1):
+            print('Work on ID {}'.format(ii+1))
+            #make outfolder
+            if not os.path.exists(outpath+'/id{}'.format(ii+1)):
+                os.makedirs(outpath+'/id{}'.format(ii+1))
+            currentpath=outpath+'/id{}'.format(ii+1)
+            #next generate image
+            for cc,thiscube in enumerate(cubes):
+                subprocess.call(["Cube2Im","-cube",thiscube,"-out","{}/{}_img.fits".format(currentpath,tags[cc]),"-id","{}".format(ii+1),"-idcube",objidmask,"-nl","-1","-idpad","20","-sbscale",".true."])
+                #append variance if needed
+                if(variance):
+                    #propagate the variance along lambda axis
+              
+                    #find star-end in each dimension
+                    ilstart=np.min(inside[0])
+                    ilend=np.max(inside[0])
+                    dl=ilend-ilstart+1
+                    ixstart=np.min(inside[1])
+                    ixend=np.max(inside[1])
+                    dx=ixend-ixstart+1
+                    iystart=np.min(inside[2])
+                    iyend=np.max(inside[2])
+                    dy=iyend-iystart+1
+
+                    #now build a mask array
+                    thismask=np.zeros((dl,dx,dy))
+                    thismask[inside[0]-ilstart,inside[1]-ixstart,inside[2]-iystart]=1.0
+                    
+                    #build variance slice
+                    varslice=np.zeros((dl,dx,dy))
+                    varslice[inside[0]-ilstart,inside[1]-ixstart,inside[2]-iystart]=\
+                        allvar[cc][inside[0],inside[1],inside[2]]
+                    
+                    #now with flux 
+                    flux=fits.open(thiscube)
+                    fluxslice=np.zeros((dl,dx,dy))
+                    fluxslice[inside[0]-ilstart,inside[1]-ixstart,inside[2]-iystart]=\
+                        flux[0].data[inside[0],inside[1],inside[2]]
+                    flux.close()
+                    
+                    #compute integral flux and SN
+                    totflux=np.sum(fluxslice*thismask)*1e-20*1.25
+                    toterr=np.sqrt(np.sum(varslice*thismask))*1e-20*1.25
+                    print('Flux: {}'.format(totflux))
+                    print('S/N: {}'.format(totflux/toterr))
+                    
+                    #open image to update
+                    imgupdate=fits.open("{}/{}_img.fits".format(currentpath,tags[cc]),mode='update')
+                    imgupdate[0].header['ISOFLUX']=totflux
+                    imgupdate[0].header['ISOERR']=toterr
+                    imgupdate[0].header['S2N']=totflux/toterr
+                    imgupdate.flush()
+                    imgupdate.close()
+                    
+            #finally call spectrum generation
+            print('Extracting 1d spectrum from {}'.format(cubespec))
+            mutl.cube2spec(cubespec,0,0,0,shape='mask',tovac=vacuum,idsource=ii+1,mask=segmap[0].data,\
+                               write='{}/spectrum.fits'.format(currentpath))
+        else:
+            print('Skip index {} as not in ID map'.format(ii+1))
 
     segmap.close()
      
