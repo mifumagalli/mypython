@@ -799,16 +799,16 @@ def sourceimgspec(cubes,tags,objidmask,specube=None,vacuum=True,outpath='imgspec
                     flux.close()
                     
                     #compute integral flux and SN
-                    totflux=np.sum(fluxslice*thismask)*1e-20*1.25
-                    toterr=np.sqrt(np.sum(varslice*thismask))*1e-20*1.25
+                    totflux=np.sum(np.nan_to_num(fluxslice)*thismask)*1e-20*1.25
+                    toterr=np.sqrt(np.sum(np.nan_to_num(varslice)*thismask))*1e-20*1.25
                     print('Flux: {}'.format(totflux))
                     print('S/N: {}'.format(totflux/toterr))
                     
                     #open image to update
                     imgupdate=fits.open("{}/{}_img.fits".format(currentpath,tags[cc]),mode='update')
-                    imgupdate[0].header['ISOFLUX']=totflux
-                    imgupdate[0].header['ISOERR']=toterr
-                    imgupdate[0].header['S2N']=totflux/toterr
+                    imgupdate[0].header['ISOFLUX']=np.nan_to_num(totflux)
+                    imgupdate[0].header['ISOERR']=np.nan_to_num(toterr)
+                    imgupdate[0].header['S2N']=np.nan_to_num(totflux/toterr)
                     imgupdate.flush()
                     imgupdate.close()
                     
