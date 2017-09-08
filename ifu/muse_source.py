@@ -350,11 +350,17 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         #Compute local sky 
         #####
         skyreg=kn*kronrad*np.sqrt(aphot*bphot)+15
-        cutskymask=segmasktrans[yphot-skyreg:yphot+skyreg,xphot-skyreg:xphot+skyreg]
-        cutskydata=dataflx[yphot-skyreg:yphot+skyreg,xphot-skyreg:xphot+skyreg]
+        if (yphot-skyreg < 0.0): yphot=skyreg
+        if (xphot-skyreg < 0.0): xphot=skyreg
+        if (yphot+skyreg > segmasktrans.shape[0]-1): yphot=segmasktrans.shape[0]-1-skyreg
+        if (xphot+skyreg > segmasktrans.shape[1]-1): xphot=segmasktrans.shape[1]-1-skyreg
+        #print(int(yphot-skyreg),int(yphot+skyreg),int(xphot-skyreg),int(xphot+skyreg))
+        cutskymask=segmasktrans[int(yphot-skyreg):int(yphot+skyreg),int(xphot-skyreg):int(xphot+skyreg)]
+        cutskydata=dataflx[int(yphot-skyreg):int(yphot+skyreg),int(xphot-skyreg):int(xphot+skyreg)]
         skymedian=np.nan_to_num(np.median(cutskydata[np.where(cutskymask < 1.0)]))
 
         #print skymedian    
+
         #plt.imshow(cutskymask,origin='low')
         #plt.show()
         #if(idobj > 30):
@@ -522,6 +528,9 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
         #auto select with gap 
         minw=10
         maxw=cubhdu[0].header['NAXIS3']-10
+    if wavelimits:
+        minw = wavelimits[0]
+        maxw = wavelimits[1]
     minx=20
     maxx=cubhdu[0].header['NAXIS1']-20
     miny=20
@@ -580,7 +589,7 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
                                              (((ww+0.5-wc)**2)/(2.*sigmaw**2))))
                               
                         #store
-                        newcube[ww,yy,xx]=newcube[ww,yy,xx]+pix
+                        newcube[int(ww),int(yy),int(xx)]=newcube[int(ww),int(yy),int(xx)]+pix
     
     print('Done.. writing!')
 
