@@ -178,7 +178,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     #now perform healthy checks for calibrations with AO mode
     objheader=fits.open("Raw/"+(list(xml_info['OBJECT'])[0])+".fits.fz")
     scimode=(objheader[0].header['ESO INS MODE']).strip()
-    if('WFM-AO-' in mode):
+    if('WFM-AO-' in scimode):
         #loop over standards and check
         for std in list(xml_info['STD']):
             objheader=fits.open("Raw/"+std+".fits.fz")
