@@ -48,13 +48,12 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     data=data.byteswap(True).newbyteorder()
     #grab effective dimension
     nex,ney=data.shape
-
     #close fits
     img.close()
 
     #create bad pixel mask
     if(regmask):
-        Mask=msk.PyMask(nex,ney,regmask)
+        Mask=msk.PyMask(ney,nex,regmask)
         for ii in range(Mask.nreg):
             Mask.fillmask(ii)
             if(ii == 0):
@@ -71,6 +70,7 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
         hdulist = fits.HDUList([hdumain])
         hdulist.writeto(output+"/badmask.fits",clobber=True)
     
+
     #check background level, but do not subtract it
     print 'Checking background levels'
     bkg = sep.Background(data,mask=badmask)    

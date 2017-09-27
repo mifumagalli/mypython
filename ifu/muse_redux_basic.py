@@ -197,7 +197,8 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     cl=open('calplan.txt','w')
     for kk in xml_info.keys():
         for ll in xml_info[kk]:
-            cl.write('{0} {1}\n'.format(kk,ll))
+            if(('PATHCAL' not in kk) & ('SUFFIXCAL' not in kk)):
+                cl.write('{0} {1}\n'.format(kk,ll))
     cl.close()
 
     return xml_info  
