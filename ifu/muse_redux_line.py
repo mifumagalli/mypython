@@ -936,9 +936,13 @@ def internalskysub(listob,skymask,deepwhite=None):
                     os.remove(zapsvdout) 
                 except:
                     pass
-                #run new
-                zap.process(newcube,outcubefits=zapcube,clean=True,svdoutputfits=zapsvdout,mask=zapmask)
-            
+                #run new - handle change in keywords from v1 to v2 
+                try:
+                    zap.process(newcube,outcubefits=zapcube,clean=True,svdoutputfits=zapsvdout,mask=zapmask)
+                except:
+                    zap.process(newcube,outcubefits=zapcube,clean=True,mask=zapmask)
+
+                    
                 #create white image from zap cube
                 cube=fits.open(zapcube)
                 print ('Creating final white image from ZAP')
