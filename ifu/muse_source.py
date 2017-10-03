@@ -227,7 +227,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     #grab detection and seg mask 
     detflx=np.nan_to_num(det[0].data.byteswap(True).newbyteorder())
     #go back to 1d
-    if(len(seg[0].data.shape)):
+    if(len(seg[0].data.shape)>2):
         segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))[0,:,:]
     else:
         segmask=(np.nan_to_num(seg[0].data.byteswap(True).newbyteorder()))
