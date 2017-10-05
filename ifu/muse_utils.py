@@ -412,8 +412,9 @@ def cubestat(cube,region=None,delta=10,mask=None):
         rms[ii]=np.std(np.nan_to_num(allpix))
         wrms[ii]=wcent
         
-    #normalise units from pixel to as^2 and from pix to A
-    rms=rms*1e-20/lambdabin/pixbin**2
+    #normalise units from pixel to as^2 
+    #rms=rms*1e-20/lambdabin/pixbin**2
+    rms=rms*1e-20/pixbin**2
     return wrms,rms
 
 def readcube(cube, helio=0):
