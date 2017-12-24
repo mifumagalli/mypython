@@ -110,7 +110,10 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     if('2.1.1-1' in pipeversion):
         pipeversion='muse-2.1.1' 
     staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
-    
+    #fix path on cosma/durham
+    if('/cosma/' in staticalpath):
+        staticalpath='/cosma/local/muse/'+pipeversion+'/calib/muse-'+pipeversion+'/cal/'
+ 
     #Here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
     #This is the largest time at one should worry about legacy products 
     legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
