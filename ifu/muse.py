@@ -40,88 +40,93 @@ class Muse(object):
         import muse_redux_basic as rdx
         import os
 
-        print 'Starting reduction...'
+        print('Starting reduction...')
         
         #First, make sure the various folders exist as needed 
         if not os.path.exists(path+"Raw"):
-            print "Cannot find Raw data..."
+            print("Cannot find Raw data...")
             exit()
         if not os.path.exists(path+"Script"):
             os.makedirs(path+"Script")
         if not os.path.exists(path+"Proc"):
             os.makedirs(path+"Proc")
 
+
         #parse the xml file(s) 
         xml_info=rdx.parse_xml(path=path,nproc=nproc,pipecal=pipecal)
-        
+
         #now start reduction. Enter the proc folder
         currdir=os.getcwd()
         os.chdir(path+'Proc')
-        print 'Changing dir to proc...'
-        
+        print('Changing dir to proc...')
+        if not os.path.exists("./Basic"):
+            os.makedirs("./Basic")
+        os.chdir("./Basic")
+        print('Changing dir to Basic...')
+   
         #First handle the bias
         if not os.path.isfile("MASTER_BIAS.fits"):
-            print 'Creating bias...'
+            print('Creating bias...')
             rdx.make_bias(xml_info,nproc=nproc)
-            print 'All done with the bias...'
+            print('All done with the bias...')
         else:
-            print 'Bias already exist'
+            print('Bias already exist')
             
         #Next handle the dark
         if not os.path.isfile("MASTER_DARK.fits"):
-            print 'Creating dark...'
+            print('Creating dark...')
             rdx.make_dark(xml_info,nproc=nproc)
-            print 'All done with the dark...'
+            print('All done with the dark...')
         else:
-            print 'Dark already exist'
+            print('Dark already exist')
             
         #Next handle the flats
         if not os.path.isfile("MASTER_FLAT.fits"):
-            print 'Creating flat...'
+            print('Creating flat...')
             rdx.make_flat(xml_info,nproc=nproc)
-            print 'All done with flat...'
+            print('All done with flat...')
         else:
-            print 'Flat already exist'
+            print('Flat already exist')
   
         #Next handle the arcs
         if not os.path.isfile("WAVECAL_RESIDUALS.fits"):
-            print 'Processing the arcs...'
+            print('Processing the arcs...')
             rdx.make_arcs(xml_info,nproc=nproc)
-            print 'All done with arcs...'
+            print('All done with arcs...')
         else:
-            print 'Arcs already processed'
+            print('Arcs already processed')
             
         #Next handle the twilight flat
         if not os.path.isfile("DATACUBE_SKYFLAT.fits"):
-            print 'Processing the twiflat...'
+            print('Processing the twiflat...')
             rdx.make_twiflat(xml_info,nproc=nproc)
-            print 'All done with twiflat...'
+            print('All done with twiflat...')
         else:
-            print 'Twiflat already processed'
+            print('Twiflat already processed')
 
         #Next calibrate standard star
         if not os.path.isfile("STD_RED_0001.fits"):
-            print 'Processing the standard star...'
+            print('Processing the standard star...')
             rdx.make_stdstar(xml_info,nproc=nproc)
-            print 'All done with standard star...'
+            print('All done with standard star...')
         else:
-            print 'Standard star already processed'
+            print('Standard star already processed')
                 
         #Next generate flux table
         if not os.path.isfile("STD_FLUXES_0001.fits"):
-            print 'Processing the flux table...'
+            print('Processing the flux table...')
             rdx.make_stdflux(xml_info,nproc=nproc)
-            print 'All done with flux table...'
+            print('All done with flux table...')
         else:
-            print 'Flux table already processed'
+            print('Flux table already processed')
       
         #Next calibrate objects
         if not os.path.isfile("OBJECT_RED_0001.fits"):
-            print 'Processing the objects...'
+            print('Processing the objects...')
             rdx.make_objects(xml_info,nproc=nproc)
-            print 'All done with objects...'
+            print('All done with objects...')
         else:
-            print 'Objects already processed'
+            print('Objects already processed')
 
         #Finally, process science
         print('Preparing intermediate data cubes...')
