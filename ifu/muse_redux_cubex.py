@@ -1,4 +1,142 @@
 
+def individual_resample(listob,refpath='./',nproc=24):
+
+    """
+    Loop over each OB and re-run scipost using a final coadded cube as
+    a reference for WCS. This produces cubes that are all regridded to 
+    a common 3D grid with a single interpolation. 
+
+
+    listob -> OBs to process
+    refpath -> where reference path is for WCS resampling
+    nproc -> numer of processors in parallel runs 
+
+    """
+      
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final sky-subtracted cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/')
+
+        #make cubex folder
+        if not os.path.exists('Cubex'):
+            os.makedirs('Cubex')
+
+        #change dir
+        os.chdir('Cubex')
+
+        print('Processing {} for resampling on reference cube'.format(ob))
+ 
+        #Search how many exposures are there
+        scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+        
+        #loop on exposures and reduce frame with sky subtraction 
+        for exp in range(nsci):
+            
+            if not os.path.isfile('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1)):
+                print("Compute offsets...")
+                            
+                #create align file 
+                alignsof=open('../../Script/align_toref_{0:d}.sof'.format(exp+1),'w')
+                alignsof.write("../../../{}/IMAGE_FOV_0001.fits IMAGE_FOV\n".format(refpath))
+                alignsof.write("../Basic/IMAGE_FOV_EXP{0:d}.fits IMAGE_FOV\n".format(exp+1))
+                alignsof.close()
+                
+                #run script align with respect to registered reference cube  
+                alignscr=open('../../Script/make_align_toref_{0:d}.sh'.format(exp+1),'w')
+                alignscr.write("esorex --log-file=align_toref_{0:d}.log muse_exp_align --threshold=4. ../../Script/align_toref_{0:d}.sof".format(exp+1))
+                alignscr.close()
+                subprocess.call(["sh","../../Script/make_align_toref_{0:d}.sh".format(exp+1)])    
+                
+                #copy the offsets 
+                alig=fits.open('OFFSET_LIST.fits')
+                alig.writeto('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1),clobber=True)
+
+            else:
+                print('Offsets exist.. skip')
+
+            #define some output names for final cube 
+            cname="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            pname="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            iname="IMAGE_FOV_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+ 
+            if not os.path.isfile(cname):
+                print("Processing exposure {0:d} to align to reference".format(exp+1))
+                
+                #copy sof file written for basic reduction
+                sof_old=open("../../Script/scipost_{0:d}.sof".format(exp+1))
+                sof_name="../../Script/scipost_line_{0:d}.sof".format(exp+1)
+                sofedit=open(sof_name,'w')
+                
+                #read the offsets 
+                alig=fits.open('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1))
+                offsets=alig[1].data[1]
+
+                #now apply offsets to pixel table
+                print ('Apply offsets...')
+                pixtablist=[]
+                for ll in sof_old:
+                    if('PIXTABLE_OBJECT' in ll):
+                        pixtab=ll.split(' ')[0]
+                        pxt=fits.open('../Basic/'+pixtab)
+                        pxt[0].header['RA']=pxt[0].header['RA']-offsets[2]
+                        pxt[0].header['DEC']=pxt[0].header['DEC']-offsets[3]
+                        
+                        pxt.writeto("WCS_"+pixtab,clobber=True)
+                        pixtablist.append("WCS_"+pixtab)
+                        sofedit.write("WCS_"+pixtab+" PIXTABLE_OBJECT\n")
+                    elif('STD_' in ll):
+                        fil,tag=ll.split(' ')
+                        sofedit.write("../Basic/"+fil+" "+tag)
+                    else:
+                        sofedit.write(ll)
+
+                #append reference frame to sof file 
+                sofedit.write('../../../{}/DATACUBE_FINAL.fits OUTPUT_WCS\n'.format(refpath))
+                sofedit.close()
+                sof_old.close()
+            
+                
+                #Write the command file 
+                scr=open("../../Script/make_scipost_line_{0:d}.sh".format(exp+1),"w")
+                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+                
+                scr.write('esorex --log-file=scipost_line_{0:d}.log muse_scipost --filter=white  --skymethod="none" --save=cube,individual ../../Script/scipost_line_{0:d}.sof'.format(exp+1))
+                scr.close()
+                
+                #Run pipeline 
+                subprocess.call(["sh", "../../Script/make_scipost_line_{0:d}.sh".format(exp+1)])    
+                subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+            else:
+                print("Exposure {0:d} exists.. skip! ".format(exp+1))
+     
+
+        #clean dir for unwanted stuff...
+        print ('Clean directory!')
+        garbage=glob.glob("WCS_PIXTABLE_OBJECT*")
+        for gg in garbage:
+            os.remove(gg)
+
+        #back to top
+        os.chdir(topdir)
+
+
+
 def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     
     
@@ -42,23 +180,23 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
 
     #now fix the cube
     if ((os.path.isfile(fixed)) & (noclobber)):
-        print "Cube {0} already fixed".format(cube)
+        print("Cube {0} already fixed".format(cube))
     else:
-        print 'Cubefix ', cube
+        print('Cubefix ', cube)
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed])
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
-        print "Cube {0} already skysub".format(fixed)
+        print("Cube {0} already skysub".format(fixed))
     else:
-        print 'Sky sub ', fixed
+        print('Sky sub ', fixed)
         subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-lcheck",".false."])
                                
     #create a white image
     if ((os.path.isfile(white)) & (noclobber)):
-        print "White image for cube {0} already exists".format(skysub)
+        print("White image for cube {0} already exists".format(skysub))
     else:
-        print 'Create white image for ', skysub
+        print('Create white image for ', skysub)
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
 
@@ -92,32 +230,33 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         white=cube.split('.fits')[0]+"_white2.fits"
         sharpmsk=cube.split('.fits')[0]+"_sharpmask2.fits"
 
-    #assign names for source mask 
-    mask_source=cube.split('.fits')[0]+"_white.Objects_Id.fits"
-    white_source=cube.split('.fits')[0]+"_white.fits"
-
     #now fix the cube using masks
     if ((os.path.isfile(fixed)) & (noclobber)):
-        print "Cube {0} already fixed".format(cube)
+        print("Cube {0} already fixed".format(cube))
     else:
 
-        print 'Create source mask ', white_source
+        print('Create source mask ', white_source)
         #if high cube provide, overwrite white image 
         if(highsn):
-            print 'Using high SN cube...'
+            print('Using high SN cube...')
+            #create source mask from deep exposure 
+            mask_source=cube.split('.fits')[0]+"_whitedeep.Objects_Id.fits"
+            white_source=cube.split('.fits')[0]+"_whitedeep.fits"
             subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','3','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
         else:
-            print 'Using white image from previous loop'
-            #create source mask 
+            print('Using white image from previous loop')
+            #create source mask from previous step
+            mask_source=cube.split('.fits')[0]+"_white.Objects_Id.fits"
+            white_source=cube.split('.fits')[0]+"_white.fits"
             subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
             
-        print 'Cubefix ', cube
+        print('Cubefix ', cube)
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source]) 
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 
-    #if told to mask sky do it.. otherwise leave image empty
+    #if told to mask a particular sky region do it.. otherwise leave image empty
     cb=fits.open(cube)
     nx=cb[1].header['NAXIS1']
     ny=cb[1].header['NAXIS2']
@@ -141,20 +280,20 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
-        print "Cube {0} already skysub".format(fixed)
+        print("Cube {0} already skysub".format(fixed))
     else:
-        print 'Sky sub ', fixed
+        print('Sky sub ', fixed)
         if(highsn):
             #now few more options to control sky sub 
-            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-hsncube",highsn,"-lcheck",".false."])
+            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-hsncube",highsn,"-lcheck",".true."])
         else:
             subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk])
                                
     #create a white image
     if ((os.path.isfile(white)) & (noclobber)):
-        print "White image for cube {0} already exists".format(skysub)
+        print("White image for cube {0} already exists".format(skysub))
     else:
-        print 'Create white image for ', skysub
+        print('Create white image for ', skysub)
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
 def cubex_driver(listob,last=False,highsn=None,skymask=None):
@@ -182,11 +321,11 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
     for ob in listob:
         
         #change dir
-        os.chdir(ob+'/Proc/')
+        os.chdir(ob+'/Proc/Cubex')
         print('Processing {} with cubex '.format(ob))
 
         #Search how many exposures are there
-        scils=glob.glob("OBJECT_RED_0*.fits*")
+        scils=glob.glob("DATACUBE_FINAL_RESAMPLED_EXP*.fits")
         nsci=len(scils)
         
         #this is the final pass with highsn cube
@@ -198,8 +337,8 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
             workers=[]
             for dd in range(nsci):
                 #reconstruct the name 
-                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
-                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
                 p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask))
                 workers.append(p)
@@ -220,8 +359,8 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
             workers=[]
             for dd in range(nsci):
                 #reconstruct the name 
-                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
-                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
                 p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,skymask))
                 workers.append(p)
@@ -240,8 +379,8 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
             workers=[]
             for dd in range(nsci):
                 #reconstruct the name 
-                pixtab="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(dd+1)
-                cube="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(dd+1)
+                pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
+                cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
                 p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask))
                 workers.append(p)
@@ -309,7 +448,7 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         print ('Creating combined cube {}'.format(cname))
 
         if(regions):
-            print "Updating the masks"
+            print("Updating the masks")
         
             #loads list
             listmask=np.loadtxt(masks,dtype=np.dtype('a'))
@@ -361,11 +500,11 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
             llms.close()
 
         else:
-            print 'Using original masks'
+            print('Using original masks')
             mask_new=masks
 
         #now run combine
-        print 'Combine the cube...'    
+        print('Combine the cube...')
       
         #make mean cube - write this as script that can be ran indepedently 
         scr=open(scriptname,'w')

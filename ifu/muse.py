@@ -10,7 +10,7 @@ class Muse(object):
 
         """ Stuff at init .. not much for now """
         
-        print "Initialisation of Muse object"
+        print("Initialisation of Muse object")
         self.musepip=1.0
         
 
@@ -142,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='./esocombine/',skymask=None):
+    def cubex_process(self,refpath='esocombine/',skymask=None):
 
         """
   
@@ -158,7 +158,6 @@ class Muse(object):
         import os
         import glob
         import subprocess
-        import muse_redux_line as ex 
         import muse_redux_cubex as cx 
         import multiprocessing
         import numpy as np
@@ -174,11 +173,14 @@ class Muse(object):
             os.makedirs('cubexcombine')
 
         #rerun pipeline enabling resampling on final ESO cube using modules coded for line_process
-        ex.individual_resample(listob,refpath=refpath)
+        cx.individual_resample(listob,refpath=refpath)
+    
         
         #now do the first two passes of cubex on each OB to prepare a temporary cube
         cx.cubex_driver(listob,skymask=skymask)
-       
+        
+        exit()
+
         #prepare for intermediate combine 
         #dump to disk file lists
         topdir=os.getcwd()
@@ -298,7 +300,7 @@ class Muse(object):
 
         #back to top level
         os.chdir(topdir)
-        print 'All done with cubex redux'
+        print('All done with cubex redux')
         
 
     def eso_process(self):
