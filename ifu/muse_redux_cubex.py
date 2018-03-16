@@ -161,28 +161,30 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     white=cube.split('.fits')[0]+"_white.fits"
     sharpmsk=cube.split('.fits')[0]+"_sharpmask.fits"
 
-    #if told to mask sky do it.. otherwise leave image empty
-    cb=fits.open(cube)
-    nx=cb[1].header['NAXIS1']
-    ny=cb[1].header['NAXIS2']
-    sharpmask=np.zeros((ny,nx))
-    if(skymask):
-        #construct the sky region mask
-        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
-        for ii in range(mysky.nreg):
-            mysky.fillmask(ii)
-            sharpmask=sharpmask+mysky.mask
-    #write mask
-    hdu = fits.PrimaryHDU(sharpmask)
-    hdulist = fits.HDUList([hdu])
-    hdulist.writeto(sharpmsk,clobber=True)
-    cb.close()
 
     #now fix the cube
     if ((os.path.isfile(fixed)) & (noclobber)):
         print("Cube {0} already fixed".format(cube))
     else:
         print('Cubefix ', cube)
+        #if told to mask sky do it.. otherwise leave image empty
+        cb=fits.open(cube)
+        nx=cb[1].header['NAXIS1']
+        ny=cb[1].header['NAXIS2']
+        sharpmask=np.zeros((ny,nx))
+        if(skymask):
+            #construct the sky region mask
+            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+            for ii in range(mysky.nreg):
+                mysky.fillmask(ii)
+                sharpmask=sharpmask+mysky.mask
+        #write mask
+        hdu = fits.PrimaryHDU(sharpmask)
+        hdulist = fits.HDUList([hdu])
+        hdulist.writeto(sharpmsk,clobber=True)
+        cb.close()
+
+        #run cubefix
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed])
 
     #now run cube skysub
@@ -235,7 +237,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         print("Cube {0} already fixed".format(cube))
     else:
 
-        print('Create source mask ', white_source)
+        print('Create source mask...')
         #if high cube provide, overwrite white image 
         if(highsn):
             print('Using high SN cube...')
@@ -243,40 +245,40 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
             mask_source=cube.split('.fits')[0]+"_whitedeep.Objects_Id.fits"
             white_source=cube.split('.fits')[0]+"_whitedeep.fits"
             subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','4.5','-RescaleVar','.true.'])
         else:
             print('Using white image from previous loop')
             #create source mask from previous step
             mask_source=cube.split('.fits')[0]+"_white.Objects_Id.fits"
             white_source=cube.split('.fits')[0]+"_white.fits"
-            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','5','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','4.5','-RescaleVar','.true.'])
             
         print('Cubefix ', cube)
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source]) 
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 
-    #if told to mask a particular sky region do it.. otherwise leave image empty
-    cb=fits.open(cube)
-    nx=cb[1].header['NAXIS1']
-    ny=cb[1].header['NAXIS2']
-    sharpmask=np.zeros((ny,nx))
-    if(skymask):
-        #construct the sky region mask
-        mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
-        for ii in range(mysky.nreg):
-            mysky.fillmask(ii)
-            sharpmask=sharpmask+mysky.mask
-    cb.close()
+        #if told to mask a particular sky region do it.. otherwise leave image empty
+        cb=fits.open(cube)
+        nx=cb[1].header['NAXIS1']
+        ny=cb[1].header['NAXIS2']
+        sharpmask=np.zeros((ny,nx))
+        if(skymask):
+            #construct the sky region mask
+            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=cb[1].header)
+            for ii in range(mysky.nreg):
+                mysky.fillmask(ii)
+                sharpmask=sharpmask+mysky.mask
+        cb.close()
 
-    #inject src mask in sharpmask
-    srcmk=fits.open(mask_source)
-    sharpmask=sharpmask+srcmk[0].data
+        #inject src mask in sharpmask
+        srcmk=fits.open(mask_source)
+        sharpmask=sharpmask+srcmk[0].data
 
-    #write mask
-    hdu = fits.PrimaryHDU(sharpmask)
-    hdulist = fits.HDUList([hdu])
-    hdulist.writeto(sharpmsk,clobber=True)
+        #write mask
+        hdu = fits.PrimaryHDU(sharpmask)
+        hdulist = fits.HDUList([hdu])
+        hdulist.writeto(sharpmsk,clobber=True)
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
@@ -325,7 +327,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
         print('Processing {} with cubex '.format(ob))
 
         #Search how many exposures are there
-        scils=glob.glob("DATACUBE_FINAL_RESAMPLED_EXP*.fits")
+        scils=glob.glob("PIXTABLE_REDUCED_RESAMPLED_EXP*.fits")
         nsci=len(scils)
         
         #this is the final pass with highsn cube
@@ -393,6 +395,183 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
                 
         #back to top
         os.chdir(topdir)
+
+def tweak_edges(rootname):
+
+    """
+
+    Procedure that identifies the edges of the IFU mask and applies them to the SliceEdgeMask
+
+    rootname: the base name to process
+
+    """
+
+    import numpy as np
+    from astropy.io import fits
+    from scipy import ndimage
+    import matplotlib.pyplot as plt
+    
+
+    #open IFU image
+    ifu=fits.open(rootname+"_IFUSliceMap.fits")
+
+    #make all the same
+    ifuimg=ifu[0].data
+    ifuimg[np.where(ifuimg > 0)]=1e3
+    ifuimg=ndimage.gaussian_filter(ifu[0].data,3)
+    
+    #find egdes
+    sx=ndimage.sobel(ifuimg,axis=0,mode='constant')
+    sy=ndimage.sobel(ifuimg,axis=1,mode='constant')
+    edges=np.hypot(sx,sy)
+    
+    #update slice mask
+    newmask=np.where(edges > 350)
+    slicemask=fits.open(rootname+"_SliceEdgeMask.fits",mode='update')
+    slicemask[0].data[newmask]=0
+    slicemask.flush()
+
+    #plt.imshow(ifuimg,origin='low')
+    #plt.show()
+    #plt.imshow(slicemask[0].data,origin='low')
+    #plt.imshow(edges,origin='low',alpha=0.5)
+    #plt.show()
+
+    #close fits
+    ifu.close()
+    slicemask.close()
+    
+
+def drive_combine(option,listob):
+
+    """
+
+    Utility function that drives the procedure to combine cubes 
+
+    
+    option: -> the options to combine
+               INTERMEDIATE: intermadiate products following a first pass of cubefix/cubesharp
+               HIGHSN: last coadd, following the new high SN iteration 
+               INDEPENDENT: split the data in two batches
+
+    listob: -> list of OBs
+
+    """
+
+    import os 
+    import glob
+           
+
+    #get number of OBs
+    nobs=len(listob)
+
+    if('INTERMEDIATE' in option):
+        
+        print('Coadd intermediate products')
+        #dump to disk file lists
+        topdir=os.getcwd()
+        os.chdir('cubexcombine')
+
+        fl1=open('cubes.lst','w')
+        fl2=open('masks.lst','w')
+
+        #loop over OBs
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../{}/Proc/Cubex/PIXTABLE_REDUCED_RESAMPLED_EXP*.fits".format(listob[oob])))
+            #reconstruct names 
+            for ll in range(nsci):
+                fl1.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                #tweak IFU edges - this can manually be adjusted using GUI 
+                tweak_edges('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fix2'.format(listob[oob],ll+1))
+                
+        fl1.close()
+        fl2.close()
+        
+        #make the temp combine
+        combine_cubes("cubes.lst","masks.lst")
+
+        #back to top 
+        os.chdir(topdir)
+
+
+    elif('HIGHSN' in option):
+        
+        print('Coadd final products')
+            
+
+        #dump to disk file lists
+        topdir=os.getcwd()
+        os.chdir('cubexcombine')
+
+        fl1=open('cubes_final.lst','w')
+        fl2=open('masks_final.lst','w')
+
+        #loop over OBs
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../{}/Proc/Cubex/PIXTABLE_REDUCED_RESAMPLED_EXP*.fits".format(listob[oob])))
+            #reconstruct names 
+            for ll in range(nsci):
+                fl1.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                #tweak IFU edges - this can manually be adjusted using GUI 
+                tweak_edges('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn'.format(listob[oob],ll+1))
+              
+        fl1.close()
+        fl2.close()
+        
+        #make the temp combine
+        combine_cubes("cubes_final.lst","masks_final.lst",final=True)
+        os.chdir(topdir)
+
+
+    elif('INDEPENDENT' in option):
+
+        print('Perform half coadds')
+        #NEEDS TO BE UPDATED!
+        exit()
+
+        #dump to disk file lists
+        topdir=os.getcwd()
+        os.chdir('cubexcombine')
+
+        #now make two independent halves 
+        fl1cube=open('cubes_half1.lst','w')
+        fl1mask=open('masks_half1.lst','w')
+        fl2cube=open('cubes_half2.lst','w')
+        fl2mask=open('masks_half2.lst','w')
+
+        #loop over OBs
+        counter=0
+        for oob in range(nobs):
+            #count how many science exposures
+            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
+            #reconstruct names 
+            for ll in range(nsci):
+                counter=counter+1
+                if(counter % 2 == 0):
+                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
+                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                else:
+                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
+                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                    
+        #close files
+        fl1cube.close()
+        fl1mask.close()
+        fl2cube.close()      
+        fl2mask.close()
+
+        #now combine
+        combine_cubes("cubes_half1.lst","masks_half1.lst",halfset='half1')
+        combine_cubes("cubes_half2.lst","masks_half2.lst",halfset='half2')
+        
+ 
+        #back to top 
+        os.chdir(topdir)
+
 
 def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfinal=False):
 
@@ -515,6 +694,9 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         scr.write("Cube2Im -cube "+cmed+" -out "+imed)
         scr.close()
         subprocess.call(["sh",scriptname])
+
+
+
 
 def dataquality(cubeslist,maskslist):
 

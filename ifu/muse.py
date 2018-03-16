@@ -175,124 +175,25 @@ class Muse(object):
         #rerun pipeline enabling resampling on final ESO cube using modules coded for line_process
         cx.individual_resample(listob,refpath=refpath)
     
-        
         #now do the first two passes of cubex on each OB to prepare a temporary cube
         cx.cubex_driver(listob,skymask=skymask)
         
-        exit()
-
         #prepare for intermediate combine 
-        #dump to disk file lists
-        topdir=os.getcwd()
-        os.chdir('cubexcombine')
-
-        fl1=open('cubes.lst','w')
-        fl2=open('masks.lst','w')
-
-        #loop over OBs
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-        fl1.close()
-        fl2.close()
-        
-        #make the temp combine
-        cx.combine_cubes("cubes.lst","masks.lst")
-
-        #now make two independent halves 
-        fl1cube=open('cubes_half1.lst','w')
-        fl1mask=open('masks_half1.lst','w')
-        fl2cube=open('cubes_half2.lst','w')
-        fl2mask=open('masks_half2.lst','w')
-
-        #loop over OBs
-        counter=0
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                counter=counter+1
-                if(counter % 2 == 0):
-                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                else:
-                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                    
-        #close files
-        fl1cube.close()
-        fl1mask.close()
-        fl2cube.close()      
-        fl2mask.close()
-
-        #now combine
-        cx.combine_cubes("cubes_half1.lst","masks_half1.lst",halfset='half1')
-        cx.combine_cubes("cubes_half2.lst","masks_half2.lst",halfset='half2')
-        
-        #back to top 
-        os.chdir(topdir)
+        cx.drive_combine('INTERMEDIATE',listob)
 
         #now do the final pass of cubex using the tmp combined cube for better masking
-        cx.cubex_driver(listob,last=True,highsn='../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
+        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
+
+        exit()
 
         #make the final combined cube
-        #dump to disk file lists
-        topdir=os.getcwd()
-        os.chdir('cubexcombine')
+        cx.drive_combine('HIGHSN',listob)
 
-        fl1=open('cubes_final.lst','w')
-        fl2=open('masks_final.lst','w')
+        exit()
 
-        #loop over OBs
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-        fl1.close()
-        fl2.close()
+        #make independent coadds
+        cx.drive_combine('INDEPENDENT',listob)
         
-        #make the temp combine
-        cx.combine_cubes("cubes_final.lst","masks_final.lst",final=True)
-
-
-        #now make two independent halves 
-        fl1cube=open('cubes_final_half1.lst','w')
-        fl1mask=open('masks_final_half1.lst','w')
-        fl2cube=open('cubes_final_half2.lst','w')
-        fl2mask=open('masks_final_half2.lst','w')
-
-        #loop over OBs
-        counter=0
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                counter=counter+1
-                if(counter % 2 == 0):
-                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                else:
-                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                    
-        #close files
-        fl1cube.close()
-        fl1mask.close()
-        fl2cube.close()      
-        fl2mask.close()
-
-        #now combine
-        cx.combine_cubes("cubes_final_half1.lst","masks_final_half1.lst",halfsetfinal='half1')
-        cx.combine_cubes("cubes_final_half2.lst","masks_final_half2.lst",halfsetfinal='half2')
 
         #now run quality checks on final redux products
         #Typically one uses first pass, so check those
