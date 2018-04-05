@@ -224,7 +224,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         fixed=cube.split('.fits')[0]+"_fixhsn.fits"
         skysub=cube.split('.fits')[0]+"_skysubhsn.fits"
         white=cube.split('.fits')[0]+"_whitehsn.fits"
-        sharpmsk=cube.split('.fits')[0]+"_sharpmasksn.fits"
+        sharpmsk=cube.split('.fits')[0]+"_sharpmaskhsn.fits"
     else:
         #prepare intermediate names
         fixed=cube.split('.fits')[0]+"_fix2.fits"
@@ -245,7 +245,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
             mask_source=cube.split('.fits')[0]+"_whitedeep.Objects_Id.fits"
             white_source=cube.split('.fits')[0]+"_whitedeep.fits"
             subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','4.5','-RescaleVar','.true.'])
+            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-ApplyFilter','.true.','-ApplyFilterVar','.true.','-FilterXYRad','1','-SN_Threshold','7','-MinNSpax','5'])
         else:
             print('Using white image from previous loop')
             #create source mask from previous step
@@ -287,7 +287,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         print('Sky sub ', fixed)
         if(highsn):
             #now few more options to control sky sub 
-            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-hsncube",highsn,"-lcheck",".true."])
+            subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk,"-hsncube",highsn,"-lsig","5"])
         else:
             subprocess.call(["CubeSharp","-cube",fixed,"-out",skysub,"-sourcemask",sharpmsk])
                                
@@ -350,7 +350,6 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
             for p in workers:
                 if(p.is_alive()):
                     p.join()  
-            
         else:
             
             ########################################
@@ -500,7 +499,6 @@ def drive_combine(option,listob):
         
         print('Coadd final products')
             
-
         #dump to disk file lists
         topdir=os.getcwd()
         os.chdir('cubexcombine')
@@ -530,9 +528,7 @@ def drive_combine(option,listob):
     elif('INDEPENDENT' in option):
 
         print('Perform half coadds')
-        #NEEDS TO BE UPDATED!
-        exit()
-
+      
         #dump to disk file lists
         topdir=os.getcwd()
         os.chdir('cubexcombine')
@@ -547,17 +543,22 @@ def drive_combine(option,listob):
         counter=0
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
+            nsci=len(glob.glob("../{}/Proc/Cubex/PIXTABLE_REDUCED_RESAMPLED_EXP*.fits".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
                 counter=counter+1
                 if(counter % 2 == 0):
-                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                    fl1cube.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                    fl1mask.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                    #tweak IFU edges - this can manually be adjusted using GUI 
+                    tweak_edges('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn'.format(listob[oob],ll+1))
                 else:
-                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                    
+                    fl2cube.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
+                    fl2mask.write('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
+                    #tweak IFU edges - this can manually be adjusted using GUI 
+                    tweak_edges('../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_EXP{}_fixhsn'.format(listob[oob],ll+1))
+          
+    
         #close files
         fl1cube.close()
         fl1mask.close()
@@ -565,8 +566,8 @@ def drive_combine(option,listob):
         fl2mask.close()
 
         #now combine
-        combine_cubes("cubes_half1.lst","masks_half1.lst",halfset='half1')
-        combine_cubes("cubes_half2.lst","masks_half2.lst",halfset='half2')
+        combine_cubes("cubes_half1.lst","masks_half1.lst",halfsetfinal='half1')
+        combine_cubes("cubes_half2.lst","masks_half2.lst",halfsetfinal='half2')
         
  
         #back to top 
@@ -696,8 +697,6 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         subprocess.call(["sh",scriptname])
 
 
-
-
 def dataquality(cubeslist,maskslist):
 
     
@@ -726,13 +725,17 @@ def dataquality(cubeslist,maskslist):
 
     print("Perform QA checks...")
 
+    #move in cubex dir 
+    topdir=os.getcwd()
+    os.chdir('cubexcombine')
+
     #make QA folder
     if not os.path.exists('QA'):
         os.makedirs('QA')
 
     #cube names
-    cname="COMBINED_CUBE.fits"
-    iname="COMBINED_IMAGE.fits"
+    cname="COMBINED_CUBE_FINAL.fits"
+    iname="COMBINED_IMAGE_FINAL.fits"
    
     #first identify bright sources in final white image 
     catsrc=msrc.findsources(iname,cname,check=True,output='QA',nsig=5,minarea=20)
@@ -812,7 +815,7 @@ def dataquality(cubeslist,maskslist):
         for tmpc in open(cubeslist,'r'):
             thisob=tmpc.split('/')[1]
             thisexp=tmpc.split('_')[3]
-            wname='../{}/Proc/DATACUBE_FINAL_LINEWCS_{}_white2.fits'.format(thisob,thisexp)
+            wname='../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_{}_whitehsn.fits'.format(thisob,thisexp)
             wfits=fits.open(wname)
             
             #now loop on sources
@@ -845,7 +848,7 @@ def dataquality(cubeslist,maskslist):
         for tmpc in open(cubeslist,'r'):
             thisob=tmpc.split('/')[1]
             thisexp=tmpc.split('_')[3]
-            wname='../{}/Proc/DATACUBE_FINAL_LINEWCS_{}_white2.fits'.format(thisob,thisexp)
+            wname='../{}/Proc/DATACUBE_FINAL_RESAMPLED_{}_whitehsn.fits'.format(thisob,thisexp)
             wfits=fits.open(wname)
             
             phot_this_white = aperture_photometry(wfits[0].data, apertures)
@@ -878,5 +881,5 @@ def dataquality(cubeslist,maskslist):
         pdf.savefig()  # saves the current figure into a pdf page
         plt.close()
         
-        
-
+    #back to top dir
+    os.chdir(topdir)

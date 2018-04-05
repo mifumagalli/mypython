@@ -194,10 +194,11 @@ class Muse(object):
         #make independent coadds
         cx.drive_combine('INDEPENDENT',listob)
         
+        exit()
 
         #now run quality checks on final redux products
         #Typically one uses first pass, so check those
-        cx.dataquality("cubes.lst","masks.lst")
+        cx.dataquality("cubes_final.lst","masks_final.lst")
 
         #back to top level
         os.chdir(topdir)
