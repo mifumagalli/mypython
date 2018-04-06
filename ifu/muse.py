@@ -184,24 +184,17 @@ class Muse(object):
         #now do the final pass of cubex using the tmp combined cube for better masking
         cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
 
-        exit()
-
         #make the final combined cube
         cx.drive_combine('HIGHSN',listob)
-
-        exit()
 
         #make independent coadds
         cx.drive_combine('INDEPENDENT',listob)
         
-        exit()
-
         #now run quality checks on final redux products
         #Typically one uses first pass, so check those
         cx.dataquality("cubes_final.lst","masks_final.lst")
 
         #back to top level
-        os.chdir(topdir)
         print('All done with cubex redux')
         
 
@@ -267,6 +260,9 @@ class Muse(object):
                      otherwise the cube itself is used 
                    
         """
+
+        print('Needs to be updated to correct paths following major upgrades in eso/cubex reduction')
+        exit()
 
         import os
         import glob

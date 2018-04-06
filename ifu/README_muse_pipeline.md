@@ -101,9 +101,9 @@ Call cubex from top level directory above OB reduction with
 
 First, the pipeline uses the eso reduction and the muse pipeline to align each expsoure to the 
 reference, and produces a resampled cube on this frame. It's worth checking is the files 
-DATACUBE_FINAL_LINEWCS_EXP* look sesnibly alligned to absolute reference wcs.  
+DATACUBE_FINAL_RESAMPLED_EXP* look sensibly alligned to absolute reference wcs.  
 
-Next, produces a first pass of illumination correction and sky subtraction for each science exposure in the OB#/Proc
+Next, produces a first pass of illumination correction and sky subtraction for each science exposure in the OB#/Proc/Cubex
 subfolders. 
 
 A bunch of data cubes are produced in the process:
@@ -125,7 +125,7 @@ Once all the OBs have been processed up to this point, a final cube is reconstru
 cubexcombine/COMBINED_CUBE.fits
 
 If there are obvious large scale artifact that should be mask, this can simply achieved by creating
-a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
+a ds9 region file inside the OB#/Proc/Cubex folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate.
 To aid the preparation of masks, run muse_redux_gui in 'maskcubex' mode.
 
@@ -207,4 +207,10 @@ linecombine/COMBINED_CUBE_FINAL.fits
 linecombine/COMBINED_CUBE_MED_FINAL.fits
 
 Datacubes are produced with median and mean statistics. 
+
+
+
+D. MPDAF OPTIMISED REDUCTION
+----------------------------
+Under development 
 

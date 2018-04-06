@@ -711,11 +711,13 @@ def dataquality(cubeslist,maskslist):
     from mypython.fits import pyregmask as msk
     from mypython.ifu import muse_utils as mutil
     from mypython.ifu import muse_source as msrc
+    import matplotlib
     from matplotlib.backends.backend_pdf import PdfPages
     import matplotlib.pyplot as plt
     import matplotlib.cm as cm
     from astropy.stats import sigma_clipped_stats
-    
+    matplotlib.use('Agg')
+
     try:
         from photutils import CircularAperture, aperture_photometry,\
             data_properties, properties_table, centroids
@@ -765,8 +767,8 @@ def dataquality(cubeslist,maskslist):
     #find FWHM on rband image
     fwhm=np.zeros(len(rmag))
     for ii in range(len(rmag)):
-        subdata=rsdssall[1].data[roundsrc['y'][ii]-10:roundsrc['y'][ii]+10,\
-                                     roundsrc['x'][ii]-10:roundsrc['x'][ii]+10]
+        subdata=rsdssall[1].data[int(roundsrc['y'][ii])-10:int(roundsrc['y'][ii])+10,\
+                                     int(roundsrc['x'][ii])-10:int(roundsrc['x'][ii])+10]
         tdfit=centroids.fit_2dgaussian(subdata, error=None, mask=None)
         fwhm[ii]=2.3548*0.5*(tdfit.x_stddev+tdfit.y_stddev)*rsdssall[0].header['PC2_2']*3600.
 
@@ -822,8 +824,8 @@ def dataquality(cubeslist,maskslist):
             delta_x=np.zeros(len(rmag))
             delta_y=np.zeros(len(rmag))
             for ii in range(len(rmag)):
-                subdata=wfits[0].data[roundsrc['y'][ii]-10:roundsrc['y'][ii]+10,\
-                                          roundsrc['x'][ii]-10:roundsrc['x'][ii]+10]
+                subdata=wfits[0].data[int(roundsrc['y'][ii])-10:int(roundsrc['y'][ii])+10,\
+                                          int(roundsrc['x'][ii])-10:int(roundsrc['x'][ii])+10]
                 x1,y1=centroids.centroid_2dg(subdata)
                 delta_x[ii]=10.5-x1
                 delta_y[ii]=10.5-y1
@@ -848,7 +850,7 @@ def dataquality(cubeslist,maskslist):
         for tmpc in open(cubeslist,'r'):
             thisob=tmpc.split('/')[1]
             thisexp=tmpc.split('_')[3]
-            wname='../{}/Proc/DATACUBE_FINAL_RESAMPLED_{}_whitehsn.fits'.format(thisob,thisexp)
+            wname='../{}/Proc/Cubex/DATACUBE_FINAL_RESAMPLED_{}_whitehsn.fits'.format(thisob,thisexp)
             wfits=fits.open(wname)
             
             phot_this_white = aperture_photometry(wfits[0].data, apertures)
