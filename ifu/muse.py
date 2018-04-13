@@ -321,4 +321,44 @@ class Muse(object):
         print("All done!")
 
 
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits'):
+
+        """
+
+        Produces final cubes optimised for fields that are relatively 
+        empty in continuum sources using the GTO/MPDAF procedures
+
+        refpath -> where the reference cubes for wcs resempling are 
+                     otherwise the cube itself is used 
+                   
+        deepwhite -> the best white image available to mask sources
+
+
+        """
+
+
+        import os
+        import glob
+        import subprocess
+        import muse_redux_mpdaf as ex 
+
+        #first, list how many OBs are there
+        listob=glob.glob('OB*')
+        listob.sort()
+        nobs=len(listob)
+        print('Process {} OBs'.format(nobs))
+        
+    
+        #now make space as needed for final products
+        if not os.path.exists('mpdafcombine'):
+            os.makedirs('mpdafcombine')
+
+        #rerun pipe enabling resampling on final ESO cube
+        ex.individual_resample(listob,refpath=refpath)
+        
+        #now perform self-calibration on pixel table 
+        ex.selfcalibrate(listob,deepwhite)
+    
+
+        print("All done!")
 
