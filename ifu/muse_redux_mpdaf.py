@@ -17,8 +17,110 @@ def selfcalibrate(listob,deepwhite):
 
 
     """
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+    import sep
+    from mpdaf.drs import PixTable
 
-    
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final sky-subtracted cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/MPDAF')
+
+
+        #make source mask 
+        srcmask='selfcalib_mask.fits'
+        if(os.path.isfile(srcmask)):
+            print("Source mask already exists!")
+        else:
+            print("Create source mask for selfcalibration")
+  
+            #open the ifu mask to create a good mask 
+            deepdata=fits.open("../../../"+deepwhite)
+
+            ##define geometry 
+            #nx=deepdata[0].header["NAXIS1"]
+            #ny=deepdata[0].header["NAXIS2"]
+
+            #now flag the sources
+            image=deepdata[0].data.byteswap().newbyteorder()
+            bkg=sep.Background(image)
+            bkg.subfrom(image)
+            obj,segmap=sep.extract(image,5.*bkg.globalrms,minarea=6,segmentation_map=True)
+            segmap[np.where(segmap > 0)]=1
+
+            #write source mask to disk 
+            hdu=fits.PrimaryHDU(segmap,header=deepdata[0].header)
+            hdu.writeto(srcmask,overwrite=True)
+
+
+        #now loop over exposures and apply self calibration
+        scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+        
+        #loop on exposures and apply self calibration
+        for exp in range(nsci):
+            
+            pixselfcal="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_fix.fits".format(exp+1)
+            if not os.path.isfile(pixselfcal):
+                print("Apply self-calibration to {}".format(pixselfcal))
+                
+                #open reduced pixel table
+                pix=PixTable("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(exp+1))
+                
+                #create mask
+                maskpix=pix.mask_column(srcmask)
+                maskpix.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_mask.fits".format(exp+1))
+                #selfcalibrate
+                autocalib=pix.selfcalibrate(pixmask=maskpix)
+              
+                #write to disk
+                autocalib.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_autocalib.fits".format(exp+1))
+                pix.write(pixselfcal)
+                                    
+            else:
+                print("Self-calibration for {} already done! Skip...".format(pixselfcal))
+
+            cubeselfcal="DATACUBE_RESAMPLED_EXP{0:d}_fix.fits".format(exp+1)
+            imageselfcal="IMAGE_RESAMPLED_EXP{0:d}_fix.fits".format(exp+1)
+            if not os.path.isfile(cubeselfcal):
+                print('Reconstruct cube {}'.format(cubeselfcal))
+     
+                #now reconstruct cube and white image on right reference frame 
+                #handle sof file
+                sof_name="../../Script/scipost_mpdaf_self{0:d}.sof".format(exp+1)
+                sofedit=open(sof_name,'w')
+                sofedit.write('../../../{}/DATACUBE_FINAL.fits OUTPUT_WCS\n'.format(refpath))
+                sofedit.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_autocalib.fits PIXTABLE_OBJECT\n".format(exp+1))
+                sofedit.close()
+                
+                #now run script
+                scr=open("../../Script/make_scipostmakecube_mpdaf_{0:d}.sh".format(exp+1),"w")
+                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+                scr.write('esorex --log-file=scipost_mpdaf_self{0:d}.log muse_scipost_make_cube  ../../Script/scipost_mpdaf_self{0:d}.sof'.format(exp+1))
+                scr.close()
+                
+                #Run pipeline 
+                subprocess.call(["sh", "../../Script/make_scipost_mpdaf_self{0:d}.sh".format(exp+1)])    
+                subprocess.call(["mv","DATACUBE_FINAL.fits",cubeselfcal])
+                subprocess.call(["mv","IMAGE_FOV_0001.fits",imageselfcal])
+
+            else:
+                print('Cube {} already exists! Skip...'.format(cubeselfcal))
+
+            
+        #back to top
+        os.chdir(topdir)
+
 
 
 
@@ -31,7 +133,9 @@ def individual_resample(listob,refpath='./',nproc=24):
 
     If desired, one can then reconstruct a cube by running 
     > esorex  muse_scipost_make_cube makecube.sof
-    with "PIXTABLE_REDUCED_RESAMPLED_EXP1.fits PIXTABLE_OBJECT" in sof file 
+    with "PIXTABLE_REDUCED_RESAMPLED_EXP1.fits PIXTABLE_OBJECT" 
+         "../../.././esocombine/DATACUBE_FINAL.fits OUTPUT_WCS"
+    in sof file 
 
 
     listob -> OBs to process
