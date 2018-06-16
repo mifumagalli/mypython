@@ -5,6 +5,7 @@ import subprocess
 import time
 import os 
 from distutils.spawn import find_executable
+import socket
 
 def grabtime(namelist):
 
@@ -102,18 +103,33 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     xml_info["PATHCAL"]='../../Raw/'
     xml_info["SUFFIXCAL"]='.fits'
 
+
+
     #grab some info on executable dir
-    esorexpath=find_executable('esorex')
-    staticalpath=esorexpath.split('/bin')[0]
-    pipeversion=staticalpath.split('/')[-1]
-    #handle special case of pipe version 2.1.1
-    if('2.1.1-1' in pipeversion):
-        pipeversion='muse-2.1.1' 
-    staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
-    #fix path on cosma/durham
-    if('/cosma/' in staticalpath):
+    hostname=socket.gethostname()
+    if('mad' in hostname):
+        #find version of pipe loaded
+        modules=os.popen("module list").read()
+        pipeversion=[i for i in  modules.split(" ") if "muse" in i]
+        pipeversion=pipeversion[0].split('/')[-1]
+        staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
+    elif('zwicky' in hostname):
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
+        #handle special case of pipe version 2.1.1
+        if('2.1.1-1' in pipeversion):
+            pipeversion='muse-2.1.1' 
+        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+    elif('cosma' in hostname):
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
         staticalpath='/cosma/local/muse/'+pipeversion+'/calib/muse-'+pipeversion+'/cal/'
- 
+    else:
+        print('Please specify location of static calibrations for {}'.format(hostname))
+
+
     #Here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
     #This is the largest time at one should worry about legacy products 
     legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
