@@ -5,6 +5,13 @@ Some info on muse redux [MF, March 2016]
 > Tested with Cubex 1.5, 1.6
 > Tested with ZAP v1
 
+List of dependencies: 
+     . esorex
+     . cubex (step 2)
+     . photutils (step 2)
+     . sep (step 2)
+     . scikit-image (step 2)
+
 * Step 1
 
 To run the eso pipeline, download data with calibrations from the ESO archive.
