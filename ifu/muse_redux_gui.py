@@ -498,8 +498,14 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
     elif(mode is 'maskcubex'): 
         print('REDUXGUI: Run in maskcubex mode')
         for ii in open(listimg):
+            #check if running on intermediate or final step
+            if('hsn' in ii):
+                #override flag to right extension
+                cubexsuffix='hsn'
+        
             whiteimg="_".join(ii.split("_")[0:-1])+"_white{}.fits".format(cubexsuffix)
             region="_".join(ii.split("_")[0:-1])+"_fix{}_SliceEdgeMask.reg".format(cubexsuffix)
+            
             GUIvalues = guivalues()
             
             #if region file exists load it back 
