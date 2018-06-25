@@ -497,7 +497,9 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
         
     elif(mode is 'maskcubex'): 
         print('REDUXGUI: Run in maskcubex mode')
+	print(listimg)
         for ii in open(listimg):
+	    print(ii)
             whiteimg="_".join(ii.split("_")[0:-1])+"_white{}.fits".format(cubexsuffix)
             region="_".join(ii.split("_")[0:-1])+"_fix{}_SliceEdgeMask.reg".format(cubexsuffix)
             GUIvalues = guivalues()
