@@ -109,9 +109,10 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     hostname=socket.gethostname()
     if('mad' in hostname):
         #find version of pipe loaded
-        modules=os.popen("module list").read()
-        pipeversion=[i for i in  modules.split(" ") if "muse" in i]
-        pipeversion=pipeversion[0].split('/')[-1]
+        output=os.popen("esorex --man-page muse_bias").readlines()
+        for i in output:
+            if('muse_bias -- version' in i):
+                pipeversion=i.split(" ")[-1].strip()
         staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
     elif('zwicky' in hostname):
         esorexpath=find_executable('esorex')
