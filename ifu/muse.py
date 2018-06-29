@@ -321,7 +321,7 @@ class Muse(object):
         print("All done!")
 
 
-    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits'):
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',nproc=24):
 
         """
 
@@ -332,6 +332,8 @@ class Muse(object):
                      otherwise the cube itself is used 
                    
         deepwhite -> the best white image available to mask sources
+
+        nproc -> number of processors 
 
 
         """
@@ -357,8 +359,13 @@ class Muse(object):
         ex.individual_resample(listob,refpath=refpath)
         
         #now perform self-calibration on pixel table 
-        ex.selfcalibrate(listob,deepwhite)
+        ex.selfcalibrate(listob,deepwhite,refpath=refpath,nproc=nproc)
     
+        #now perform sky subtraction on cubes with zap 
+        ex.zapskysub(listob)
+
+        #finally, coadd data
+        ex.coaddcubes(listob)
 
         print("All done!")
 

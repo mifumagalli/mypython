@@ -11,6 +11,8 @@ List of dependencies:
      . photutils (step 2)
      . sep (step 2)
      . scikit-image (step 2)
+     . mpdaf (setp 4)
+     . zap (step 3,4)
 
 * Step 1
 
@@ -207,7 +209,6 @@ propagated.
 If there are obvious large scale artifacts that should be masked, this can simply achieved by creating a ds9 region file inside the OB#/Proc folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate. In case no masks are found, as a rule, the code also searches for masks from the cubex reduction (above). These masks are not used if new masks are found. 
 
-
 In the end, a final coadded cube is reconstructed in 
 
 linecombine/COMBINED_CUBE_FINAL.fits
@@ -219,5 +220,20 @@ Datacubes are produced with median and mean statistics.
 
 D. MPDAF OPTIMISED REDUCTION
 ----------------------------
-Under development 
+
+This reduction uses the MPADF self-calibration method to perform illumination correction, and then performs sky subtraction using the ZAP code. 
+
+More info here: 
+mpdaf.readthedocs.io
+github.com/musevlt/zap
+
+To run, 
+
+>> muse=mp.ifu.muse.Muse()
+>> muse.mpdaf_process(deepwhite='cubexcombine/COMBINED_IMAGE_MED_FINAL.fits')
+
+where a deep white image is needed to mask sources. 
+
+The final producs are stored in mpdafcombine folder.
+
 

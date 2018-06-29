@@ -6,7 +6,117 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 """
 from __future__ import print_function
 
-def selfcalibrate(listob,deepwhite):
+
+def coaddcubes(listob):
+
+    """
+
+    Loop over each OB and make final combined (mean, median) cubes
+    
+    listob -> OBs to process
+ 
+    """
+
+    
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+    
+
+    #first collect all relevant exposures
+    allexposures=[]
+    for ob in listob:
+        finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE*ZAP*fits".format(ob))
+        allexposures.append(allexposures)
+
+        
+
+
+def zapskysub(listob):
+    
+    """
+
+    Loop over each OB and performs zap sky subtraction
+    
+
+    listob -> OBs to process
+ 
+    """
+
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+    import sep
+    import zap
+    
+
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final sky-subtracted cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/MPDAF')
+
+        #use source mask already available 
+        srcmask='selfcalib_mask.fits'
+
+        #now loop over exposures and apply self calibration
+        scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+        
+        #loop on exposures and apply self calibration
+        for exp in range(nsci):
+             
+            #these are the self-calibrated data
+            cubeselfcal="DATACUBE_RESAMPLED_EXP{0:d}_fix.fits".format(exp+1)
+            imageselfcal="IMAGE_RESAMPLED_EXP{0:d}_fix.fits".format(exp+1)
+
+            #these are the sky subtracted products
+            cubezap="DATACUBE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
+            imagezap="IMAGE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
+
+            if not os.path.isfile(cubezap):
+                print('Reconstruct cube {} with ZAP'.format(cubezap))
+                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=srcmask)
+
+                #create white image from zap cube
+                cube=fits.open(cubezap)
+                #define geometry 
+                nwave=cube[1].header["NAXIS3"]
+                nx=cube[1].header["NAXIS1"]
+                ny=cube[1].header["NAXIS2"]
+   
+                print ('Creating final white image from ZAP')
+                white_new=np.zeros((ny,nx))
+                for xx in range(nx):
+                    for yy in range(ny):
+                        white_new[yy,xx]=np.nansum(cube[1].data[:,yy,xx])/nwave  
+                    
+                #save projected image 
+                hdu1 = fits.PrimaryHDU([])
+                hdu2 = fits.ImageHDU(white_new)
+                hdu2.header=cube[1].header
+                hdulist = fits.HDUList([hdu1,hdu2])
+                hdulist.writeto(imagezap,overwrite=True)
+
+            else:
+                print('Cube {} already exists! Skip...'.format(cubezap))
+            
+        #back to top
+        os.chdir(topdir)
+
+
+def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
     
     """
 
@@ -14,7 +124,8 @@ def selfcalibrate(listob,deepwhite):
 
     listob -> OBs to process
     deepwhite -> the best white image available to mask sources
-
+    refpath -> where to find a white image to be used as reference wcs grid
+    nproc -> number of processors
 
     """
     import os
@@ -100,11 +211,11 @@ def selfcalibrate(listob,deepwhite):
                 sof_name="../../Script/scipost_mpdaf_self{0:d}.sof".format(exp+1)
                 sofedit=open(sof_name,'w')
                 sofedit.write('../../../{}/DATACUBE_FINAL.fits OUTPUT_WCS\n'.format(refpath))
-                sofedit.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_autocalib.fits PIXTABLE_OBJECT\n".format(exp+1))
+                sofedit.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_fix.fits PIXTABLE_OBJECT\n".format(exp+1))
                 sofedit.close()
                 
                 #now run script
-                scr=open("../../Script/make_scipostmakecube_mpdaf_{0:d}.sh".format(exp+1),"w")
+                scr=open("../../Script/make_scipost_mpdaf_self{0:d}.sh".format(exp+1),"w")
                 scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
                 scr.write('esorex --log-file=scipost_mpdaf_self{0:d}.log muse_scipost_make_cube  ../../Script/scipost_mpdaf_self{0:d}.sof'.format(exp+1))
                 scr.close()
