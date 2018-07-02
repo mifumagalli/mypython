@@ -26,14 +26,132 @@ def coaddcubes(listob):
     import muse_utils as mut 
     import numpy as np
     
+    
+    #names for median output
+    cubemed="mpdafcombine/COMBINED_CUBE_MED_FINAL.fits"
+    imagemed="mpdafcombine/COMBINED_IMAGE_MED_FINAL.fits"
 
-    #first collect all relevant exposures
-    allexposures=[]
-    for ob in listob:
-        finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE*ZAP*fits".format(ob))
-        allexposures.append(allexposures)
+    if not os.path.isfile(cubemed):
+        print('Compute median coadd {}'.format(cubemed))
+          
+        #first collect all relevant exposures
+        allexposures=[]
+        for ob in listob:
+            finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE_RESAMPLED_EXP*_zap.fits".format(ob))
+            allexposures+=finalexp
 
+        #loop over exposures for median combine
+        for i,exp in enumerate(allexposures):
+            data=fits.open(exp)
+            if(i == 0):
+                nw,nx,ny=data[1].data.shape
+                nexp=len(allexposures)
+                alldata=np.zeros((nexp,nw,nx,ny))
+                alldata[i]=data[1].data
+                headermain=data[0].header
+                headerext=data[1].header
+            else:
+                alldata[i]=data[1].data
+
+            data.close()
+
+        #perform median combine
+        medcube=np.nanmedian(alldata,axis=0)
+
+        #save output
+        hdu = fits.PrimaryHDU([])
+        hdu1= fits.ImageHDU(medcube)
+        hdulist = fits.HDUList([hdu,hdu1])
+        hdulist[0].header=headermain
+        hdulist[1].header=headerext
+        hdulist.writeto(cubemed,overwrite=True)
+
+
+        #now make white image
+        print ('Creating final white image from median cube')
+        white_new=np.zeros((ny,nx))
+        for xx in range(nx):
+            for yy in range(ny):
+                #skip couple of channells for cosmetics 
+                white_new[yy,xx]=np.nansum(medcube[2:,xx,yy])/(nw-2)  
+                
+        #save projected image 
+        hdu1 = fits.PrimaryHDU([])
+        hdu2 = fits.ImageHDU(white_new)
+        hdu2.header=headerext
+        hdulist = fits.HDUList([hdu1,hdu2])
+        hdulist.writeto(imagemed,overwrite=True)
+
+        #clean
+        del alldata, medcube
+
+    else:
         
+        print('Median coadd {} already exists!'.format(cubemed))
+
+    exit()
+
+
+    #now for the mean combine with clipping
+    cubemean="mpdafcombine/COMBINED_CUBE_FINAL.fits"
+    imagemean="mpdafcombine/COMBINED_IMAGE_FINAL.fits"
+
+    if not os.path.isfile(cubemean):
+        print('Compute mean coadd {}'.format(cubemean))
+          
+        #first collect all relevant exposures
+        allexposures=[]
+        for ob in listob:
+            finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE_RESAMPLED_EXP*_zap.fits".format(ob))
+            allexposures+=finalexp
+
+        #loop over exposures for mean combine
+        for i,exp in enumerate(allexposures):
+            data=fits.open(exp)
+            if(i == 0):
+                nw,nx,ny=data[1].data.shape
+                nexp=len(allexposures)
+                alldata=np.zeros((nexp,nw,nx,ny))
+                alldata[i]=data[1].data
+                headermain=data[0].header
+                headerext=data[1].header
+            else:
+                alldata[i]=data[1].data
+
+            data.close()
+
+        #perform mean combine - need to do much better with masking 
+        meancube=np.nansum(alldata,axis=0)/nexp
+
+        #save output
+        hdu = fits.PrimaryHDU([])
+        hdu1= fits.ImageHDU(meancube)
+        hdulist = fits.HDUList([hdu,hdu1])
+        hdulist[0].header=headermain
+        hdulist[1].header=headerext
+        hdulist.writeto(cubemean,overwrite=True)
+
+        #now make white image
+        print ('Creating final white image from mean cube')
+        white_new=np.zeros((ny,nx))
+        for xx in range(nx):
+            for yy in range(ny):
+                #skip couple of channells for cosmetics 
+                white_new[yy,xx]=np.nansum(medcube[2:,xx,yy])/(nw-2)  
+                  
+        #save projected image 
+        hdu1 = fits.PrimaryHDU([])
+        hdu2 = fits.ImageHDU(white_new)
+        hdu2.header=headerext
+        hdulist = fits.HDUList([hdu1,hdu2])
+        hdulist.writeto(imagemean,overwrite=True)
+            
+        del alldata, meancube
+
+    else:
+        
+        print('Mean coadd {} already exists!'.format(outmean))
+
 
 
 def zapskysub(listob):

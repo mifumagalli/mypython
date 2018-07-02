@@ -338,7 +338,6 @@ class Muse(object):
 
         """
 
-
         import os
         import glob
         import subprocess
