@@ -186,6 +186,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
 
         #run cubefix
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed])
+        
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):

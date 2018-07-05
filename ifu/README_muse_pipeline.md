@@ -11,6 +11,7 @@ List of dependencies:
      . photutils (step 2)
      . sep (step 2)
      . scikit-image (step 2)
+     . pyregion (step 2)
      . mpdaf (setp 4)
      . zap (step 3,4)
 

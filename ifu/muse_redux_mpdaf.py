@@ -25,14 +25,17 @@ def coaddcubes(listob):
     from astropy.io import fits
     import muse_utils as mut 
     import numpy as np
+    import matplotlib.pyplot as plt
+
     
-    
-    #names for median output
+    #names for median/mean output
     cubemed="mpdafcombine/COMBINED_CUBE_MED_FINAL.fits"
     imagemed="mpdafcombine/COMBINED_IMAGE_MED_FINAL.fits"
+    cubemean="mpdafcombine/COMBINED_CUBE_FINAL.fits"
+    imagemean="mpdafcombine/COMBINED_IMAGE_FINAL.fits"
 
-    if not os.path.isfile(cubemed):
-        print('Compute median coadd {}'.format(cubemed))
+    if ((not os.path.isfile(cubemed)) | (not os.path.isfile(cubemean))) :
+        print('Compute mean/median coadd {} {}'.format(cubemed,cubemean))
           
         #first collect all relevant exposures
         allexposures=[]
@@ -40,40 +43,92 @@ def coaddcubes(listob):
             finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE_RESAMPLED_EXP*_zap.fits".format(ob))
             allexposures+=finalexp
 
-        #loop over exposures for median combine
+        #loop over exposures for  combine
         for i,exp in enumerate(allexposures):
+            print('Ingesting {}'.format(exp))
+            #open exposure
             data=fits.open(exp)
+            
+            #operations to do only once 
             if(i == 0):
                 nw,nx,ny=data[1].data.shape
                 nexp=len(allexposures)
-                alldata=np.zeros((nexp,nw,nx,ny))
-                alldata[i]=data[1].data
+                datashape=(nexp,nw,nx,ny)
+                alldata=np.ma.zeros(datashape)
+                alldata.mask=np.full(datashape,False)
                 headermain=data[0].header
                 headerext=data[1].header
-            else:
-                alldata[i]=data[1].data
+
+            #store data
+            alldata.data[i]=data[1].data
+
+            #catch nans in this exposure
+            alldata.mask[i]=np.logical_not(np.isfinite(data[1].data))
 
             data.close()
 
-        #perform median combine
-        medcube=np.nanmedian(alldata,axis=0)
+            #now handle mask for this exposure if available in cubex
+            cubexmask=exp.split("_RESAMPLED")
+            cubexmask=cubexmask[0]+"_FINAL_RESAMPLED"+cubexmask[1]
+            cubexmask=cubexmask.replace('MPDAF','Cubex')
+            cubexmask1=cubexmask.replace('_zap.fits','_fixhsn_SliceEdgeMask_wreg.fits')
+            cubexmask2=cubexmask.replace('_zap.fits','_fixhsn_SliceEdgeMask.fits')
+            if os.path.isfile(cubexmask1):
+                cubexmask=cubexmask1
+            elif os.path.isfile(cubexmask2):
+                cubexmask=cubexmask2
+            else:
+                cubexmask=None
+            if(cubexmask):
+                #mask edges
+                fitsmask=fits.open(cubexmask)
+                slicemask=np.full(fitsmask[0].data.shape,False)
+                masked=np.where(fitsmask[0].data < 1)
+                slicemask[masked]=True
+                #grow cube
+                slicecube=np.tile(slicemask,(nw,1,1))
+                alldata.mask[i]=slicecube
+                fitsmask.close()
+                
 
+        #now catch significant outliers
+        #print('Catching outliers')
+        #stdevall=alldata.std(axis=0)
+        #meanall=alldata.mean(axis=0)
+
+        #loop over exposures
+        #alldata=np.ma.masked_greater(alldata,)
+        
+        
+        #save exposure time map
+        print('Compute exposure map')
+        expcube=alldata.count(axis=0)
+        expmap=np.sum(expcube,axis=0)/nw
+        hdu1 = fits.PrimaryHDU([])
+        hdu2 = fits.ImageHDU(expmap)
+        hdu2.header=headerext
+        hdulist = fits.HDUList([hdu1,hdu2])
+        hdulist.writeto("mpdafcombine/FINAL_COADD_EXPOSUREMAP.fits",overwrite=True)
+
+        #at last perform median combine
+        print('Computing median')
+        medcube=np.ma.median(alldata,axis=0)
+        
         #save output
         hdu = fits.PrimaryHDU([])
-        hdu1= fits.ImageHDU(medcube)
+        hdu1= fits.ImageHDU(medcube.data)
         hdulist = fits.HDUList([hdu,hdu1])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
         hdulist.writeto(cubemed,overwrite=True)
 
-
         #now make white image
         print ('Creating final white image from median cube')
-        white_new=np.zeros((ny,nx))
+        white_new=np.zeros((nx,ny))
         for xx in range(nx):
             for yy in range(ny):
                 #skip couple of channells for cosmetics 
-                white_new[yy,xx]=np.nansum(medcube[2:,xx,yy])/(nw-2)  
+                white_new[xx,yy]=np.nansum(medcube.data[2:-3,xx,yy])/(nw-4)  
                 
         #save projected image 
         hdu1 = fits.PrimaryHDU([])
@@ -82,50 +137,14 @@ def coaddcubes(listob):
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto(imagemed,overwrite=True)
 
-        #clean
-        del alldata, medcube
 
-    else:
+        #at last perform mean combine
+        print('Computing mean')
+        meancube=alldata.mean(axis=0)
         
-        print('Median coadd {} already exists!'.format(cubemed))
-
-    exit()
-
-
-    #now for the mean combine with clipping
-    cubemean="mpdafcombine/COMBINED_CUBE_FINAL.fits"
-    imagemean="mpdafcombine/COMBINED_IMAGE_FINAL.fits"
-
-    if not os.path.isfile(cubemean):
-        print('Compute mean coadd {}'.format(cubemean))
-          
-        #first collect all relevant exposures
-        allexposures=[]
-        for ob in listob:
-            finalexp=glob.glob("{}/Proc/MPDAF/DATACUBE_RESAMPLED_EXP*_zap.fits".format(ob))
-            allexposures+=finalexp
-
-        #loop over exposures for mean combine
-        for i,exp in enumerate(allexposures):
-            data=fits.open(exp)
-            if(i == 0):
-                nw,nx,ny=data[1].data.shape
-                nexp=len(allexposures)
-                alldata=np.zeros((nexp,nw,nx,ny))
-                alldata[i]=data[1].data
-                headermain=data[0].header
-                headerext=data[1].header
-            else:
-                alldata[i]=data[1].data
-
-            data.close()
-
-        #perform mean combine - need to do much better with masking 
-        meancube=np.nansum(alldata,axis=0)/nexp
-
         #save output
         hdu = fits.PrimaryHDU([])
-        hdu1= fits.ImageHDU(meancube)
+        hdu1= fits.ImageHDU(meancube.data)
         hdulist = fits.HDUList([hdu,hdu1])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
@@ -133,24 +152,24 @@ def coaddcubes(listob):
 
         #now make white image
         print ('Creating final white image from mean cube')
-        white_new=np.zeros((ny,nx))
+        white_new=np.zeros((nx,ny))
         for xx in range(nx):
             for yy in range(ny):
                 #skip couple of channells for cosmetics 
-                white_new[yy,xx]=np.nansum(medcube[2:,xx,yy])/(nw-2)  
-                  
+                white_new[xx,yy]=np.nansum(meancube.data[2:-3,xx,yy])/(nw-4)  
+                
         #save projected image 
         hdu1 = fits.PrimaryHDU([])
         hdu2 = fits.ImageHDU(white_new)
         hdu2.header=headerext
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto(imagemean,overwrite=True)
-            
-        del alldata, meancube
+    
+    
 
     else:
         
-        print('Mean coadd {} already exists!'.format(outmean))
+        print('Median and mean coadd {} already exists!'.format(cubemed,cubemean))
 
 
 
