@@ -64,6 +64,8 @@ def individual_resample(listob,refpath='./',nproc=24):
                 #copy the offsets 
                 alig=fits.open('OFFSET_LIST.fits')
                 alig.writeto('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1),clobber=True)
+                
+
 
             else:
                 print('Offsets exist.. skip')
@@ -187,6 +189,12 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
         #run cubefix
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed])
         
+        #catch werid cases in which cubefix crashes
+        if not os.path.isfile(fixed):
+            print('Redo fix with step 3 only')
+            #try again with step 3 only
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-step","3"])
+
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
@@ -255,7 +263,13 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
             subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-SN_Threshold','4.5','-RescaleVar','.true.'])
             
         print('Cubefix ', cube)
-        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source]) 
+        subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])         
+        #catch werid cases in which cubefix crashes
+        if not os.path.isfile(fixed):
+            #try again with step 3 only
+            print('Redo fix with step 3 only')
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-step","3"]) 
+
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
 

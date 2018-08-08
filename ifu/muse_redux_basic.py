@@ -330,7 +330,7 @@ def make_twiflat(xml_info,nproc=12):
     #check time stamp for vignetting
     time_flat=grabtime(flat_list)
     vignetting_cat=xml_info["VIGNETTING_MASK"][0]
-
+  
     #Write the sof file 
     sof=open("../../Script/twilight.sof","w")
     for ii in flat_list:
