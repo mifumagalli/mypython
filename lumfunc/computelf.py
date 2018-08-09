@@ -25,6 +25,10 @@ class LumFun:
             self.param=self.Grove09()
         elif('Reddy09' in self.whichlf):
             self.param=self.Reddy09()
+        elif('KhostovanOII2015' in self.whichlf):
+            self.param=self.KhostovanOII2015()
+        elif('KhostovanOIII2015' in self.whichlf):
+            self.param=self.KhostovanOIII2015()
         else:
             raise TypeError('LF {} not known'.format(self.whichlf))
             
@@ -111,6 +115,39 @@ class LumFun:
         ltype='SchLum'
 
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+
+
+
+    def KhostovanOII2015(self):
+
+        """
+        This evaluates the OII luminosity function from Khostovan et al. 2015 
+        
+        """
+
+        #values at 2.25
+        alpha=-1.30
+        phistar=10**(-2.48)
+        Mstar=42.34
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+
+    def KhostovanOIII2015(self):
+
+        """
+        This evaluates the OIII luminosity function from Khostovan et al. 2015 
+        
+        """
+
+        #values at 2.25
+        alpha=-1.60
+        phistar=10**(-3.03)
+        Mstar=42.66
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+ 
 
     def plot(self):
 
