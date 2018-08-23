@@ -7,13 +7,15 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 from __future__ import print_function
 
 
-def coaddcubes(listob):
+def coaddcubes(listob,nclip=2.5):
 
     """
 
     Loop over each OB and make final combined (mean, median) cubes
     
     listob -> OBs to process
+    nclip -> threshold for sigmaclipping
+
  
     """
 
@@ -90,16 +92,22 @@ def coaddcubes(listob):
                 alldata.mask[i]=slicecube
                 fitsmask.close()
                 
+        #sanitise output
+        alldata=np.ma.masked_invalid(alldata)
 
-        #now catch significant outliers
-        #print('Catching outliers')
-        #stdevall=alldata.std(axis=0)
-        #meanall=alldata.mean(axis=0)
+        #iterative sigmaclipping
+        for niter in range(3):
+            #now catch significant outliers
+            print('Catching outliers with sigma clipping; loop {}'.format(niter+1))
+            stdevtmp=alldata.std(axis=0)
+            medtmp=np.ma.median(alldata,axis=0)
+    
+            #loop over exposures
+            for i,exp in enumerate(allexposures):
+                print('Masking outliers in {}'.format(exp))
+                alldata[i]=np.ma.masked_where(abs(alldata[i] - medtmp) >= nclip*stdevtmp,alldata[i])
+                            
 
-        #loop over exposures
-        #alldata=np.ma.masked_greater(alldata,)
-        
-        
         #save exposure time map
         print('Compute exposure map')
         expcube=alldata.count(axis=0)
@@ -121,7 +129,7 @@ def coaddcubes(listob):
         hdulist[0].header=headermain
         hdulist[1].header=headerext
         hdulist.writeto(cubemed,overwrite=True)
-
+        
         #now make white image
         print ('Creating final white image from median cube')
         white_new=np.zeros((nx,ny))
