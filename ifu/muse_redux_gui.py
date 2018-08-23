@@ -499,15 +499,11 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
         print('REDUXGUI: Run in maskcubex mode')
 	print(listimg)
         for ii in open(listimg):
-<<<<<<< HEAD
             #check if running on intermediate or final step
             if('hsn' in ii):
                 #override flag to right extension
                 cubexsuffix='hsn'
         
-=======
-	    print(ii)
->>>>>>> origin
             whiteimg="_".join(ii.split("_")[0:-1])+"_white{}.fits".format(cubexsuffix)
             region="_".join(ii.split("_")[0:-1])+"_fix{}_SliceEdgeMask.reg".format(cubexsuffix)
             
