@@ -117,7 +117,7 @@ def coaddcubes(listob,nclip=2.5):
         hdu2.header=headerext
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto("mpdafcombine/FINAL_COADD_EXPOSUREMAP.fits",overwrite=True)
-
+ 
         #at last perform median combine
         print('Computing median')
         medcube=np.ma.median(alldata,axis=0)
