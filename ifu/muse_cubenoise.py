@@ -5,6 +5,105 @@ import sep
 from scipy import ndimage
 from scipy import signal
 from scipy import interpolate as inter
+import multiprocessing as mp
+import os
+
+def evaluatenoise(ww,dictin):
+    
+    """
+    Utility function that evaluates boostrap noise
+    
+    """
+    
+    print(ww,mp.current_process())
+    
+    
+    for i in range(10000):
+        a=0
+
+    thisslice=np.zeros((dictin['nx'],dictin['ny']))
+
+    
+
+    return thisslice
+
+
+def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=10):
+
+    """
+    
+    Take a list of exposures and estimate variance with boostrap
+    at pixel level
+
+    cubes -> list of input cubes
+    masks -> list of associated masks
+    nsamp -> number of samples to draw
+    outvar -> where to store output
+    nproc -> number of proc to run this over 
+
+    
+    """
+
+    #load the exposures and stash them in pointer stack
+    allexposures=[]
+    allmasks=[]
+    nexp=0
+    for exp in open(cubes):
+        allexposures.append(fits.open(exp.strip()))
+        nexp=nexp+1
+    print('Opened {} exposures'.format(nexp))
+
+    if(masks):
+        for exp in open(masks):
+            allmasks.append(fits.open(exp.strip()))
+    print('Opened {} masks'.format(nexp))
+
+        
+    #find format of data and create empty var
+    nw,nx,ny=allexposures[0][1].data.shape
+    print('Data format {} {} {}'.format(nw,nx,ny))
+    newvar=np.zeros((nw,nx,ny))
+
+    
+    #loop over pixels
+    for ww in range(nw):
+        print('Working on slice {}/{}'.format(ww+1,nw))
+        for xx in range(nx):
+            for yy in range(ny):
+                #initialise arrays
+                fluxstack=np.array([])
+                npix=0
+                #ingest pixel
+                for exp in range(nexp):
+                    if(masks):
+                        maskpix=allmasks[exp][0].data[xx,yy]
+                    else:
+                        maskpix=0
+                    fluxpix=allexposures[exp][1].data[ww,xx,yy]
+                    if((maskpix < 1) & (np.isfinite(fluxpix))):
+                        fluxstack=np.append(fluxstack,fluxpix)
+                        npix=npix+1
+                #bootstrap
+                if(npix > 0):
+                    #bootstrap
+                    rindex=np.random.randint(npix,size=nsamp)
+                    newvar[ww,xx,yy]=np.std(fluxstack[rindex])**2
+                else:
+                    newvar[ww,xx,yy]=np.nan
+                    
+    #save fits
+    hdu=fits.PrimaryHDU(newvar)
+    hdu.writeto(outvar,overwrite=True)
+
+    
+    #nproc=4
+    #nw=50
+    #pool=mp.Pool(processes=nproc)
+    #argsdic={'nx':nx,'ny':ny,'cubes':cubes,'mask':mask}    
+    #varslices=[pool.apply(evaluatenoise,args=(ww,argsdic,)) for ww in range(nw)]
+
+        
+
 
 def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="rms_rescaled_var.fits",cut=10,smooth=1,block=65,disp=0.07):
     
@@ -60,7 +159,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="rms_rescaled_var
         normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
 
         #utilities
-        varspec.append(np.median(slicevar[goodpix])/4)
+        varspec.append(np.median(slicevar[goodpix]))
         wave.append(ww)
 
         #compute scaling factor
