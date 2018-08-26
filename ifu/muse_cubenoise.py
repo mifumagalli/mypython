@@ -78,9 +78,9 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
                     if(masks):
                         maskpix=allmasks[exp][0].data[xx,yy]
                     else:
-                        maskpix=0
+                        maskpix=1
                     fluxpix=allexposures[exp][1].data[ww,xx,yy]
-                    if((maskpix < 1) & (np.isfinite(fluxpix))):
+                    if((maskpix > 0) & (np.isfinite(fluxpix))):
                         fluxstack=np.append(fluxstack,fluxpix)
                         npix=npix+1
                 #bootstrap
