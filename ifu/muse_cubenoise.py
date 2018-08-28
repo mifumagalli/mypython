@@ -28,7 +28,7 @@ def evaluatenoise(ww,dictin):
     return thisslice
 
 
-def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=10):
+def bootstrapnoise(cubes,masks=None,nsamp=500000,outvar="bootstrap_variance.fits",nproc=10):
 
     """
     
@@ -63,7 +63,6 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     nw,nx,ny=allexposures[0][1].data.shape
     print('Data format {} {} {}'.format(nw,nx,ny))
     newvar=np.zeros((nw,nx,ny))
-
     
     #loop over pixels
     for ww in range(nw):
@@ -85,9 +84,16 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
                         npix=npix+1
                 #bootstrap
                 if(npix > 0):
+                    #print(fluxstack,np.mean(fluxstack))
                     #bootstrap
-                    rindex=np.random.randint(npix,size=nsamp)
-                    newvar[ww,xx,yy]=np.std(fluxstack[rindex])**2
+                    meanset=[]
+                    for nss in range(nsamp):
+                        rindex=np.random.randint(npix,size=npix)
+                        meanset.append(np.mean(fluxstack[rindex]))
+                    newvar[ww,xx,yy]=np.std(meanset)**2
+                    #print(npix,newvar[ww,xx,yy])
+                    #plt.hist(meanset,bins=100)
+                    #plt.show()
                 else:
                     newvar[ww,xx,yy]=np.nan
                     
