@@ -7,28 +7,70 @@ from scipy import signal
 from scipy import interpolate as inter
 import multiprocessing as mp
 import os
+import glob
+import datetime
 
-def evaluatenoise(ww,dictin):
+def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks):
     
     """
     Utility function that evaluates boostrap noise
     
     """
     
-    print(ww,mp.current_process())
+    #now load the exposures
+    dataexp=np.zeros((nexp,wend-wstart+1,nx,ny))
+    datamas=np.zeros((nexp,nx,ny))
     
-    
-    for i in range(10000):
-        a=0
+    iexp=0
+    for exp in allexposures:
+        dataexp[iexp]=fits.open(exp)[1].data[wstart:wend+1,:,:]
+        iexp=iexp+1
 
-    thisslice=np.zeros((dictin['nx'],dictin['ny']))
+    iexp=0
+    if(masks):
+        for exp in allmasks:
+            datamas[iexp]=fits.open(exp)[0].data[:,:]
+            iexp=iexp+1
 
-    
+    print('Proc {}: All data loaded'.format(iproc))        
 
-    return thisslice
+    #make space for output
+    newvar=np.zeros((wend-wstart+1,nx,ny))
+
+    #loop over slices (include tail)
+    for ww in range(wstart,wend+1):
+        print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
+       
+        #giant loop on pixels - not all pixels are the same length 
+        for xx in range(nx):
+            for yy in range(ny):
+                #ingest mask pixel
+                if(masks):
+                    maskpix=datamas[:,xx,yy]
+                else:
+                    maskpix=np.zeros(nexp)+1
+                    
+                #ingest flux 
+                fluxpix=dataexp[:,ww-wstart,xx,yy]
+                
+                #apply mask
+                fluxpix=fluxpix[np.where((maskpix > 0) & (np.isfinite(fluxpix)))]
+                npix=len(fluxpix)
+
+                #bootstrap
+                if(npix > 1):
+                    #bootstrap
+                    rindex=np.random.randint(npix,size=(nsamp,npix))
+                    newvar[ww-wstart,xx,yy]=np.std(np.mean(fluxpix[rindex],axis=1))**2
+                else:
+                    newvar[ww-wstart,xx,yy]=np.nan
+                    
+    #save output
+    np.savez("boostrapvar_tmpout_proc{}".format(iproc),wstart=wstart,wend=wend,newvar=newvar)
+    print("Proc {}: Done!".format(iproc))
 
 
-def bootstrapnoise(cubes,masks=None,nsamp=500000,outvar="bootstrap_variance.fits",nproc=10):
+def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50):
 
     """
     
@@ -37,78 +79,75 @@ def bootstrapnoise(cubes,masks=None,nsamp=500000,outvar="bootstrap_variance.fits
 
     cubes -> list of input cubes
     masks -> list of associated masks
-    nsamp -> number of samples to draw
+    nsamp -> number of samples to draw [ideally 500000]
     outvar -> where to store output
     nproc -> number of proc to run this over 
 
     
     """
 
+    print('Start at {}'.format(datetime.datetime.now()))
+
     #load the exposures and stash them in pointer stack
     allexposures=[]
     allmasks=[]
     nexp=0
     for exp in open(cubes):
-        allexposures.append(fits.open(exp.strip()))
+        allexposures.append(exp.strip())
         nexp=nexp+1
-    print('Opened {} exposures'.format(nexp))
+    print('Found {} exposures'.format(nexp))
 
     if(masks):
         for exp in open(masks):
-            allmasks.append(fits.open(exp.strip()))
-    print('Opened {} masks'.format(nexp))
-
-        
+            allmasks.append(exp.strip())
+    print('Found {} masks'.format(nexp))
+    
     #find format of data and create empty var
-    nw,nx,ny=allexposures[0][1].data.shape
+    nw,nx,ny=fits.open(allexposures[0])[1].data.shape
     print('Data format {} {} {}'.format(nw,nx,ny))
-    newvar=np.zeros((nw,nx,ny))
     
-    #loop over pixels
-    for ww in range(nw):
-        print('Working on slice {}/{}'.format(ww+1,nw))
-        for xx in range(nx):
-            for yy in range(ny):
-                #initialise arrays
-                fluxstack=np.array([])
-                npix=0
-                #ingest pixel
-                for exp in range(nexp):
-                    if(masks):
-                        maskpix=allmasks[exp][0].data[xx,yy]
-                    else:
-                        maskpix=1
-                    fluxpix=allexposures[exp][1].data[ww,xx,yy]
-                    if((maskpix > 0) & (np.isfinite(fluxpix))):
-                        fluxstack=np.append(fluxstack,fluxpix)
-                        npix=npix+1
-                #bootstrap
-                if(npix > 0):
-                    #print(fluxstack,np.mean(fluxstack))
-                    #bootstrap
-                    meanset=[]
-                    for nss in range(nsamp):
-                        rindex=np.random.randint(npix,size=npix)
-                        meanset.append(np.mean(fluxstack[rindex]))
-                    newvar[ww,xx,yy]=np.std(meanset)**2
-                    #print(npix,newvar[ww,xx,yy])
-                    #plt.hist(meanset,bins=100)
-                    #plt.show()
-                else:
-                    newvar[ww,xx,yy]=np.nan
-                    
-    #save fits
-    hdu=fits.PrimaryHDU(newvar)
-    hdu.writeto(outvar,overwrite=True)
+    #now prepare batches for parallel run
+    itempbatch=nw/nproc
+    print('Running on {} proc with batches of {}'.format(nproc,itempbatch))
 
-    
-    #nproc=4
-    #nw=50
-    #pool=mp.Pool(processes=nproc)
-    #argsdic={'nx':nx,'ny':ny,'cubes':cubes,'mask':mask}    
-    #varslices=[pool.apply(evaluatenoise,args=(ww,argsdic,)) for ww in range(nw)]
-
+    #loop over processors and start parallel function
+    wstart=0
+    wend=np.round(itempbatch)
+    processes=[]
+    for iproc in range(nproc):
+        #make sure does not run over index 
+        wend=np.minimum(wend,nw-1)
+        print('Proc {}: Start slice {} End slice {}'.format(iproc,wstart,wend))
+        p=mp.Process(target=evaluatenoise,args=(iproc,wstart,wend,nx,ny,nexp,
+                                                nsamp,allexposures,allmasks,masks))
+        processes.append(p)
+        p.start()
         
+        #update for next loop
+        wstart=wend+1
+        wend=wstart+itempbatch
+        if(iproc == nproc -1):
+            wend=nw-1
+            
+    for p in processes:
+        p.join()
+    
+    #reconstruct variance array 
+    allvar=np.zeros((nw,nx,ny))
+    for iproc in range(nproc):
+        thisproc=np.load("boostrapvar_tmpout_proc{}.npz".format(iproc))
+        allvar[thisproc['wstart']:thisproc['wend']+1,:,:]=thisproc['newvar']
+
+    #save to fits file
+    hdu=fits.PrimaryHDU(allvar)
+    hdu.writeto(outvar,overwrite=True)    
+
+    #clean tmp files
+    alltmp=glob.glob("boostrapvar_tmpout_proc*.npz")
+    for tmpfile in alltmp:
+        os.remove(tmpfile)
+
+    print('All done at {}'.format(datetime.datetime.now()))
 
 
 def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="rms_rescaled_var.fits",cut=10,smooth=1,block=65,disp=0.07):
