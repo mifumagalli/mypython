@@ -191,9 +191,9 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
         
         #catch werid cases in which cubefix crashes
         if not os.path.isfile(fixed):
-            print('Redo fix with step 3 only')
-            #try again with step 3 only
-            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-step","3"])
+            print('Redo fix with step 4 only')
+            #try again with step 4 only
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-step","4"])
 
 
     #now run cube skysub
@@ -266,9 +266,9 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])         
         #catch werid cases in which cubefix crashes
         if not os.path.isfile(fixed):
-            #try again with step 3 only
-            print('Redo fix with step 3 only')
-            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-step","3"]) 
+            #try again with step 4 only
+            print('Redo fix with step 4 only')
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-step","4"]) 
 
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
