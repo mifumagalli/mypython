@@ -261,9 +261,6 @@ class Muse(object):
                    
         """
 
-        print('Needs to be updated to correct paths following major upgrades in eso/cubex reduction')
-        exit()
-
         import os
         import glob
         import subprocess
@@ -275,16 +272,17 @@ class Muse(object):
         nobs=len(listob)
         print('Process {} OBs'.format(nobs))
         
-    
         #now make space as needed for final products
         if not os.path.exists('linecombine'):
             os.makedirs('linecombine')
 
         #rerun pipe enabling resampling on final ESO cube
         ex.individual_resample(listob,refpath=refpath)
+        exit()
         
         #next construct the ifu mask for each exposure 
         ex.make_ifumasks(listob,refpath=refpath)
+    
 
         #compute illumination correction 
         ex.make_illcorr(listob)
@@ -306,11 +304,11 @@ class Muse(object):
         #loop over OBs
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
+            nsci=len(glob.glob("../{}/Proc/Basic/OBJECT_RED_0*.fits*".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/MASK_EXP{}_ILLCORR_edges.fits\n'.format(listob[oob],ll+1))
+                fl1.write('../{}/Proc/Line/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/Line/MASK_EXP{}_ILLCORR_edges.fits\n'.format(listob[oob],ll+1))
         fl1.close()
         fl2.close()
         
