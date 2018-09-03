@@ -278,11 +278,9 @@ class Muse(object):
 
         #rerun pipe enabling resampling on final ESO cube
         ex.individual_resample(listob,refpath=refpath)
-        exit()
         
         #next construct the ifu mask for each exposure 
         ex.make_ifumasks(listob,refpath=refpath)
-    
 
         #compute illumination correction 
         ex.make_illcorr(listob)

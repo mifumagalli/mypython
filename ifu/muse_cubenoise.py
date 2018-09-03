@@ -150,7 +150,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     print('All done at {}'.format(datetime.datetime.now()))
 
 
-def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="rms_rescaled_var.fits",cut=10,smooth=1,block=65,disp=0.07):
+def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07):
     
     """
 
@@ -304,8 +304,8 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="rms_rescaled_var
     plt.legend()
 
     #save fits
-    hdu=fits.PrimaryHDU(newvar)
-    hdu.writeto(outvar,overwrite=True)
+    data[2].data=newvar
+    data.writeto(outvar,overwrite=True)
 
     data.close()
     plt.show()
