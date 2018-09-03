@@ -142,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='esocombine/',skymask=None):
+    def cubex_process(self,refpath='esocombine/',skymask=None,version='1.6'):
 
         """
   
@@ -152,6 +152,10 @@ class Muse(object):
         refpath -> where the reference cubes for wcs resempling are 
         
         skymask -> mask this region before running cubesharp (ds9 region in image units)
+
+        version -> the version of cubex in use. v 1.8 onward have some different behaviours compared to previous
+                   versions
+
 
         """
 
@@ -176,13 +180,13 @@ class Muse(object):
         cx.individual_resample(listob,refpath=refpath)
     
         #now do the first two passes of cubex on each OB to prepare a temporary cube
-        cx.cubex_driver(listob,skymask=skymask)
+        cx.cubex_driver(listob,skymask=skymask,version=version)
         
         #prepare for intermediate combine 
         cx.drive_combine('INTERMEDIATE',listob)
 
         #now do the final pass of cubex using the tmp combined cube for better masking
-        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
+        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,version=version)
 
         #make the final combined cube
         cx.drive_combine('HIGHSN',listob)

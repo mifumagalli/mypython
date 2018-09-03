@@ -139,7 +139,7 @@ def individual_resample(listob,refpath='./',nproc=24):
 
 
 
-def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
+def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None,version='1.6'):
     
     
     """ 
@@ -163,6 +163,13 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
     white=cube.split('.fits')[0]+"_white.fits"
     sharpmsk=cube.split('.fits')[0]+"_sharpmask.fits"
 
+
+    #define the step to catch error
+    if('1.8' in version):
+        errorstep='4'
+    else:
+        errorstep='3'
+    
 
     #now fix the cube
     if ((os.path.isfile(fixed)) & (noclobber)):
@@ -191,9 +198,9 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
         
         #catch werid cases in which cubefix crashes
         if not os.path.isfile(fixed):
-            print('Redo fix with step 4 only')
-            #try again with step 4 only
-            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-step","4"])
+            print('Redo fix with last step only')
+            #try again with last step only
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-step",errorstep])
 
 
     #now run cube skysub
@@ -211,7 +218,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None):
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
 
-def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
+def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,version='1.6'):
         
     """ 
  
@@ -227,6 +234,14 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
     import numpy as np
     from astropy.io import fits
     from mypython.fits import pyregmask as pmk
+
+
+    #define the step to catch error
+    if('1.8' in version):
+        errorstep='4'
+    else:
+        errorstep='3'
+
 
     if(highsn):
         #prepare final names
@@ -266,9 +281,9 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source])         
         #catch werid cases in which cubefix crashes
         if not os.path.isfile(fixed):
-            #try again with step 4 only
-            print('Redo fix with step 4 only')
-            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-step","4"]) 
+            #try again with last step only
+            print('Redo fix with last step only')
+            subprocess.call(["CubeFix","-cube", cube,"-pixtable", pixtab,"-out", fixed,"-sourcemask",mask_source,"-step",errorstep]) 
 
 
         #At this step, check out cubeAdd2Mask if want to fix edges or weird ifus/slices 
@@ -313,7 +328,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None):
         print('Create white image for ', skysub)
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
-def cubex_driver(listob,last=False,highsn=None,skymask=None):
+def cubex_driver(listob,last=False,highsn=None,skymask=None,version='1.6'):
     
     """
     Procedures that drives the loops of cubex within each OB folder
@@ -322,6 +337,8 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
     last  -> set to True for final pass with high-sn cube 
     highsn -> name of the highsn cube used for masking 
     skymask -> mask this region in source mask before running cubesharp
+    version -> the version of cubex 
+    
 
     """
     
@@ -357,7 +374,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
                 pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask,version))
                 workers.append(p)
                 p.start()
    
@@ -378,7 +395,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
                 pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,skymask))
+                p = multiprocessing.Process(target=fixandsky_firstpass,args=(cube,pixtab,True,skymask,version))
                 workers.append(p)
                 p.start()
    
@@ -398,7 +415,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None):
                 pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask,version))
                 workers.append(p)
                 p.start()
    

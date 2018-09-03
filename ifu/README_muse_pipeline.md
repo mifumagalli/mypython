@@ -108,6 +108,10 @@ Call cubex from top level directory above OB reduction with
 >>muse=mp.ifu.muse.Muse()
 >>muse.cubex_process()
 
+Since v1.8, cubex introduces some changes that are not backward compatible. 
+To run with a specific version, do, e.g.:
+   muse.cubex_process(version='1.8')
+
 
 First, the pipeline uses the eso reduction and the muse pipeline to align each expsoure to the 
 reference, and produces a resampled cube on this frame. It's worth checking is the files 
