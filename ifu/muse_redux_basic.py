@@ -5,6 +5,7 @@ import subprocess
 import time
 import os 
 from distutils.spawn import find_executable
+import socket
 
 def grabtime(namelist):
 
@@ -83,7 +84,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
             #now handle by keyword according to calibration plan
             if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
                 #grab daily calibrations 
-                recent=np.where(delta_time <= 17.)
+                recent=np.where(delta_time <= 14.)
                 xml_info[kk]=currentlist[recent[0]]
                 print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
@@ -99,21 +100,37 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
 
     #set the calibration path relative and suffix
-    xml_info["PATHCAL"]='../Raw/'
+    xml_info["PATHCAL"]='../../Raw/'
     xml_info["SUFFIXCAL"]='.fits'
 
+
+
     #grab some info on executable dir
-    esorexpath=find_executable('esorex')
-    staticalpath=esorexpath.split('/bin')[0]
-    pipeversion=staticalpath.split('/')[-1]
-    #handle special case of pipe version 2.1.1
-    if('2.1.1-1' in pipeversion):
-        pipeversion='muse-2.1.1' 
-    staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
-    #fix path on cosma/durham
-    if('/cosma/' in staticalpath):
+    hostname=socket.gethostname()
+    if('mad' in hostname):
+        #find version of pipe loaded
+        output=os.popen("esorex --man-page muse_bias").readlines()
+        for i in output:
+            if('muse_bias -- version' in i):
+                pipeversion=i.split(" ")[-1].strip()
+        staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
+    elif('zwicky' in hostname):
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
+        #handle special case of pipe version 2.1.1
+        if('2.1.1-1' in pipeversion):
+            pipeversion='muse-2.1.1' 
+        staticalpath=staticalpath+'/calib/'+pipeversion+'/cal/'
+    elif('cosma' in hostname):
+        esorexpath=find_executable('esorex')
+        staticalpath=esorexpath.split('/bin')[0]
+        pipeversion=staticalpath.split('/')[-1]
         staticalpath='/cosma/local/muse/'+pipeversion+'/calib/muse-'+pipeversion+'/cal/'
- 
+    else:
+        print('Please specify location of static calibrations for {}'.format(hostname))
+
+
     #Here sort out things with static calibrations: GEOMETRY & ASTROMETRY 
     #This is the largest time at one should worry about legacy products 
     legacy_time=time.mktime(time.strptime("14 Feb 16", "%d %b %y"))       
@@ -127,17 +144,17 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         tedge3=time.mktime(time.strptime("09 Sep 15", "%d %b %y"))
         if(reference_time <= tedge1):
             #use commissioning static - you may need even older ones so check 
-            geometrystatic='../staticcal/geometry_table_wfm_comm2b.fits'   
-            astrostatic='../staticcal/astrometry_wcs_wfm_comm2b.fits'
+            geometrystatic='../../staticcal/geometry_table_wfm_comm2b.fits'   
+            astrostatic='../../staticcal/astrometry_wcs_wfm_comm2b.fits'
         elif((reference_time > tedge1) & (reference_time <= tedge2)):
-            geometrystatic='../staticcal/geometry_table_wfm_2014-12-01.fits'
-            astrostatic='../staticcal/astrometry_wcs_wfm_2014-12-01.fits'
+            geometrystatic='../../staticcal/geometry_table_wfm_2014-12-01.fits'
+            astrostatic='../../staticcal/astrometry_wcs_wfm_2014-12-01.fits'
         elif((reference_time > tedge2) & (reference_time <= tedge3)):
-            geometrystatic='../staticcal/geometry_table_wfm_2015-04-16.fits'
-            astrostatic='../staticcal/astrometry_wcs_wfm_2015-04-16.fits'
+            geometrystatic='../../staticcal/geometry_table_wfm_2015-04-16.fits'
+            astrostatic='../../staticcal/astrometry_wcs_wfm_2015-04-16.fits'
         else:
-            geometrystatic='../staticcal/geometry_table_wfm_2015-09-10.fits'
-            astrostatic='../staticcal/astrometry_wcs_wfm_2015-09-10.fits'
+            geometrystatic='../../staticcal/geometry_table_wfm_2015-09-10.fits'
+            astrostatic='../../staticcal/astrometry_wcs_wfm_2015-09-10.fits'
 
     else:
         print('Using pipeline static calibrations for astrometry and geometry')
@@ -213,19 +230,19 @@ def make_bias(xml_info,nproc=12):
     bias_list=xml_info["BIAS"]
     
     #Write the sof file 
-    sof=open("../Script/bias.sof","w")
+    sof=open("../../Script/bias.sof","w")
     for ii in bias_list:
-        sof.write("../Raw/{0}.fits.fz BIAS\n".format(ii)) 
+        sof.write("../../Raw/{0}.fits.fz BIAS\n".format(ii)) 
     sof.close()
     
     #Write the command file 
-    scr=open("../Script/make_bias.sh","w")
+    scr=open("../../Script/make_bias.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=bias.log muse_bias --nifu=-1 --merge ../Script/bias.sof")
+    scr.write("esorex --log-file=bias.log muse_bias --nifu=-1 --merge ../../Script/bias.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_bias.sh"])
+    subprocess.call(["sh", "../../Script/make_bias.sh"])
     
 
 def make_dark(xml_info,nproc=12):
@@ -237,20 +254,20 @@ def make_dark(xml_info,nproc=12):
     if(len(dark_list) > 0):
 
         #Write the sof file 
-        sof=open("../Script/dark.sof","w")
+        sof=open("../../Script/dark.sof","w")
         for ii in dark_list:
-            sof.write("../Raw/{0}.fits.fz DARK\n".format(ii)) 
+            sof.write("../../Raw/{0}.fits.fz DARK\n".format(ii)) 
         sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
         sof.close()
 
         #Write the command file 
-        scr=open("../Script/make_dark.sh","w")
+        scr=open("../../Script/make_dark.sh","w")
         scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-        scr.write("esorex --log-file=dark.log muse_dark --nifu=-1 --merge ../Script/dark.sof")
+        scr.write("esorex --log-file=dark.log muse_dark --nifu=-1 --merge ../../Script/dark.sof")
         scr.close()
 
         #Run pipeline 
-        subprocess.call(["sh", "../Script/make_dark.sh"])
+        subprocess.call(["sh", "../../Script/make_dark.sh"])
     
     else:
         print ("No DARK found... return!")
@@ -263,21 +280,21 @@ def make_flat(xml_info,nproc=12):
     pix_tab=xml_info["BADPIX_TABLE"][0]
     
     #Write the sof file 
-    sof=open("../Script/flat.sof","w")
+    sof=open("../../Script/flat.sof","w")
     for ii in flat_list:
-        sof.write("../Raw/{0}.fits.fz FLAT\n".format(ii)) 
+        sof.write("../../Raw/{0}.fits.fz FLAT\n".format(ii)) 
     sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n")        
     sof.close()
               
     #Write the command file 
-    scr=open("../Script/make_flat.sh","w")
+    scr=open("../../Script/make_flat.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=flat.log muse_flat --nifu=-1 --merge ../Script/flat.sof")
+    scr.write("esorex --log-file=flat.log muse_flat --nifu=-1 --merge ../../Script/flat.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_flat.sh"])
+    subprocess.call(["sh", "../../Script/make_flat.sh"])
 
 def make_arcs(xml_info,nproc=12):
     
@@ -286,22 +303,23 @@ def make_arcs(xml_info,nproc=12):
     line_cat=xml_info["LINE_CATALOG"][0]
 
     #Write the sof file 
-    sof=open("../Script/wavecal.sof","w")
+    sof=open("../../Script/wavecal.sof","w")
     for ii in arc_list:
-        sof.write("../Raw/{0}.fits.fz ARC\n".format(ii))
+        sof.write("../../Raw/{0}.fits.fz ARC\n".format(ii))
     sof.write("{}{}{} LINE_CATALOG\n".format(xml_info["PATHCAL"],line_cat,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("TRACE_TABLE.fits TRACE_TABLE\n") 
     sof.close()
     
     #Write the command file 
-    scr=open("../Script/make_wavecal.sh","w")
+    scr=open("../../Script/make_wavecal.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=wavecal.log muse_wavecal --nifu=-1 --resample --residuals --merge ../Script/wavecal.sof")
+    scr.write("esorex --log-file=wavecal.log muse_wavecal --nifu=-1 --resample --residuals --merge ../../Script/wavecal.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_wavecal.sh"])
+    subprocess.call(["sh", "../../Script/make_wavecal.sh"])
+
 
 def make_twiflat(xml_info,nproc=12):
 
@@ -312,11 +330,11 @@ def make_twiflat(xml_info,nproc=12):
     #check time stamp for vignetting
     time_flat=grabtime(flat_list)
     vignetting_cat=xml_info["VIGNETTING_MASK"][0]
-
+  
     #Write the sof file 
-    sof=open("../Script/twilight.sof","w")
+    sof=open("../../Script/twilight.sof","w")
     for ii in flat_list:
-        sof.write("../Raw/{0}.fits.fz SKYFLAT\n".format(ii))
+        sof.write("../../Raw/{0}.fits.fz SKYFLAT\n".format(ii))
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
     sof.write("MASTER_FLAT.fits MASTER_FLAT\n") 
@@ -326,18 +344,20 @@ def make_twiflat(xml_info,nproc=12):
     #add vignetting as appropriate before March 2017
     legacy_time=time.mktime(time.strptime("11 Mar 17", "%d %b %y"))       
     if(time_flat[0] < legacy_time):
-        sof.write("../Raw/{0}.fits VIGNETTING_MASK\n".format(vignetting_cat)) 
+        sof.write("../../Raw/{0}.fits VIGNETTING_MASK\n".format(vignetting_cat)) 
 
     sof.close()
 
     #Write the command file 
-    scr=open("../Script/make_twilight.sh","w")
+    scr=open("../../Script/make_twilight.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=twilight.log muse_twilight ../Script/twilight.sof")
+    scr.write("esorex --log-file=twilight.log muse_twilight ../../Script/twilight.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_twilight.sh"])
+    subprocess.call(["sh", "../../Script/make_twilight.sh"])
+
+
 
 def make_stdstar(xml_info,nproc=12):
 
@@ -346,8 +366,8 @@ def make_stdstar(xml_info,nproc=12):
     geom_cat=xml_info["GEOMETRY_TABLE"][0]
     pix_tab=xml_info["BADPIX_TABLE"][0]
         
-    sof=open("../Script/object_std.sof","w")
-    sof.write("../Raw/{0}.fits.fz STD\n".format(std_list)) 
+    sof=open("../../Script/object_std.sof","w")
+    sof.write("../../Raw/{0}.fits.fz STD\n".format(std_list)) 
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
@@ -358,13 +378,13 @@ def make_stdstar(xml_info,nproc=12):
     sof.close()
 
     #Write the command file 
-    scr=open("../Script/make_scibasic_std.sh","w")
+    scr=open("../../Script/make_scibasic_std.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=object_std.log muse_scibasic --nifu=-1 --merge ../Script/object_std.sof")
+    scr.write("esorex --log-file=object_std.log muse_scibasic --nifu=-1 --merge ../../Script/object_std.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_scibasic_std.sh"])
+    subprocess.call(["sh", "../../Script/make_scibasic_std.sh"])
 
 def make_stdflux(xml_info,nproc=12):
 
@@ -373,7 +393,7 @@ def make_stdflux(xml_info,nproc=12):
     flx_tab=xml_info["STD_FLUX_TABLE"][0]
     
     #Write the sof file 
-    sof=open("../Script/std.sof","w")
+    sof=open("../../Script/std.sof","w")
     sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],ext_tab,xml_info["SUFFIXCAL"]))
     sof.write("{}{}{} STD_FLUX_TABLE\n".format(xml_info["PATHCAL"],flx_tab,xml_info["SUFFIXCAL"])) 
     for ifu in range(24):
@@ -381,13 +401,13 @@ def make_stdflux(xml_info,nproc=12):
     sof.close()
 
     #Write the command file 
-    scr=open("../Script/make_std.sh","w")
+    scr=open("../../Script/make_std.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=std.log muse_standard  --filter=white ../Script/std.sof")
+    scr.write("esorex --log-file=std.log muse_standard  --filter=white ../../Script/std.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_std.sh"])
+    subprocess.call(["sh", "../../Script/make_std.sh"])
 
 
 def make_objects(xml_info,nproc=12):
@@ -402,11 +422,11 @@ def make_objects(xml_info,nproc=12):
     pix_tab=xml_info["BADPIX_TABLE"][0]
 
     #Write the sof file 
-    sof=open("../Script/object.sof","w")
+    sof=open("../../Script/object.sof","w")
        
     for ii in obj_list:
-        sof.write("../Raw/{0}.fits.fz OBJECT\n".format(ii))
-    sof.write("../Raw/{0}.fits.fz ILLUM\n".format(ill))
+        sof.write("../../Raw/{0}.fits.fz OBJECT\n".format(ii))
+    sof.write("../../Raw/{0}.fits.fz ILLUM\n".format(ill))
     sof.write("{0} GEOMETRY_TABLE\n".format(geom_cat)) 
     sof.write("{}{}{} BADPIX_TABLE\n".format(xml_info["PATHCAL"],pix_tab,xml_info["SUFFIXCAL"])) 
     sof.write("MASTER_BIAS.fits MASTER_BIAS\n") 
@@ -417,13 +437,13 @@ def make_objects(xml_info,nproc=12):
     sof.close()
 
     #Write the command file 
-    scr=open("../Script/make_scibasic.sh","w")
+    scr=open("../../Script/make_scibasic.sh","w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=object.log muse_scibasic --nifu=-1 --merge ../Script/object.sof")
+    scr.write("esorex --log-file=object.log muse_scibasic --nifu=-1 --merge ../../Script/object.sof")
     scr.close()
     
     #Run pipeline 
-    subprocess.call(["sh", "../Script/make_scibasic.sh"])
+    subprocess.call(["sh", "../../Script/make_scibasic.sh"])
 
 
 def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
@@ -463,7 +483,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             print "Processing exposure {0:d}".format(exp+1)
             
             #Write the sof file 
-            sof=open("../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
+            sof=open("../../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
             sof.write("{0} ASTROMETRY_WCS\n".format(xml_info["ASTROMETRY_WCS"][0])) 
             sof.write("{}{}{} SKY_LINES\n".format(xml_info["PATHCAL"],xml_info["SKY_LINES"][0],xml_info["SUFFIXCAL"])) 
             sof.write("{}{}{} EXTINCT_TABLE\n".format(xml_info["PATHCAL"],xml_info["EXTINCT_TABLE"][0],xml_info["SUFFIXCAL"])) 
@@ -478,29 +498,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
 	        sof.write("OFFSET_LIST.fits OFFSET_LIST\n") 
 	    
 	    for ifu in range(24):
-            #	  if(wcsoff):
-            #	      
-            #	      #check if RA/Dec corrected pix tab exists
-            #	      oldpixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
-            #	      ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}_off.fits".format(scilist[exp],ifu+1)
-            #	   
-            #	      if not os.path.isfile(ifupixtab):
-            #		  print 'Correcting RA/Dec in pix table for ifu ', ifu+1
-            #		  #make a copy
-            #		  shutil.copyfile(oldpixtab,ifupixtab)
-            #		  #update header with RA/Dec
-            #		  pixtabfits=fits.open(ifupixtab, mode='update')
-            #		  pixtabfits[0].header['RA']=pixtabfits[0].header['RA']-wcsoff[0][exp]
-            #		  pixtabfits[0].header['DEC']=pixtabfits[0].header['DEC']-wcsoff[1][exp]
-            #		  pixtabfits.flush()
-            #		  pixtabfits.close()
-            #	      else:
-            #		  print 'Using existing corrected pixel tables for ifu', ifu+1
-            #	  else:
-            #	      #handle case of no offset
-                
 		ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
-
                 #now write the pix tab in sof
                 sof.write("{} PIXTABLE_OBJECT\n".format(ifupixtab)) 
                 
@@ -510,14 +508,14 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
             sof.close()
 
             #Write the command file 
-            scr=open("../Script/make_scipost_{0:d}.sh".format(scilist[exp]),"w")
+            scr=open("../../Script/make_scipost_{0:d}.sh".format(scilist[exp]),"w")
             scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-            scr.write('esorex --log-file=scipost_{0:d}.log muse_scipost --skymethod="none" --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(scilist[exp]))
+            scr.write('esorex --log-file=scipost_{0:d}.log muse_scipost --skymethod="none" --filter=white --save=cube,individual ../../Script/scipost_{0:d}.sof'.format(scilist[exp]))
             scr.close()
     
             #Run pipeline 
-            subprocess.call(["sh", "../Script/make_scipost_{0:d}.sh".format(scilist[exp])])    
+            subprocess.call(["sh", "../../Script/make_scipost_{0:d}.sh".format(scilist[exp])])    
             subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
             subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
             subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
@@ -549,7 +547,7 @@ def make_skymodel(xml_info,nproc=12):
         
     #now loop and find sky 
     for exp in list(xml_info['OBJECT']):
-        objheader=fits.open("../Raw/"+exp+".fits.fz")
+        objheader=fits.open("../../Raw/"+exp+".fits.fz")
         objorsky=(objheader[0].header['HIERARCH ESO DPR TYPE']).strip()
     
         #process sky exposure if exists
@@ -562,7 +560,7 @@ def make_skymodel(xml_info,nproc=12):
             if not os.path.isfile("IMAGE_FOV_{}.fits".format(currentid)):
   
                 #Write the sof file 
-                sof=open("../Script/sky_{}.sof".format(currentid),"w")
+                sof=open("../../Script/sky_{}.sof".format(currentid),"w")
                 for ii in range(24):
                     sof.write("PIXTABLE_OBJECT_{0}-{1:02d}.fits PIXTABLE_SKY\n".format(currentid,ii+1)) 
                 sof.write("STD_RESPONSE_0001.fits STD_RESPONSE\n")
@@ -573,13 +571,13 @@ def make_skymodel(xml_info,nproc=12):
                 sof.close()
 
                 #Write the command file 
-                scr=open("../Script/make_sky_{}.sh".format(currentid),"w")
+                scr=open("../../Script/make_sky_{}.sh".format(currentid),"w")
                 scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-                scr.write("esorex --log-file=sky_{}.log muse_create_sky ../Script/sky_{}.sof".format(currentid,currentid))
+                scr.write("esorex --log-file=sky_{}.log muse_create_sky ../../Script/sky_{}.sof".format(currentid,currentid))
                 scr.close()
 
                 #Run pipeline 
-                subprocess.call(["sh", "../Script/make_sky_{}.sh".format(currentid)])
+                subprocess.call(["sh", "../../Script/make_sky_{}.sh".format(currentid)])
 
                 #Rename outputs
                 subprocess.call(["mv","IMAGE_FOV.fits","IMAGE_FOV_{}.fits".format(currentid)])

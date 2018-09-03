@@ -10,7 +10,7 @@ class Muse(object):
 
         """ Stuff at init .. not much for now """
         
-        print "Initialisation of Muse object"
+        print("Initialisation of Muse object")
         self.musepip=1.0
         
 
@@ -40,88 +40,93 @@ class Muse(object):
         import muse_redux_basic as rdx
         import os
 
-        print 'Starting reduction...'
+        print('Starting reduction...')
         
         #First, make sure the various folders exist as needed 
         if not os.path.exists(path+"Raw"):
-            print "Cannot find Raw data..."
+            print("Cannot find Raw data...")
             exit()
         if not os.path.exists(path+"Script"):
             os.makedirs(path+"Script")
         if not os.path.exists(path+"Proc"):
             os.makedirs(path+"Proc")
 
+
         #parse the xml file(s) 
         xml_info=rdx.parse_xml(path=path,nproc=nproc,pipecal=pipecal)
-        
+
         #now start reduction. Enter the proc folder
         currdir=os.getcwd()
         os.chdir(path+'Proc')
-        print 'Changing dir to proc...'
-        
+        print('Changing dir to proc...')
+        if not os.path.exists("./Basic"):
+            os.makedirs("./Basic")
+        os.chdir("./Basic")
+        print('Changing dir to Basic...')
+   
         #First handle the bias
         if not os.path.isfile("MASTER_BIAS.fits"):
-            print 'Creating bias...'
+            print('Creating bias...')
             rdx.make_bias(xml_info,nproc=nproc)
-            print 'All done with the bias...'
+            print('All done with the bias...')
         else:
-            print 'Bias already exist'
+            print('Bias already exist')
             
         #Next handle the dark
         if not os.path.isfile("MASTER_DARK.fits"):
-            print 'Creating dark...'
+            print('Creating dark...')
             rdx.make_dark(xml_info,nproc=nproc)
-            print 'All done with the dark...'
+            print('All done with the dark...')
         else:
-            print 'Dark already exist'
+            print('Dark already exist')
             
         #Next handle the flats
         if not os.path.isfile("MASTER_FLAT.fits"):
-            print 'Creating flat...'
+            print('Creating flat...')
             rdx.make_flat(xml_info,nproc=nproc)
-            print 'All done with flat...'
+            print('All done with flat...')
         else:
-            print 'Flat already exist'
+            print('Flat already exist')
   
         #Next handle the arcs
         if not os.path.isfile("WAVECAL_RESIDUALS.fits"):
-            print 'Processing the arcs...'
+            print('Processing the arcs...')
             rdx.make_arcs(xml_info,nproc=nproc)
-            print 'All done with arcs...'
+            print('All done with arcs...')
         else:
-            print 'Arcs already processed'
+            print('Arcs already processed')
             
         #Next handle the twilight flat
         if not os.path.isfile("DATACUBE_SKYFLAT.fits"):
-            print 'Processing the twiflat...'
+            print('Processing the twiflat...')
             rdx.make_twiflat(xml_info,nproc=nproc)
-            print 'All done with twiflat...'
+            print('All done with twiflat...')
         else:
-            print 'Twiflat already processed'
+            print('Twiflat already processed')
 
         #Next calibrate standard star
         if not os.path.isfile("STD_RED_0001.fits"):
-            print 'Processing the standard star...'
+            print('Processing the standard star...')
             rdx.make_stdstar(xml_info,nproc=nproc)
-            print 'All done with standard star...'
+            print('All done with standard star...')
         else:
-            print 'Standard star already processed'
+            print('Standard star already processed')
                 
         #Next generate flux table
         if not os.path.isfile("STD_FLUXES_0001.fits"):
-            print 'Processing the flux table...'
+            print('Processing the flux table...')
             rdx.make_stdflux(xml_info,nproc=nproc)
-            print 'All done with flux table...'
+            print('All done with flux table...')
         else:
-            print 'Flux table already processed'
+            print('Flux table already processed')
       
         #Next calibrate objects
         if not os.path.isfile("OBJECT_RED_0001.fits"):
-            print 'Processing the objects...'
+            print('Processing the objects...')
             rdx.make_objects(xml_info,nproc=nproc)
-            print 'All done with objects...'
+            print('All done with objects...')
         else:
-            print 'Objects already processed'
+            print('Objects already processed')
 
         #Finally, process science
         print('Preparing intermediate data cubes...')
@@ -137,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='./esocombine/',skymask=None):
+    def cubex_process(self,refpath='esocombine/',skymask=None,version='1.6'):
 
         """
   
@@ -148,12 +153,15 @@ class Muse(object):
         
         skymask -> mask this region before running cubesharp (ds9 region in image units)
 
+        version -> the version of cubex in use. v 1.8 onward have some different behaviours compared to previous
+                   versions
+
+
         """
 
         import os
         import glob
         import subprocess
-        import muse_redux_line as ex 
         import muse_redux_cubex as cx 
         import multiprocessing
         import numpy as np
@@ -169,131 +177,29 @@ class Muse(object):
             os.makedirs('cubexcombine')
 
         #rerun pipeline enabling resampling on final ESO cube using modules coded for line_process
-        ex.individual_resample(listob,refpath=refpath)
-        
+        cx.individual_resample(listob,refpath=refpath)
+    
         #now do the first two passes of cubex on each OB to prepare a temporary cube
-        cx.cubex_driver(listob,skymask=skymask)
-       
+        cx.cubex_driver(listob,skymask=skymask,version=version)
+        
         #prepare for intermediate combine 
-        #dump to disk file lists
-        topdir=os.getcwd()
-        os.chdir('cubexcombine')
-
-        fl1=open('cubes.lst','w')
-        fl2=open('masks.lst','w')
-
-        #loop over OBs
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-        fl1.close()
-        fl2.close()
-        
-        #make the temp combine
-        cx.combine_cubes("cubes.lst","masks.lst")
-
-        #now make two independent halves 
-        fl1cube=open('cubes_half1.lst','w')
-        fl1mask=open('masks_half1.lst','w')
-        fl2cube=open('cubes_half2.lst','w')
-        fl2mask=open('masks_half2.lst','w')
-
-        #loop over OBs
-        counter=0
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                counter=counter+1
-                if(counter % 2 == 0):
-                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                else:
-                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysub2.fits\n'.format(listob[oob],ll+1))
-                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fix2_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                    
-        #close files
-        fl1cube.close()
-        fl1mask.close()
-        fl2cube.close()      
-        fl2mask.close()
-
-        #now combine
-        cx.combine_cubes("cubes_half1.lst","masks_half1.lst",halfset='half1')
-        cx.combine_cubes("cubes_half2.lst","masks_half2.lst",halfset='half2')
-        
-        #back to top 
-        os.chdir(topdir)
+        cx.drive_combine('INTERMEDIATE',listob)
 
         #now do the final pass of cubex using the tmp combined cube for better masking
-        cx.cubex_driver(listob,last=True,highsn='../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask)
+        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,version=version)
 
         #make the final combined cube
-        #dump to disk file lists
-        topdir=os.getcwd()
-        os.chdir('cubexcombine')
+        cx.drive_combine('HIGHSN',listob)
 
-        fl1=open('cubes_final.lst','w')
-        fl2=open('masks_final.lst','w')
-
-        #loop over OBs
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-        fl1.close()
-        fl2.close()
+        #make independent coadds
+        cx.drive_combine('INDEPENDENT',listob)
         
-        #make the temp combine
-        cx.combine_cubes("cubes_final.lst","masks_final.lst",final=True)
-
-
-        #now make two independent halves 
-        fl1cube=open('cubes_final_half1.lst','w')
-        fl1mask=open('masks_final_half1.lst','w')
-        fl2cube=open('cubes_final_half2.lst','w')
-        fl2mask=open('masks_final_half2.lst','w')
-
-        #loop over OBs
-        counter=0
-        for oob in range(nobs):
-            #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
-            #reconstruct names 
-            for ll in range(nsci):
-                counter=counter+1
-                if(counter % 2 == 0):
-                    fl1cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                    fl1mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                else:
-                    fl2cube.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_skysubhsn.fits\n'.format(listob[oob],ll+1))
-                    fl2mask.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_fixhsn_SliceEdgeMask.fits\n'.format(listob[oob],ll+1))
-                    
-        #close files
-        fl1cube.close()
-        fl1mask.close()
-        fl2cube.close()      
-        fl2mask.close()
-
-        #now combine
-        cx.combine_cubes("cubes_final_half1.lst","masks_final_half1.lst",halfsetfinal='half1')
-        cx.combine_cubes("cubes_final_half2.lst","masks_final_half2.lst",halfsetfinal='half2')
-
         #now run quality checks on final redux products
         #Typically one uses first pass, so check those
-        cx.dataquality("cubes.lst","masks.lst")
+        cx.dataquality("cubes_final.lst","masks_final.lst")
 
         #back to top level
-        os.chdir(topdir)
-        print 'All done with cubex redux'
+        print('All done with cubex redux')
         
 
     def eso_process(self):
@@ -370,7 +276,6 @@ class Muse(object):
         nobs=len(listob)
         print('Process {} OBs'.format(nobs))
         
-    
         #now make space as needed for final products
         if not os.path.exists('linecombine'):
             os.makedirs('linecombine')
@@ -401,11 +306,11 @@ class Muse(object):
         #loop over OBs
         for oob in range(nobs):
             #count how many science exposures
-            nsci=len(glob.glob("../{}/Proc/OBJECT_RED_0*.fits*".format(listob[oob])))
+            nsci=len(glob.glob("../{}/Proc/Basic/OBJECT_RED_0*.fits*".format(listob[oob])))
             #reconstruct names 
             for ll in range(nsci):
-                fl1.write('../{}/Proc/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(listob[oob],ll+1))
-                fl2.write('../{}/Proc/MASK_EXP{}_ILLCORR_edges.fits\n'.format(listob[oob],ll+1))
+                fl1.write('../{}/Proc/Line/DATACUBE_FINAL_LINEWCS_EXP{}_zapsky.fits\n'.format(listob[oob],ll+1))
+                fl2.write('../{}/Proc/Line/MASK_EXP{}_ILLCORR_edges.fits\n'.format(listob[oob],ll+1))
         fl1.close()
         fl2.close()
         
@@ -416,4 +321,50 @@ class Muse(object):
         print("All done!")
 
 
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',nproc=24):
+
+        """
+
+        Produces final cubes optimised for fields that are relatively 
+        empty in continuum sources using the GTO/MPDAF procedures
+
+        refpath -> where the reference cubes for wcs resempling are 
+                     otherwise the cube itself is used 
+                   
+        deepwhite -> the best white image available to mask sources
+
+        nproc -> number of processors 
+
+
+        """
+
+        import os
+        import glob
+        import subprocess
+        import muse_redux_mpdaf as ex 
+
+        #first, list how many OBs are there
+        listob=glob.glob('OB*')
+        listob.sort()
+        nobs=len(listob)
+        print('Process {} OBs'.format(nobs))
+        
+    
+        #now make space as needed for final products
+        if not os.path.exists('mpdafcombine'):
+            os.makedirs('mpdafcombine')
+
+        #rerun pipe enabling resampling on final ESO cube
+        ex.individual_resample(listob,refpath=refpath)
+        
+        #now perform self-calibration on pixel table 
+        ex.selfcalibrate(listob,deepwhite,refpath=refpath,nproc=nproc)
+    
+        #now perform sky subtraction on cubes with zap 
+        ex.zapskysub(listob)
+
+        #finally, coadd data
+        ex.coaddcubes(listob)
+
+        print("All done!")
 

@@ -32,7 +32,7 @@ def individual_skysub(listob,nproc=12):
     for ob in listob:
         
         #change dir
-        os.chdir(ob+'/Proc/')
+        os.chdir(ob+'/Proc/Basic')
         print('Processing {} for sky subtraction'.format(ob))
         
         #Search how many exposures are there
@@ -72,8 +72,8 @@ def individual_skysub(listob,nproc=12):
                     matchsky=skytags[np.argmin(abs(skytimes-scitimes))]
 
                     #update sof file written for basic reduction
-                    sof_old=open("../Script/scipost_{0:d}.sof".format(exp+1),"r")
-                    sof_name="../Script/scipost_{0:d}_sky.sof".format(exp+1)
+                    sof_old=open("../../Script/scipost_{0:d}.sof".format(exp+1),"r")
+                    sof_name="../../Script/scipost_{0:d}_sky.sof".format(exp+1)
                     sof=open(sof_name,"w")
                     for ll in sof_old:
                         if('SKY_LINES' in ll):
@@ -95,14 +95,14 @@ def individual_skysub(listob,nproc=12):
                         print("Processing exposure {0:d}".format(exp+1))
 
                         #Write the command file 
-                        scr=open("../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
+                        scr=open("../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
                         scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-                        scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --skymethod=subtract-model ../Script/scipost_{0:d}_sky.sof'.format(exp+1))
+                        scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --skymethod=subtract-model ../../Script/scipost_{0:d}_sky.sof'.format(exp+1))
                         scr.close()
 
                         #Run pipeline 
-                        subprocess.call(["sh", "../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
+                        subprocess.call(["sh", "../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
                         subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
                         subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
                         subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
@@ -117,7 +117,7 @@ def individual_skysub(listob,nproc=12):
             for exp in range(nsci):
                 print('Perform internal sky subtraction')
                 #use sof file written for basic reduction
-                sof_name="../Script/scipost_{0:d}.sof".format(exp+1)
+                sof_name="../../Script/scipost_{0:d}.sof".format(exp+1)
 
                 #define some output names
                 cname="DATACUBE_FINAL_ESOSKY_EXP{0:d}.fits".format(exp+1)
@@ -128,14 +128,14 @@ def individual_skysub(listob,nproc=12):
                     print("Processing exposure {0:d}".format(exp+1))
 
                     #Write the command file 
-                    scr=open("../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
+                    scr=open("../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
                     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-                    scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual ../Script/scipost_{0:d}.sof'.format(exp+1))
+                    scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual ../../Script/scipost_{0:d}.sof'.format(exp+1))
                     scr.close()
 
                     #Run pipeline 
-                    subprocess.call(["sh", "../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
+                    subprocess.call(["sh", "../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1)])    
                     subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
                     subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
                     subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
@@ -170,12 +170,12 @@ def coaddall(listob,nproc=24):
     for ob in listob:
         
         #grab fov
-        fovimg=glob.glob("../{}/Proc/IMAGE_FOV_ESOSKY_*".format(ob))
+        fovimg=glob.glob("../{}/Proc/Basic/IMAGE_FOV_ESOSKY_*".format(ob))
         for ff in fovimg:
             alignsof.write("{} IMAGE_FOV\n".format(ff))
     
         #grab pixel tables 
-        pixtab=glob.glob("../{}/Proc/PIXTABLE_REDUCED_ESOSKY_*".format(ob))
+        pixtab=glob.glob("../{}/Proc/Basic/PIXTABLE_REDUCED_ESOSKY_*".format(ob))
         for ff in pixtab:
             coaddsof.write("{} PIXTABLE_REDUCED\n".format(ff))
         

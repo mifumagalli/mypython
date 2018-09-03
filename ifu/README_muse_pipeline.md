@@ -5,6 +5,16 @@ Some info on muse redux [MF, March 2016]
 > Tested with Cubex 1.5, 1.6
 > Tested with ZAP v1
 
+List of dependencies: 
+     . esorex
+     . cubex (step 2)
+     . photutils (step 2)
+     . sep (step 2)
+     . scikit-image (step 2)
+     . pyregion (step 2)
+     . mpdaf (setp 4)
+     . zap (step 3,4)
+
 * Step 1
 
 To run the eso pipeline, download data with calibrations from the ESO archive.
@@ -98,12 +108,16 @@ Call cubex from top level directory above OB reduction with
 >>muse=mp.ifu.muse.Muse()
 >>muse.cubex_process()
 
+Since v1.8, cubex introduces some changes that are not backward compatible. 
+To run with a specific version, do, e.g.:
+   muse.cubex_process(version='1.8')
+
 
 First, the pipeline uses the eso reduction and the muse pipeline to align each expsoure to the 
 reference, and produces a resampled cube on this frame. It's worth checking is the files 
-DATACUBE_FINAL_LINEWCS_EXP* look sesnibly alligned to absolute reference wcs.  
+DATACUBE_FINAL_RESAMPLED_EXP* look sensibly alligned to absolute reference wcs.  
 
-Next, produces a first pass of illumination correction and sky subtraction for each science exposure in the OB#/Proc
+Next, produces a first pass of illumination correction and sky subtraction for each science exposure in the OB#/Proc/Cubex
 subfolders. 
 
 A bunch of data cubes are produced in the process:
@@ -125,7 +139,7 @@ Once all the OBs have been processed up to this point, a final cube is reconstru
 cubexcombine/COMBINED_CUBE.fits
 
 If there are obvious large scale artifact that should be mask, this can simply achieved by creating
-a ds9 region file inside the OB#?proc folder, with same name as the mask from the pipeline but
+a ds9 region file inside the OB#/Proc/Cubex folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate.
 To aid the preparation of masks, run muse_redux_gui in 'maskcubex' mode.
 
@@ -200,11 +214,31 @@ propagated.
 If there are obvious large scale artifacts that should be masked, this can simply achieved by creating a ds9 region file inside the OB#/Proc folder, with same name as the mask from the pipeline but
 extension .reg. The region file should be in ds9 format, with image coordinate. In case no masks are found, as a rule, the code also searches for masks from the cubex reduction (above). These masks are not used if new masks are found. 
 
-
 In the end, a final coadded cube is reconstructed in 
 
 linecombine/COMBINED_CUBE_FINAL.fits
 linecombine/COMBINED_CUBE_MED_FINAL.fits
 
 Datacubes are produced with median and mean statistics. 
+
+
+
+D. MPDAF OPTIMISED REDUCTION
+----------------------------
+
+This reduction uses the MPADF self-calibration method to perform illumination correction, and then performs sky subtraction using the ZAP code. 
+
+More info here: 
+mpdaf.readthedocs.io
+github.com/musevlt/zap
+
+To run, 
+
+>> muse=mp.ifu.muse.Muse()
+>> muse.mpdaf_process(deepwhite='cubexcombine/COMBINED_IMAGE_MED_FINAL.fits')
+
+where a deep white image is needed to mask sources. 
+
+The final producs are stored in mpdafcombine folder.
+
 
