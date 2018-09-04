@@ -171,7 +171,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     data=fits.open(cube)
 
     #compress into image
-    image=np.median(data[1].data,axis=0)
+    image=np.nanmedian(data[1].data,axis=0)
     nx,ny=image.shape
 
     #mask edges
@@ -181,7 +181,6 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     badmask=ndimage.gaussian_filter(badmask,1.5)
     badmask[np.where(badmask > 0)]=1.0
         
-
     #mask sources
     bkg = sep.Background(image,mask=badmask)    
     thresh = 2.0 * bkg.globalrms
@@ -189,8 +188,9 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     objects,segmap=sep.extract(image,thresh,segmentation_map=True,
                                minarea=10,clean=True,mask=badmask)
     badmask[np.where(segmap > 0)]=1.0
-    goodpix=np.where(badmask < 1)
    
+    goodpix=np.where(badmask < 1)
+
     #loop over wave
     nw,nx,ny=data[1].data.shape 
     rescale=[]
@@ -201,14 +201,15 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
         #get slices
         slicecube=data[1].data[ww]
         slicevar=data[2].data[ww]
+        
         normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
 
         #utilities
-        varspec.append(np.median(slicevar[goodpix]))
+        varspec.append(np.nanmedian(slicevar[goodpix]))
         wave.append(ww)
 
         #compute scaling factor
-        stddata=np.std(normslice)
+        stddata=np.nanstd(normslice)
         rescale.append(stddata)
         
         ##checks
@@ -220,7 +221,6 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
         #plt.hist(normslice,bins=100)
         #plt.title(stddata2)
         #plt.show()
-
 
     rescale=np.array(rescale)
     varspec=np.array(varspec)
@@ -255,7 +255,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     keep=np.where(varspec[starw:endw] < np.percentile(varspec[starw:endw],cut))
     selectr=np.append(selectr,rescale[starw:endw][keep])
     selectw=np.append(selectw,wave[starw:endw][keep])
-            
+       
     #filetred version
     pnt=inter.splrep(selectw,selectr,s=smooth)    
     filterscale=inter.splev(wave,pnt,der=0)
@@ -271,6 +271,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     #plt.scatter(selectw[np.where(dist < 0.02)],selectr[np.where(dist < 0.02)],label='Sel')
     #plt.scatter(selectw[np.where(dist < 0.02)],dist[np.where(dist < 0.02)],label='Dist Sel')
     #plt.legend()
+    #plt.show()
 
     selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
     selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
