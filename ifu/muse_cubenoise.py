@@ -264,8 +264,16 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     bestv=inter.interp1d(wave,filterscale)(selectw)
     dist=abs(bestv-selectr)/bestv
     
-    selectr=selectr[np.where(dist < 0.02)]
-    selectw=selectw[np.where(dist < 0.02)]
+    #plt.figure()
+    #plt.scatter(selectw,bestv,label='Best')
+    #plt.scatter(selectw,selectr,label='Data')
+    #plt.scatter(selectw,dist,label='Dist')
+    #plt.scatter(selectw[np.where(dist < 0.02)],selectr[np.where(dist < 0.02)],label='Sel')
+    #plt.scatter(selectw[np.where(dist < 0.02)],dist[np.where(dist < 0.02)],label='Dist Sel')
+    #plt.legend()
+
+    selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
+    selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
          
     #re-filetred version trimming edges
     pnt=inter.splrep(selectw[2:-2],selectr[2:-2],s=smooth)    
