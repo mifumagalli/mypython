@@ -142,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='esocombine/',skymask=None,version='1.6'):
+    def cubex_process(self,refpath='esocombine/',skymask=None,version='1.8'):
 
         """
   
