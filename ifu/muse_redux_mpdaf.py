@@ -218,6 +218,8 @@ def zapskysub(listob):
         #now loop over exposures and apply self calibration
         scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
         nsci=len(scils)
+
+        print("Processing {} with ZAP".format(ob))
         
         #loop on exposures and apply self calibration
         for exp in range(nsci):
@@ -292,6 +294,8 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
         #change dir
         os.chdir(ob+'/Proc/MPDAF')
 
+
+        print("Processing {} for self-calibration".format(ob))
 
         #make source mask 
         srcmask='selfcalib_mask.fits'

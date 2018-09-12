@@ -180,6 +180,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     badmask[edges]=0.0
     badmask=ndimage.gaussian_filter(badmask,1.5)
     badmask[np.where(badmask > 0)]=1.0
+
         
     #mask sources
     bkg = sep.Background(image,mask=badmask)    
@@ -190,6 +191,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     badmask[np.where(segmap > 0)]=1.0
    
     goodpix=np.where(badmask < 1)
+    
 
     #loop over wave
     nw,nx,ny=data[1].data.shape 
