@@ -5,7 +5,7 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 
 """
 from __future__ import print_function
-
+import matplotlib.pyplot as plt
 
 def coaddcubes(listob,nclip=2.5):
 
@@ -311,13 +311,16 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
             #nx=deepdata[0].header["NAXIS1"]
             #ny=deepdata[0].header["NAXIS2"]
 
-            #now flag the sources
-            image=deepdata[0].data.byteswap().newbyteorder()
+            #now flag the sources (allow cubex/eso images)
+            try:
+                image=deepdata[0].data.byteswap().newbyteorder()
+            except:
+                image=deepdata[1].data.byteswap().newbyteorder()
             bkg=sep.Background(image)
             bkg.subfrom(image)
             obj,segmap=sep.extract(image,5.*bkg.globalrms,minarea=6,segmentation_map=True)
             segmap[np.where(segmap > 0)]=1
-
+            
             #write source mask to disk 
             hdu=fits.PrimaryHDU(segmap,header=deepdata[0].header)
             hdu.writeto(srcmask,overwrite=True)
