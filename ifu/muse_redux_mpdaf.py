@@ -314,15 +314,18 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
             #now flag the sources (allow cubex/eso images)
             try:
                 image=deepdata[0].data.byteswap().newbyteorder()
+                datheader=deepdata[0].header
             except:
                 image=deepdata[1].data.byteswap().newbyteorder()
+                datheader=deepdata[1].header
+
             bkg=sep.Background(image)
             bkg.subfrom(image)
             obj,segmap=sep.extract(image,5.*bkg.globalrms,minarea=6,segmentation_map=True)
             segmap[np.where(segmap > 0)]=1
             
             #write source mask to disk 
-            hdu=fits.PrimaryHDU(segmap,header=deepdata[0].header)
+            hdu=fits.PrimaryHDU(segmap,header=datheader)
             hdu.writeto(srcmask,overwrite=True)
 
 
