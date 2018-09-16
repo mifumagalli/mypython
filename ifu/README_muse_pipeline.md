@@ -219,3 +219,20 @@ where a deep white image is needed to mask sources (pass the best available).
 The final producs are stored in mpdafcombine folder, similarly to the results of step B.
 
 
+Masking of artefacts can be achieved by doing
+
+
+from mypython.ifu import muse_redux_gui as gui
+gui.reduxgui('images.lst',mode='maskmpdaf')
+
+where image.lst contains the white images following the zap step, e.g.
+      ../OB1/Proc/MPDAF/IMAGE_RESAMPLED_EXP1_zap.fits
+      ../OB1/Proc/MPDAF/IMAGE_RESAMPLED_EXP2_zap.fits
+      ../OB2/Proc/MPDAF/IMAGE_RESAMPLED_EXP1_zap.fits
+      ../OB2/Proc/MPDAF/IMAGE_RESAMPLED_EXP2_zap.fits
+
+This creates regions that are ingested and processed at the coadd step.
+
+If regions are not provided, the code defaults to regions in the cubex reduction, if present.
+
+

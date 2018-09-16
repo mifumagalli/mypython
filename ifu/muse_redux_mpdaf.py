@@ -6,7 +6,8 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 """
 from __future__ import print_function
 import matplotlib.pyplot as plt
-
+from mypython.fits import pyregmask as msk
+    
 def coaddcubes(listob,nclip=2.5):
 
     """
@@ -69,18 +70,37 @@ def coaddcubes(listob,nclip=2.5):
 
             data.close()
 
-            #now handle mask for this exposure if available in cubex
+            #now handle mask for this exposure if available in cubex or mpdaf region
+            mpdafmask=exp.split("DATACUBE")[0]+'IMAGE'+exp.split("DATACUBE")[1]
+            mpdafreg=mpdafmask.split('fits')[0]+'reg'
             cubexmask=exp.split("_RESAMPLED")
             cubexmask=cubexmask[0]+"_FINAL_RESAMPLED"+cubexmask[1]
             cubexmask=cubexmask.replace('MPDAF','Cubex')
             cubexmask1=cubexmask.replace('_zap.fits','_fixhsn_SliceEdgeMask_wreg.fits')
             cubexmask2=cubexmask.replace('_zap.fits','_fixhsn_SliceEdgeMask.fits')
-            if os.path.isfile(cubexmask1):
+            
+            #handle mpdaf first 
+            if os.path.isfile(mpdafreg):
+                #now fill using region 
+                Mask = msk.PyMask(ny,nx,mpdafreg)
+                for ii in range(Mask.nreg):
+                    Mask.fillmask(ii)
+                    if(ii == 0):
+                        slicemask=Mask.mask
+                    else:
+                        slicemask+=Mask.mask
+                slicecube=np.tile(slicemask,(nw,1,1))
+                alldata.mask[i]=slicecube
+                cubexmask=None
+            #else, look at cubex and wor as selector
+            elif os.path.isfile(cubexmask1):
                 cubexmask=cubexmask1
             elif os.path.isfile(cubexmask2):
                 cubexmask=cubexmask2
             else:
                 cubexmask=None
+
+            #fill in cubex mask if available 
             if(cubexmask):
                 #mask edges
                 fitsmask=fits.open(cubexmask)

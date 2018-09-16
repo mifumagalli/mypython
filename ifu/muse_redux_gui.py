@@ -22,6 +22,8 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                 finalmask -> let's you select a region on the coadded file 
                              and applies this mask to all the region files. Useful to trim the 
                              edges of all the exposures to look the same. Works as maskcubex.
+
+                maskmpdaf -> add mask option to mpdaf
     
     refcat (optional) --> an ascii file containing a list of RA and DEC of 
                           reference objects (stars) which acts as an absolute 
@@ -557,6 +559,47 @@ def reduxgui(listimg,mode='align',refcat='None',cubexsuffix='2'):
                     dy=(boxry[bb]-boxly[bb])/2.
                     rfl.write('box({},{},{},{},0)\n'.format(boxlx[bb]+dx,boxly[bb]+dy,2.*dx,2*dy))
                 rfl.close()
-                    
+        
+    elif(mode is 'maskmpdaf'): 
+        print('REDUXGUI: Run in maskmpdaf mode')
+
+        for ii in open(listimg):
+            
+            whiteimg=ii.strip()
+            region=ii.split("fits")[0]+"reg"
+            
+            GUIvalues = guivalues()
+            
+            #if region file exists load it back 
+            if os.path.isfile(region):
+                print('Loading existing region file {}'.format(region))
+                regload=open(region,'r')
+                for line in regload:
+                    if('box' in line):
+                        segment=line.split('(')[1].split(')')[0]
+                        xcent,ycent,twodx,twody,zero=segment.split(',')
+                        GUIvalues.boxlx.append(float(xcent)-float(twodx)/2.)
+                        GUIvalues.boxly.append(float(ycent)-float(twody)/2.)
+                        GUIvalues.boxrx.append(float(xcent)+float(twodx)/2.)
+                        GUIvalues.boxry.append(float(ycent)+float(twody)/2.)
+                regload.close()      
+                
+            #run gui
+            app = align_tk(whiteimg,None,GUIvalues,mode=mode)
+            app.title('Mask {}'.format(whiteimg))
+            app.mainloop()
+        
+            #on exit, dump to region file
+            if(len(GUIvalues.boxrx) > 0):
+                rfl=open(region,'w')
+                rfl.write('global color=green dashlist=8 3 width=1 font="helvetica 10 normal roman" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 delete=1 include=1 source=1\n')
+                rfl.write('image\n')
+                for bb in range(len(GUIvalues.boxrx)):
+                    dx=(GUIvalues.boxrx[bb]-GUIvalues.boxlx[bb])/2.
+                    dy=(GUIvalues.boxry[bb]-GUIvalues.boxly[bb])/2.
+                    rfl.write('box({},{},{},{},0)\n'.format(GUIvalues.boxlx[bb]+dx,GUIvalues.boxly[bb]+dy,2.*dx,2*dy))
+                rfl.close()
+            
+        
     else:
         print ('Mode {} not found!'.format(mode))
