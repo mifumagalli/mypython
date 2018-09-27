@@ -231,6 +231,7 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     import numpy as np
     from astropy.io import fits 
 
+
     #read the cube
     cubdata,vardata,wcsc,wavec,regi=readcube(cube,helio=helio)
     cubdata=np.nan_to_num(cubdata)
@@ -246,22 +247,25 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     else:
         #If user defined region, grab inner pixels
         #cut region of interest according to shape
-        xpix=[]
-        ypix=[]
+        xpix=np.array([],dtype=np.int)
+        ypix=np.array([],dtype=np.int)
         xside=np.arange(x-s-1,x+s+1,1)
         yside=np.arange(y-s-1,y+s+1,1)
         for xx in xside:
             for yy in yside:
+                xx=np.int(np.round(xx))
+                yy=np.int(np.round(yy))
                 if('box' in shape):
                     if((abs(xx-x) <= s) & (abs(yy-y) <= s)):
-                        xpix.append(xx)
-                        ypix.append(yy)
-                if('circ' in shape):
+                        xpix=np.append(xx,xpix)
+                        ypix=np.append(yy,ypix)
+                elif('circ' in shape):
                     dist=np.sqrt((xx-x)**2+(yy-y)**2)
                     if(dist <= s):
-                        xpix.append(xx)
-                        ypix.append(yy)
+                        xpix=np.append(xx,xpix)
+                        ypix=np.append(yy,ypix)
                         
+                             
     #Some checks...
     #cbmed=np.median(cubdata,axis=0)
     #cbmed[xpix,ypix]=100000
@@ -447,6 +451,7 @@ def readcube(cube, helio=0):
     except:
         cubdata=cfits[1].data
         vardata=cfits[2].data
+        
     #compute the helio correction on the fly
     if(helio != 0):
         hel_corr = np.sqrt( (1. + helio/299792.458) / (1. - helio/299792.458) )
