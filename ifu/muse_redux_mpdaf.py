@@ -48,7 +48,7 @@ def coaddcubes(listob,nclip=2.5):
 
         #loop over exposures for  combine
         for i,exp in enumerate(allexposures):
-            print('Ingesting {}'.format(exp))
+            print('Ingesting data {}'.format(exp))
             #open exposure
             data=fits.open(exp)
             
@@ -132,20 +132,41 @@ def coaddcubes(listob,nclip=2.5):
         print('Compute exposure map')
         expcube=alldata.count(axis=0)
         expmap=np.sum(expcube,axis=0)/nw
+      
+        #at last perform median combine
+        print('Computing median')
+        medcube=np.ma.median(alldata,axis=0)
+        
+        #at last perform mean combine
+        print('Computing mean')
+        meancube=alldata.mean(axis=0)
+
+        #now ingest variance
+        for i,exp in enumerate(allexposures):
+            print('Ingesting variance {}'.format(exp))
+            #open exposure
+            data=fits.open(exp)
+            #store data
+            alldata.data[i]=data[2].data
+            data.close()
+            
+        print('Computing variance')
+        varcube=alldata.sum(axis=0)/expcube
+
+        
+        #save exposure time map
         hdu1 = fits.PrimaryHDU([])
         hdu2 = fits.ImageHDU(expmap)
         hdu2.header=headerext
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto("mpdafcombine/FINAL_COADD_EXPOSUREMAP.fits",overwrite=True)
  
-        #at last perform median combine
-        print('Computing median')
-        medcube=np.ma.median(alldata,axis=0)
-        
-        #save output
+
+        #save output median
         hdu = fits.PrimaryHDU([])
         hdu1= fits.ImageHDU(medcube.data)
-        hdulist = fits.HDUList([hdu,hdu1])
+        hdu2= fits.ImageHDU(varcube.data)
+        hdulist = fits.HDUList([hdu,hdu1,hdu2])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
         hdulist.writeto(cubemed,overwrite=True)
@@ -164,16 +185,12 @@ def coaddcubes(listob,nclip=2.5):
         hdu2.header=headerext
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto(imagemed,overwrite=True)
-
-
-        #at last perform mean combine
-        print('Computing mean')
-        meancube=alldata.mean(axis=0)
         
-        #save output
+        #save output mean
         hdu = fits.PrimaryHDU([])
         hdu1= fits.ImageHDU(meancube.data)
-        hdulist = fits.HDUList([hdu,hdu1])
+        hdu2= fits.ImageHDU(varcube.data)
+        hdulist = fits.HDUList([hdu,hdu1,hdu2])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
         hdulist.writeto(cubemean,overwrite=True)
@@ -193,8 +210,6 @@ def coaddcubes(listob,nclip=2.5):
         hdulist = fits.HDUList([hdu1,hdu2])
         hdulist.writeto(imagemean,overwrite=True)
     
-    
-
     else:
         
         print('Median and mean coadd {} already exists!'.format(cubemed,cubemean))
