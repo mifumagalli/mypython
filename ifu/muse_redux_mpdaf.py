@@ -61,6 +61,7 @@ def coaddcubes(listob,nclip=2.5):
                 alldata.mask=np.full(datashape,False)
                 headermain=data[0].header
                 headerext=data[1].header
+                headervar=data[2].header
 
             #store data
             alldata.data[i]=data[1].data
@@ -151,9 +152,8 @@ def coaddcubes(listob,nclip=2.5):
             data.close()
             
         print('Computing variance')
-        varcube=alldata.sum(axis=0)/expcube
+        varcube=alldata.sum(axis=0)/expcube/expcube
 
-        
         #save exposure time map
         hdu1 = fits.PrimaryHDU([])
         hdu2 = fits.ImageHDU(expmap)
@@ -169,6 +169,7 @@ def coaddcubes(listob,nclip=2.5):
         hdulist = fits.HDUList([hdu,hdu1,hdu2])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
+        hdulist[2].header=headervar
         hdulist.writeto(cubemed,overwrite=True)
         
         #now make white image
@@ -193,6 +194,7 @@ def coaddcubes(listob,nclip=2.5):
         hdulist = fits.HDUList([hdu,hdu1,hdu2])
         hdulist[0].header=headermain
         hdulist[1].header=headerext
+        hdulist[2].header=headervar
         hdulist.writeto(cubemean,overwrite=True)
 
         #now make white image
