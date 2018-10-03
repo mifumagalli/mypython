@@ -305,7 +305,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
         slicevar=data[2].data[ww]
         newvar[ww]=newvar[ww]*filterscale[ww]**2
         pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
-        newrms=np.append(newrms,np.std(pix))
+        newrms=np.append(newrms,np.nanstd(pix))
         txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
 
     plt.figure()
