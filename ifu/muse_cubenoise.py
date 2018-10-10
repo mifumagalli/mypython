@@ -10,7 +10,7 @@ import os
 import glob
 import datetime
 
-def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks):
+def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median):
     
     """
     Utility function that evaluates boostrap noise
@@ -61,7 +61,10 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
                 if(npix > 1):
                     #bootstrap
                     rindex=np.random.randint(npix,size=(nsamp,npix))
-                    newvar[ww-wstart,xx,yy]=np.std(np.mean(fluxpix[rindex],axis=1))**2
+                    if median:
+                        newvar[ww-wstart,xx,yy]=np.std(np.median(fluxpix[rindex],axis=1))**2
+                    else:
+                        newvar[ww-wstart,xx,yy]=np.std(np.mean(fluxpix[rindex],axis=1))**2
                 else:
                     newvar[ww-wstart,xx,yy]=np.nan
                     
@@ -70,7 +73,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     print("Proc {}: Done!".format(iproc))
 
 
-def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50):
+def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50,median=False):
 
     """
     
@@ -82,7 +85,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     nsamp -> number of samples to draw [ideally 500000]
     outvar -> where to store output
     nproc -> number of proc to run this over 
-
+    median -> if True, switches to median estimator 
     
     """
 
@@ -119,7 +122,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
         wend=np.minimum(wend,nw-1)
         print('Proc {}: Start slice {} End slice {}'.format(iproc,wstart,wend))
         p=mp.Process(target=evaluatenoise,args=(iproc,wstart,wend,nx,ny,nexp,
-                                                nsamp,allexposures,allmasks,masks))
+                                                nsamp,allexposures,allmasks,masks,median))
         processes.append(p)
         p.start()
         
