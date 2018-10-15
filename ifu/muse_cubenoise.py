@@ -37,6 +37,14 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     #make space for output
     newvar=np.zeros((wend-wstart+1,nx,ny))
 
+
+    #select evaluator
+    if(median): 
+        from numpy import median as evaluator
+    else:
+        from numpy import mean as evaluator
+
+
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
@@ -61,10 +69,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
                 if(npix > 1):
                     #bootstrap
                     rindex=np.random.randint(npix,size=(nsamp,npix))
-                    if median:
-                        newvar[ww-wstart,xx,yy]=np.std(np.median(fluxpix[rindex],axis=1))**2
-                    else:
-                        newvar[ww-wstart,xx,yy]=np.std(np.mean(fluxpix[rindex],axis=1))**2
+                    newvar[ww-wstart,xx,yy]=np.std(evaluator(fluxpix[rindex],axis=1))**2
                 else:
                     newvar[ww-wstart,xx,yy]=np.nan
                     
