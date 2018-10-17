@@ -132,6 +132,31 @@ def flux_integrator(wave,flux,low,high,error=None,silent=False):
 
  
 
+def airtovac(wave):
 
+    """
+
+    Get wave (A) in air and convert it into vac
+
+    """
+
+    sigma2 = (1e4/wave)**2.    
+    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
+
+    return wave*fact
     
 
+def vactoair(wave):
+
+    """
+
+    Get wave (A) in vac and convert it to air
+
+
+    """
+
+    sigma2 = (1e4/wave)**2.    
+    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
+    
+    return wave/fact
+    
