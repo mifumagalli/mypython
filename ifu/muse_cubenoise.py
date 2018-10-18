@@ -178,10 +178,17 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     #open the data
     data=fits.open(cube)
 
+    #check if AO data (not really needed but that's ok)
+    mode=(data[0].header['ESO INS MODE']).strip()
+    if(('WFM-AO-N' in mode)|('WFM-AO-E' in mode)):
+        aoflag=True
+    else:
+        aoflag=False
+           
     #compress into image
     image=np.nanmedian(data[1].data,axis=0)
     nx,ny=image.shape
-
+    
     #mask edges
     edges=np.isfinite(image)
     badmask=np.zeros((nx,ny))+1
@@ -200,7 +207,6 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
    
     goodpix=np.where(badmask < 1)
     
-
     #loop over wave
     nw,nx,ny=data[1].data.shape 
     rescale=[]
@@ -208,19 +214,23 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     wave=[]
 
     for ww in range(nw):
+        
+
         #get slices
         slicecube=data[1].data[ww]
         slicevar=data[2].data[ww]
         
-        normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
+        #find good values omitting all nan slices
+        if(len((np.where(np.isfinite(slicecube)))[0]) > 0):
+            normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
 
-        #utilities
-        varspec.append(np.nanmedian(slicevar[goodpix]))
-        wave.append(ww)
-
-        #compute scaling factor
-        stddata=np.nanstd(normslice)
-        rescale.append(stddata)
+            #utilities
+            varspec.append(np.nanmedian(slicevar[goodpix]))
+            wave.append(ww)
+            
+            #compute scaling factor
+            stddata=np.nanstd(normslice)
+            rescale.append(stddata)
         
         ##checks
         #plt.hist(normslice,bins=100)
@@ -236,6 +246,11 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     varspec=np.array(varspec)
     wave=np.array(wave)
     
+    #plt.plot(wave,rescale)
+    #plt.plot(wave,varspec)
+    #plt.show()
+    
+
     #now do blocks of wave
     endw=block
     starw=0
@@ -247,9 +262,13 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
         #trigger selection where scatter is big
         disper=np.std(rescale[starw:endw])
         if(disper > disp):
-            keep=np.where(varspec[starw:endw] < np.percentile(varspec[starw:endw],cut))
-            selectr=np.append(selectr,rescale[starw:endw][keep])
-            selectw=np.append(selectw,wave[starw:endw][keep])
+            #handle AO gap
+            try:
+                keep=np.where(varspec[starw:endw] < np.percentile(varspec[starw:endw],cut))
+                selectr=np.append(selectr,rescale[starw:endw][keep])
+                selectw=np.append(selectw,wave[starw:endw][keep])
+            except:
+                pass
         else:
             selectr=np.append(selectr,rescale[starw:endw][:])
             selectw=np.append(selectw,wave[starw:endw][:])
@@ -262,10 +281,14 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     #add last chunk
     startw=endw+1
     endw=max(wave)
-    keep=np.where(varspec[starw:endw] < np.percentile(varspec[starw:endw],cut))
-    selectr=np.append(selectr,rescale[starw:endw][keep])
-    selectw=np.append(selectw,wave[starw:endw][keep])
-       
+    #handle AO gap 
+    try:
+        keep=np.where(varspec[starw:endw] < np.percentile(varspec[starw:endw],cut))
+        selectr=np.append(selectr,rescale[starw:endw][keep])
+        selectw=np.append(selectw,wave[starw:endw][keep])
+    except:
+        pass
+
     #filetred version
     pnt=inter.splrep(selectw,selectr,s=smooth)    
     filterscale=inter.splev(wave,pnt,der=0)
@@ -282,7 +305,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     #plt.scatter(selectw[np.where(dist < 0.02)],dist[np.where(dist < 0.02)],label='Dist Sel')
     #plt.legend()
     #plt.show()
-
+    
     selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
     selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
          
@@ -308,13 +331,16 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     txtout.write("SliceNumber  VarRescale\n")
     
     for ww in range(nw):
-        #get slices
-        slicecube=data[1].data[ww]
-        slicevar=data[2].data[ww]
-        newvar[ww]=newvar[ww]*filterscale[ww]**2
-        pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
-        newrms=np.append(newrms,np.nanstd(pix))
-        txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
+        #get slices - handling AO gap
+        try:
+            slicecube=data[1].data[ww]
+            slicevar=data[2].data[ww]
+            newvar[ww]=newvar[ww]*filterscale[ww]**2
+            pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
+            newrms=np.append(newrms,np.nanstd(pix))
+            txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
+        except:
+            pass
 
     plt.figure()
     plt.ylabel('Rescaled rms')
