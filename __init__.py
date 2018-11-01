@@ -10,5 +10,6 @@ try:
     import cosmo
     import spectra
     import radtrans
+    import uvb
 except:
     pass
