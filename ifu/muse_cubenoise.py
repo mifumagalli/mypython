@@ -158,7 +158,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     print('All done at {}'.format(datetime.datetime.now()))
 
 
-def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07):
+def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None):
     
     """
 
@@ -172,12 +172,17 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     smooth -> s parameter in spline evaluation
     block -> width of wave window for outlier rejections
     disp -> define the dispersion in block above which rejection is applied
+    bootstrap -> if set to a bootstrap variance cube perform rescaling using bootstrap resampling
+                 rather than imposing rms 
 
     """
  
     #open the data
     data=fits.open(cube)
-
+    
+    if(bootstrap):
+        bscube=fits.open(bootstrap)
+        
     #check if AO data (not really needed but that's ok)
     mode=(data[0].header['ESO INS MODE']).strip()
     if(('WFM-AO-N' in mode)|('WFM-AO-E' in mode)):
@@ -207,6 +212,8 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
    
     goodpix=np.where(badmask < 1)
     
+ 
+
     #loop over wave
     nw,nx,ny=data[1].data.shape 
     rescale=[]
@@ -219,18 +226,24 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
         #get slices
         slicecube=data[1].data[ww]
         slicevar=data[2].data[ww]
-        
+        if(bootstrap):
+            sliceboot=bscube[0].data[ww]
+
         #find good values omitting all nan slices
         if(len((np.where(np.isfinite(slicecube)))[0]) > 0):
-            normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
-
+                
             #utilities
             varspec.append(np.nanmedian(slicevar[goodpix]))
             wave.append(ww)
             
             #compute scaling factor
-            stddata=np.nanstd(normslice)
-            rescale.append(stddata)
+            if(bootstrap):
+                rescale.append(np.nanmean(np.sqrt(sliceboot[goodpix]/slicevar[goodpix])))
+            else:
+                #use rms value
+                normslice=slicecube[goodpix]/np.sqrt(slicevar[goodpix])
+                stddata=np.nanstd(normslice)
+                rescale.append(stddata)
         
         ##checks
         #plt.hist(normslice,bins=100)
@@ -336,9 +349,15 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
             slicecube=data[1].data[ww]
             slicevar=data[2].data[ww]
             newvar[ww]=newvar[ww]*filterscale[ww]**2
-            pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
-            newrms=np.append(newrms,np.nanstd(pix))
             txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
+            
+            if(bootstrap):
+                sliceboot=bscube[0].data[ww]
+                newrms=np.append(newrms,np.mean(np.sqrt(sliceboot[goodpix]/newvar[ww][goodpix])))
+            else:
+                pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
+                newrms=np.append(newrms,np.nanstd(pix))
+                
         except:
             pass
 
@@ -354,10 +373,6 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
 
     data.close()
     plt.show()
-
-    
-
-
 
 
 
