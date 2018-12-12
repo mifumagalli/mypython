@@ -131,13 +131,13 @@ def read_expmap(mosaicID, mosaic_file, nz=3680):
     
     print "Mosaic ID {0:d} is mapped on a square area centered on RAG: {1:f} DEG: {2:f}".format(mosaicID, rag, deg)
             
-    square = [rag,deg,nx,ny,nz] #]xc,yc]
+    square = [rag,deg,nx,ny,nz] 
     
     return square
 
 
 
-def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctype='mean'):
+def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctype='mean', memmap=True):
     
     """
     STEP 3) Reconstruct the full mosaic structure by reading the individual cubes
@@ -189,9 +189,9 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
     
     print 'Preparing an empty QB for selected area.... '
     
-    QBexpmap = emptyIM(infos_mos, inname.format(1,1))
-    QBmosaic,     lamind1, lamind2 = emptyQB(infos_mos, lambdamin, lambdamax, inname.format(1,1))
-    QBmosaic_var, lamind1, lamind2 = emptyQB(infos_mos, lambdamin, lambdamax, inname.format(1,1))
+    QBexpmap                       = make_empty_ima(infos_mos, inname.format(1,1))
+    QBmosaic,     lamind1, lamind2 = make_empty_cube(infos_mos, lambdamin, lambdamax, inname.format(1,1))
+    QBmosaic_var, lamind1, lamind2 = make_empty_cube(infos_mos, lambdamin, lambdamax, inname.format(1,1))
     
     
     print 'Now read the bit map and fill the empty QB with data '
@@ -225,7 +225,7 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
 	    obslist.append(contrib_exp[k])
 	
 	if ctype=='mean' or ctype=='wmean':
-	   QBmosaic, QBmosaic_var, QBexpmap  = feedQB(QBmosaic, QBmosaic_var, QBexpmap, explist, obslist, yreg, xreg, pix_coords, lamind1, lamind2,  expmaphdu, uniqbits[i], ctype=ctype)
+	   QBmosaic, QBmosaic_var, QBexpmap  = feedQB(QBmosaic, QBmosaic_var, QBexpmap, explist, obslist, yreg, xreg, pix_coords, lamind1, lamind2,  expmaphdu, uniqbits[i], ctype=ctype, memmap=memmap)
  	else:
 	   'Combine type not understood'
 	   return   
@@ -249,7 +249,7 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
                
        h0 = QBmosaic[0].header
        hdat = QBmosaic[1].header
-       hvar = QBmosaic_var[1].header       
+       hvar = QBmosaic_var[1].header  
        
        hd_prim = fits.PrimaryHDU(header=h0)
        hd_im =fits.ImageHDU(QBmosaic[1].data)
@@ -411,15 +411,15 @@ def get_qbposition(mosaicID, expmaphdu):
     return xmin_onmap, ymin_onmap, xmax_onmap+1, ymax_onmap+1, mask
 
 
-def emptyQB(infos, lambdamin, lambdamax, musefile):
+def make_empty_cube(infos, lambdamin, lambdamax, musefile):
+    
+    #Infos is an array of [CRVAL1, CRVAL2, NAXIS1, NAXIS2]
     
     prim_head = fits.getheader(musefile, 0) 
     header_data = fits.getheader(musefile, 1)
     
     RAG=infos[0]
     DEG=infos[1]
-    lam0=lambdamin
-    lamf=lambdamax
     
     allwaves = header_data['CRVAL3'] + header_data['CD3_3'] * np.arange(header_data['NAXIS3'])
     
@@ -430,20 +430,20 @@ def emptyQB(infos, lambdamin, lambdamax, musefile):
     
     npix_lam = lamind2-lamind1+1
 
-    header_data['CRPIX1'] = infos[4]/2
-    header_data['CRPIX2'] = infos[5]/2
+    header_data['CRPIX1'] = infos[2]/2
+    header_data['CRPIX2'] = infos[3]/2
     header_data['CRVAL1'] = RAG
     prim_head['RA'] = RAG
     header_data['CRVAL2'] = DEG
     prim_head['DEC'] = DEG
-    header_data['CRVAL3'] = lam0
+    header_data['CRVAL3'] = lambdamin
     
-    header_data['NAXIS1']= infos[2] 
-    header_data['NAXIS2']= infos[3]
-    header_data['NAXIS3']= npix_lam
+    #header_data['NAXIS1']= infos[2] 
+    #header_data['NAXIS2']= infos[3]
+    #header_data['NAXIS3']= npix_lam
     header_data['EXTNAME']='MOSAIC'
 
-    empty_cube = np.zeros([npix_lam, infos[5], infos[4]], dtype=np.float32)
+    empty_cube = np.zeros([npix_lam, infos[3], infos[2]], dtype=np.float32)
 
     hdu_pri = fits.PrimaryHDU(header=prim_head)
     hdu_im  = fits.ImageHDU(empty_cube, header=header_data)
@@ -452,7 +452,7 @@ def emptyQB(infos, lambdamin, lambdamax, musefile):
     return HDU_2fill, lamind1, lamind2  
 
 
-def emptyIM(infos, musefile):
+def make_empty_ima(infos, musefile):
     
     prim_head = fits.getheader(musefile, 0) 
     header_data = (fits.getheader(musefile, 1))
@@ -460,22 +460,22 @@ def emptyIM(infos, musefile):
     RAG=infos[0]
     DEG=infos[1]
 
-    header_data['CRPIX1'] = infos[4]/2
-    header_data['CRPIX2'] = infos[5]/2
+    header_data['CRPIX1'] = infos[2]/2
+    header_data['CRPIX2'] = infos[3]/2
     header_data['CRVAL1'] = RAG
     prim_head['RA'] = RAG
     header_data['CRVAL2'] = DEG
     prim_head['DEC'] = DEG
     
-    header_data['NAXIS1']=infos[2] 
-    header_data['NAXIS2']= infos[3]
+    #header_data['NAXIS1']=infos[2] 
+    #header_data['NAXIS2']= infos[3]
     header_data['EXTNAME']='MOSAIC'
     header_data.remove('NAXIS3') 
     header_data.remove('CRVAL3')
     header_data.remove('CRPIX3')
     header_data.remove('CD3_3')
 
-    empty_cube = np.zeros([infos[5], infos[4]], dtype=np.float32)
+    empty_cube = np.zeros([infos[3], infos[2]], dtype=np.float32)
 
     hdu_pri = fits.PrimaryHDU(header=prim_head)
     hdu_im  = fits.ImageHDU(empty_cube, header=header_data)
@@ -514,7 +514,7 @@ def get_bounds(xiqb, yiqb, xfqb, yfqb, ps, min_x, max_x, min_y, max_y):
     
     return xi, xf, yi, yf
 
-def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, lamind1, lamind2, expmaphdu, magicnum, ctype='mean'):
+def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, lamind1, lamind2, expmaphdu, magicnum, ctype='mean', memmap=True):
     
     npix_lam = lamind2-lamind1+1
     
@@ -524,7 +524,7 @@ def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, l
       
       #print 'Adding file to the mosaic: {0}'.format(filelist[kk]) 
          
-      qb = fits.open(filelist[kk])
+      qb = fits.open(filelist[kk], memmap=memmap)
       
       xiqb, yiqb, xfqb, yfqb, msk  = get_qbposition(obslist[kk], expmaphdu)
             

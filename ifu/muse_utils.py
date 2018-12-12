@@ -633,9 +633,29 @@ def check_flux_scaling(reference,listexp,maskedges=None,verbose=True,flxlim=150.
         
     fl.close()
 
+
+#Read an exposure cube and collapse along wave to generate an image.
+#Zeros along the wavelentght axis are not considered (e.g. laser notch filter) 
    
-
+def make_expmap_image(expmap_cube, outima, imtype='mean'):
     
+    from astropy.io import fits 
+    import numpy as np 
 
-
+    hdu = fits.open(expmap_cube)
+    
+    data = np.copy(hdu[0].data)
+    data[(data==0)] = np.nan
+    
+    if imtype=='mean':
+       ima = np.nanmean(data, axis=0)
+    elif imtype=='median' or imtype=='med':
+       ima = np.nanmedian(data, axis=0)   
+    else:
+       print('Imtype not understood')
+    
+    ima = np.nan_to_num(ima)
+    
+    hdu1 = fits.PrimaryHDU(ima, header=hdu[0].header)
+    hdu1.writeto(outima)
     
