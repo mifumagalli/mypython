@@ -88,8 +88,8 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 xml_info[kk]=currentlist[recent[0]]
                 print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
-                #grab within 20 days
-                recent=np.where(delta_time <= 20*12.)
+                #grab within 30 days
+                recent=np.where(delta_time <= 30*12.)
                 xml_info[kk]=currentlist[recent[0]]
                 print 'Found {0} {1} taken within 20 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
