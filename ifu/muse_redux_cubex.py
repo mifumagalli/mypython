@@ -633,24 +633,28 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         iname="COMBINED_IMAGE_FINAL.fits"
         cmed="COMBINED_CUBE_MED_FINAL.fits"
         imed="COMBINED_IMAGE_MED_FINAL.fits"
+        expmap="COMBINED_EXPMAP_FINAL.fits"
         scriptname='runcombine_final.sh'
     elif(halfset):
         cname="COMBINED_CUBE_{}.fits".format(halfset)
         iname="COMBINED_IMAGE_{}.fits".format(halfset)
         cmed="COMBINED_CUBE_MED_{}.fits".format(halfset)
         imed="COMBINED_IMAGE_MED_{}.fits".format(halfset)
+        expmap="COMBINED_EXPMAP_{}.fits".format(halfset)
         scriptname='runcombine_{}.sh'.format(halfset)
     elif(halfsetfinal):
         cname="COMBINED_CUBE_FINAL_{}.fits".format(halfsetfinal)
         iname="COMBINED_IMAGE_FINAL_{}.fits".format(halfsetfinal)
         cmed="COMBINED_CUBE_MED_FINAL_{}.fits".format(halfsetfinal)
         imed="COMBINED_IMAGE_MED_FINAL_{}.fits".format(halfsetfinal)
+        expmap="COMBINED_EXPMAP_FINAL_{}.fits".format(halfset)
         scriptname='runcombine_final_{}.sh'.format(halfsetfinal)
     else:
         cname="COMBINED_CUBE.fits"
         iname="COMBINED_IMAGE.fits"
         cmed="COMBINED_CUBE_MED.fits"
         imed="COMBINED_IMAGE_MED.fits"
+        expmap="COMBINED_EXPMAP.fits"
         scriptname='runcombine.sh'
 
 
@@ -721,9 +725,9 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         #make mean cube - write this as script that can be ran indepedently 
         scr=open(scriptname,'w')
         scr.write("export OMP_NUM_THREADS=1\n")
-        scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+"\n")
+        scr.write("CubeCombine -list "+cubes+" -out "+cname+" -masklist "+mask_new+" -outexp "+expmap+"\n")
         scr.write("Cube2Im -cube "+cname+" -out "+iname+"\n")
-        scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median\n")
+        scr.write("CubeCombine -list "+cubes+" -out "+cmed+" -masklist "+mask_new+" -comb median \n")
         scr.write("Cube2Im -cube "+cmed+" -out "+imed)
         scr.close()
         subprocess.call(["sh",scriptname])

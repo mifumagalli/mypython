@@ -116,7 +116,7 @@ class UVB:
 if __name__ == "__main__":
 
     #load UVB
-    red=0.0
+    red=3.0
     uvb=UVB(red,tag="HM2012")
 
     #compute integral
