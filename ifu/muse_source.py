@@ -4,7 +4,8 @@ These are sets of utilities to handle muse sources
 """
 
 def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.,
-                minarea=10.,regmask=None,clean=True,outspec='Spectra',marz=False):
+                minarea=10.,regmask=None,clean=True,outspec='Spectra',marz=False, 
+		rphot=False, sname='MUSE'):
 
     """      
 
@@ -27,11 +28,17 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     clean   -> clean souces 
     outspec -> where to store output spectra 
     marz    -> write spectra in also marz format (spectra needs to be true)
+    rphot   -> perform r-band aperture photometry and add r-band magnitudes to the catalogue
+    sname   -> prefix for the source names. Default = MUSE
 
     """
 
     import sep
     from astropy.io import fits
+    from astropy import wcs
+    from astropy import coordinates
+    from astropy import units as u
+    from astropy import table
     import numpy as np
     import os
     from mypython.ifu import muse_utils as utl
@@ -40,6 +47,7 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     #open image
     img=fits.open(image)
     header=img[0].header
+    imgwcs = wcs.WCS(header)
     try:
         #this is ok for narrow band images 
         data=img[1].data
@@ -96,6 +104,7 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
                                minarea=minarea,clean=clean,mask=badmask)
     print "Extracted {} objects... ".format(len(objects))
     
+    
     if(spectra):
         if not os.path.exists(outspec):
             os.makedirs(outspec)
@@ -134,18 +143,43 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
         hdulist = fits.HDUList([hdumain,hdubk])
         hdulist.writeto(output+"/segmap.fits",clobber=True)
     
-
+    #Generate source names using coordinates and name prefix
+    ra, dec = imgwcs.wcs_pix2world(objects['x'], objects['y'],0)
+    coord = coordinates.FK5(ra*u.degree, dec*u.degree)
+    rastr  = coord.ra.to_string(u.hour, precision=2, sep='')
+    decstr = coord.dec.to_string(u.degree, precision=1, sep='', alwayssign=True)
+    name = [sname+'J{0}{1}'.format(rastr[k], decstr[k]) for k in range(len(rastr))]
+    ids  = np.arange(len(name))
+    
     #write source catalogue
     print 'Writing catalogue..'
-    cols = fits.ColDefs(objects)
-    tbhdu = fits.BinTableHDU.from_columns(cols)
-    tbhdu.writeto(output+'/catalogue.fits',clobber=True)
+    tab = table.Table(objects)
+    tab.add_column(table.Column(name),0,name='name')
+    tab.add_column(table.Column(ids),0,name='ID')
+    tab.write(output+'/catalogue.fits',overwrite=True)
+    
+    #cols = fits.ColDefs(objects)
+    #cols.add_col(fits.Column(name, format='A'))
+    #tbhdu = fits.BinTableHDU.from_columns(cols)
+    #tbhdu.writeto(output+'/catalogue.fits',clobber=True)
+    
+    #rband photometry
+    if (rphot):
+        rimg, rvar, rwcsimg = utl.cube2img(cube, filt=129, write=output+'/Image_R.fits')
+	phot_r = sourcephot(output+'/catalogue.fits', output+'/Image_R.fits', output+'segmap.fits', image)
+	phot_r.add_column(table.Column(name),1,name='name')
+
+	tbhdu = fits.open(output+'/catalogue.fits')[1]
+	tbhdu2 = fits.BinTableHDU(phot_r)
+	hdulist = fits.HDUList([fits.PrimaryHDU(), tbhdu, tbhdu2])
+	hdulist.writeto(output+'/catalogue.fits',clobber=True)	
     
     if((marz) & (spectra)):
      marz_file(image, output+'/catalogue.fits', outspec, output)
     
     print 'All done'
     return objects
+    
 
 def marz_file(imagefile, catalogue, specdir, output):
     
