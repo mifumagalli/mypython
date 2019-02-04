@@ -158,7 +158,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     print('All done at {}'.format(datetime.datetime.now()))
 
 
-def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None,expmap=None,expmap_range=[0,0], memmap=True):
+def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
     
     """
 
@@ -177,6 +177,8 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     expmap -> image file with number of exposures per pixel
     expmap_range -> array with min/max values of the exposure map to be used. Range is capped to [1,nmax].		  
     memmap -> If false read the cube in memory, faster for numerical operations but more memory intensive
+
+    savechecks-> if set to a root name, save check plots in files
     
     """
  
@@ -348,14 +350,14 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     bestv=inter.interp1d(wave,filterscale)(selectw)
     dist=abs(bestv-selectr)/bestv
     
-    plt.figure()
-    plt.scatter(selectw,bestv,label='Best')
-    plt.scatter(selectw,selectr,label='Data')
-    plt.scatter(selectw,dist,label='Dist')
-    plt.scatter(selectw[np.where(dist < 0.02)],selectr[np.where(dist < 0.02)],label='Sel')
-    plt.scatter(selectw[np.where(dist < 0.02)],dist[np.where(dist < 0.02)],label='Dist Sel')
-    plt.legend()
-    plt.show()
+    #plt.figure()
+    #plt.scatter(selectw,bestv,label='Best')
+    #plt.scatter(selectw,selectr,label='Data')
+    #plt.scatter(selectw,dist,label='Dist')
+    #plt.scatter(selectw[np.where(dist < 0.02)],selectr[np.where(dist < 0.02)],label='Sel')
+    #plt.scatter(selectw[np.where(dist < 0.02)],dist[np.where(dist < 0.02)],label='Dist Sel')
+    #plt.legend()
+    #plt.show()
     
     selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
     selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
@@ -376,6 +378,11 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     plt.scatter(selectw[2:-2],selectr[2:-2],label='Used')
     plt.plot(np.arange(nw),filterscale,color='black',label='Final')
     plt.legend()
+    if(savechecks):
+        plt.ylim([1.0,2.0])
+        plt.savefig(savechecks+"_scaling.pdf")
+    else:
+        plt.show()
 
     #now rescale variance
     newvar=data[2].data
@@ -386,22 +393,22 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     
     for ww in range(nw):
         #First thing write scale txt file
-            txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
+        txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
 	
 	#get slices - handling AO gap, MFossati, unclear why we do need try statement
         #try:
-            slicecube=data[1].data[ww]
-            slicevar=data[2].data[ww]
-            newvar[ww]=newvar[ww]*filterscale[ww]**2
-            
-            if(bootstrap):
-                sliceboot=bscube[0].data[ww]
-                newrms=np.append(newrms,np.nanmean(np.sqrt(sliceboot[goodpix]/newvar[ww][goodpix])))
-                #newrms=np.append(newrms,np.nanmedian(np.sqrt(sliceboot[goodpix]/newvar[ww][goodpix])))
-                #newrms=np.append(newrms,np.nanmean(np.sqrt(sliceboot[goodpix]))/np.nanmean(np.sqrt(newvar[ww][goodpix])))
-            else:
-                pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
-                newrms=np.append(newrms,np.nanstd(pix))
+        slicecube=data[1].data[ww]
+        slicevar=data[2].data[ww]
+        newvar[ww]=newvar[ww]*filterscale[ww]**2
+        
+        if(bootstrap):
+            sliceboot=bscube[0].data[ww]
+            newrms=np.append(newrms,np.nanmean(np.sqrt(sliceboot[goodpix]/newvar[ww][goodpix])))
+            #newrms=np.append(newrms,np.nanmedian(np.sqrt(sliceboot[goodpix]/newvar[ww][goodpix])))
+            #newrms=np.append(newrms,np.nanmean(np.sqrt(sliceboot[goodpix]))/np.nanmean(np.sqrt(newvar[ww][goodpix])))
+        else:
+            pix=slicecube[goodpix]/np.sqrt(newvar[ww][goodpix])
+            newrms=np.append(newrms,np.nanstd(pix))
                 
         #except:
         #    pass
@@ -411,6 +418,11 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     plt.xlabel('Wave')
     plt.scatter(np.arange(nw),newrms)    
     plt.legend()
+    if(savechecks):
+        plt.ylim([0.7,1.2])
+        plt.savefig(savechecks+"_rescaled.pdf")
+    else:
+        plt.show()
 
     print('Rescaled arrays!')
 
@@ -421,7 +433,6 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     print('All data saved!')
 
     data.close()
-    plt.show()
 
 
 
