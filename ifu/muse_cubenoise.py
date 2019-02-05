@@ -362,6 +362,9 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
     selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
     
+    #selectw=selectw[np.where((dist < 0.02) & (selectr > 0.88))]
+    #selectr=selectr[np.where((dist < 0.02) & (selectr > 0.88))]
+    
     print('Performed final rejection!')
      
     #re-filetred version trimming edges
