@@ -4,7 +4,7 @@ These are sets of utilities to handle muse sources
 """
 
 def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.,
-                minarea=10.,regmask=None,clean=True,outspec='Spectra',marz=False, 
+                minarea=10.,regmask=None,invregmask=False,clean=True,outspec='Spectra',marz=False, 
 		rphot=False, sname='MUSE'):
 
     """      
@@ -25,6 +25,7 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     nsig    -> number of skyrms used for source id 
     minarea -> minimum area for extraction 
     regmask -> ds9 region file (image) of regions to be masked before extraction [e.g. edges]
+    invregmask -> if True invert the mask (region defines good area)
     clean   -> clean souces 
     outspec -> where to store output spectra 
     marz    -> write spectra in also marz format (spectra needs to be true). 
@@ -75,7 +76,10 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
             badmask=1.*badmask
     else:
         badmask=np.zeros((nex,ney))
-
+    
+    if (regmask) and (invregmask):
+        badmask = 1-badmask
+    
     if(check):
         print('Dumping badmask')
         hdumain  = fits.PrimaryHDU(badmask,header=header)
@@ -149,8 +153,8 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     #Generate source names using coordinates and name prefix
     ra, dec = imgwcs.wcs_pix2world(objects['x'], objects['y'],0)
     coord = coordinates.FK5(ra*u.degree, dec*u.degree)
-    rastr  = coord.ra.to_string(u.hour, precision=2, sep='')
-    decstr = coord.dec.to_string(u.degree, precision=1, sep='', alwayssign=True)
+    rastr  = coord.ra.to_string(u.hour, precision=2, sep='', pad=True)
+    decstr = coord.dec.to_string(u.degree, precision=1, sep='', alwayssign=True, pad=True)
     name = [sname+'J{0}{1}'.format(rastr[k], decstr[k]) for k in range(len(rastr))]
     ids  = np.arange(len(name))
     
