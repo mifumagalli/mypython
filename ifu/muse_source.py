@@ -176,10 +176,10 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
         phot_r = sourcephot(output+'/catalogue.fits', output+'/Image_R.fits', output+'/segmap.fits', image)
         phot_r.add_column(table.Column(name),1,name='name')
 
-    tbhdu = fits.open(output+'/catalogue.fits')[1]
-    tbhdu2 = fits.BinTableHDU(phot_r)
-    hdulist = fits.HDUList([fits.PrimaryHDU(), tbhdu, tbhdu2])
-    hdulist.writeto(output+'/catalogue.fits',overwrite=True)	
+        tbhdu = fits.open(output+'/catalogue.fits')[1]
+        tbhdu2 = fits.BinTableHDU(phot_r)
+        hdulist = fits.HDUList([fits.PrimaryHDU(), tbhdu, tbhdu2])
+        hdulist.writeto(output+'/catalogue.fits',overwrite=True)	
     
     if((marz) & (spectra)):
         #if marz is True but no magnitude limit set, create marz file for whole catalogue
@@ -775,6 +775,128 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     write='{}_{}'.format(outprefix,cube)
     hdulist.writeto(write,clobber=True)
     
+
+    fl.close()
+              
+    return
+
+def mockcont(image,segmap,fluxlimits,num=200,spatwidth=3.5,outprefix='cmocks',fill=6.):
+
+    """
+
+    Inject mock line emission in a image using a flat distribution between fluxlimits
+    and a three dimensional Gaussian with x/y FWHM = spatwidth and lambda FWHM = wavewidth
+
+
+    image -> a MUSE image [filename] to use for mock 
+    fluxlimits -> mock sources will be drawn in range [min,max] in units of image [default 1e-20]
+    num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
+    wavelimits -> [min,max] slices in which mocks are populated 
+    spatwidth -> FWHM in spatial direction, in pixels 
+    wavewidth -> FWHM in spectral direction, in slices
+    outprefix -> prefix for output  
+
+    fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+
+    """
+    
+    from astropy.io import fits 
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import os
+    
+    #open the image 
+    imahdu=fits.open(image)
+    
+    try:
+        newimage=imahdu[0].data
+        ext=0
+    except:
+        newimage=imahdu[1].data
+        ext=1
+    
+    #Open segmentation image
+    
+    seghdu = fits.open(segmap)
+    segima = seghdu[0].data
+    
+    minx=20
+    maxx=imahdu[0].header['NAXIS1']-20
+    miny=20
+    maxy=imahdu[0].header['NAXIS2']-20
+    
+    #now draw random distributions
+
+    #open output to store mocks
+    fl=open("{}_{}_catalogue.txt".format(outprefix,os.path.basename(image).split('.fits')[0]),'w')
+    
+    ind = 0
+    
+    #go from fwhm to sigma 
+    sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+    sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+    
+    #loop on mocks
+    print('Injecting mock sources')
+    
+    while ind<num:
+        
+	mflux=np.random.uniform(fluxlimits[0],fluxlimits[1])
+        xc=np.random.uniform(minx,maxx)
+        yc=np.random.uniform(miny,maxy)
+	
+	sizex = int(np.ceil(2*sigmax))
+	sizey = int(np.ceil(2*sigmay)) 
+	
+	#Verify availablity in seg map
+	thisseg = np.sum(segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+	thisima = np.sum(newimage[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+	if thisseg > 0 or np.isnan(thisima):
+	   continue
+	else:
+	  segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex] = 1 
+	  ind += 1  
+	
+        norm=mflux/(sigmax*sigmay*(2*np.pi))
+
+        #now evaluate Gaussian at pixel center [can do better with Gauss integral]
+        allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
+        ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
+
+        fl.write("{} {} {} \n".format(xc,yc,mflux))
+        
+
+        for xx in allx:
+            for yy in ally:
+
+                    if((xx > minx) & (yy > miny) & (xx < maxx) & (yy < maxy)):
+                        #eval, ask why 0.5 offsets
+                        pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+
+                                             (((yy-yc)**2)/(2.*sigmay**2))))
+                              
+                        #store
+                        newimage[int(yy),int(xx)]=newimage[int(yy),int(xx)]+pix
+    
+    print('Done.. writing!')
+
+    #store output
+    if(ext==0):
+        hdufirst = fits.PrimaryHDU(newimage)
+        hdulist = fits.HDUList([hdufirst])
+        hdulist[0].header=imahdu[0].header
+    elif(ext==1):
+        hdufirst = fits.PrimaryHDU([])
+        hdusecond = fits.ImageHDU(newimage)
+        hdulist = fits.HDUList([hdufirst,hdusecond])
+        hdulist[0].header=imahdu[0].header
+        hdulist[1].header=imahdu[1].header
+
+    write='{}_{}'.format(outprefix,os.path.basename(image))
+    hdulist.writeto(write,clobber=True)
+    
+    hdusegout = fits.ImageHDU(segima)
+    write='{}_{}'.format(outprefix,os.path.basename(segmap))
+    hdusegout.writeto(write, clobber=True)
 
     fl.close()
               
