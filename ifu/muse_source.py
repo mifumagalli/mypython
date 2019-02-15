@@ -656,13 +656,12 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     return phot
 
 
-def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6.):
+def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6., exp=False,scalelimits=None):
 
     """
 
     Inject mock line emission in a cube using a flat distribution between fluxlimits
     and a three dimensional Gaussian with x/y FWHM = spatwidth and lambda FWHM = wavewidth
-
 
     cube -> a MUSE cube [filename] to use for mock 
     fluxlimits -> mock sources will be drawn in range [min,max] in units of CUBE [default 1e-20]
@@ -671,15 +670,19 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     spatwidth -> FWHM in spatial direction, in pixels 
     wavewidth -> FWHM in spectral direction, in slices
     outprefix -> prefix for output  
-
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+    exp -> use an exponential profile in x,y. If false, use point sources
+    scalelimits -> [min,max] scale lengths of exponential disc
 
     """
     
     from astropy.io import fits 
     import numpy as np
     import matplotlib.pyplot as plt
-    
+    from astropy.cosmology import FlatLambdaCDM
+    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+    from astropy import units as u
+
     #open the cube 
     cubhdu=fits.open(cube)
     
@@ -688,6 +691,7 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
         ext=0
     except:
         newcube=cubhdu[1].data
+        var=cubhdu[2].data
         ext=1
     
     #find ranges
@@ -698,6 +702,10 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     if wavelimits:
         minw = wavelimits[0]
         maxw = wavelimits[1]
+    if scalelimits:
+        mins = scalelimits[0]
+        maxs = scalelimits[1]
+   
     minx=20
     maxx=cubhdu[0].header['NAXIS1']-20
     miny=20
@@ -707,10 +715,17 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     mflux=np.random.uniform(fluxlimits[0],fluxlimits[1],num)
     mx=np.random.uniform(minx,maxx,num)
     my=np.random.uniform(miny,maxy,num)
+    ms_kpc=np.random.uniform(mins,maxs,num)
     #sort wave for convinience in comparison
     mlambda=np.random.uniform(minw,maxw,num)
     mlambda=np.sort(mlambda)
 
+    #convert scale length to pixels
+    z=3.5
+    lum_dist = (cosmo.luminosity_distance(z)).value #Mpc
+    ms_rad = ((ms_kpc *(1+z)**2)/(lum_dist*1e3)) 
+    ms_arcsec = (ms_rad*(180/np.pi)*3600)
+    ms=ms_arcsec/0.2 #MUSE resolution = 0.2as
 
     #construct the x,y,lambda index images
     #xindex=np.arange(0,cubhdu[0].header['NAXIS1'])
@@ -720,8 +735,11 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     #ymap=np.tile(yindex,(cubhdu[0].header['NAXIS1'],1))
     #ymap=ymap.transpose()+0.5
     
+    folder = cube.split('COMBINED')[0]
+    cube_name = cube.split(folder)[1]
+
     #open output to store mocks
-    fl=open("{}_{}_catalogue.txt".format(outprefix,cube.split('.fits')[0]),'w')
+    fl=open(output + "{}_{}_catalogue.txt".format(outprefix,cube_name.split('.fits')[0]),'w')
     
     #loop on mocks
     print('Looping on mock sources')
@@ -734,27 +752,39 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
         xc=mx[mm]
         yc=my[mm]
         wc=mlambda[mm]
-        norm=mflux[mm]/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
-
+        if exp:
+            norm=mflux[mm]/((ms[mm]**2)*sigmaw*(2*np.pi)**(3./2.))
+        else:
+            norm=mflux[mm]/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
         #now evaluate Gaussian at pixel center [can do better with Gauss integral]
-        allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
-        ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
+        if exp:
+            allx=np.round(np.arange(np.floor(xc-fill*ms[mm]),xc+fill*ms[mm],1))
+            ally=np.round(np.arange(np.floor(yc-fill*ms[mm]),yc+fill*ms[mm],1))
+        else:
+            allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
+            ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
         allw=np.round(np.arange(np.floor(wc-fill*sigmaw),wc+fill*sigmaw,1))
 
         fl.write("{} {} {} {}\n".format(xc,yc,wc,mflux[mm]))
         
-
         for xx in allx:
             for yy in ally:
                 for ww in allw:
 
                     if((xx > minx) & (yy > miny) & (ww > minw) & 
                        (xx < maxx) & (yy < maxy) & (ww < maxw)):
-                        #eval 
-                        pix=norm*np.exp(-1.*((((xx+0.5-xc)**2)/(2.*sigmax**2))+
-                                             (((yy+0.5-yc)**2)/(2.*sigmay**2))+
-                                             (((ww+0.5-wc)**2)/(2.*sigmaw**2))))
-                              
+                        #evaluate 
+
+                        if exp:
+                            pix= norm*np.exp(-1.*(( abs((xx-xc)) /ms[mm] )+
+                                                  ( abs((yy-yc)) /ms[mm] )+
+                                                  (((ww-wc)**2)/(2.*sigmaw**2))))
+                        
+                        else:
+                            pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+
+                                             (((yy-yc)**2)/(2.*sigmay**2))+
+                                             (((ww-wc)**2)/(2.*sigmaw**2))))      
+                     
                         #store
                         newcube[int(ww),int(yy),int(xx)]=newcube[int(ww),int(yy),int(xx)]+pix
     
@@ -768,17 +798,20 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
     elif(ext==1):
         hdufirst = fits.PrimaryHDU([])
         hdusecond = fits.ImageHDU(newcube)
-        hdulist = fits.HDUList([hdufirst,hdusecond])
+        hduthird = fits.ImageHDU(var)
+        hdulist = fits.HDUList([hdufirst,hdusecond,hduthird])
         hdulist[0].header=cubhdu[0].header
         hdulist[1].header=cubhdu[1].header
+        hdulist[2].header=cubhdu[2].header
 
-    write='{}_{}'.format(outprefix,cube)
+    write=  output + "{}_{}".format(outprefix,cube_name)    #'{}_{}'.format(outprefix,cube)
     hdulist.writeto(write,clobber=True)
     
 
     fl.close()
               
     return
+
 
 def mockcont(image,segmap,fluxlimits,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.):
 
