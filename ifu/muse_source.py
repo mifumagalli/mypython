@@ -780,7 +780,7 @@ def mocklines(cube,fluxlimits,num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,
               
     return
 
-def mockcont(image,segmap,fluxlimits,num=200,spatwidth=3.5,outprefix='cmocks',fill=6.):
+def mockcont(image,segmap,fluxlimits,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.):
 
     """
 
@@ -789,13 +789,14 @@ def mockcont(image,segmap,fluxlimits,num=200,spatwidth=3.5,outprefix='cmocks',fi
 
 
     image -> a MUSE image [filename] to use for mock 
-    fluxlimits -> mock sources will be drawn in range [min,max] in units of image [default 1e-20]
+    fluxlimits -> mock sources will be drawn in range [min,max] in units of image [default 1e-20] 
+                  if ZP is -1, in mag units otherwise
+    ZP -> Zero point for magnitude to flux conversion, if -1 do the mock in flux
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
     wavelimits -> [min,max] slices in which mocks are populated 
     spatwidth -> FWHM in spatial direction, in pixels 
     wavewidth -> FWHM in spectral direction, in slices
     outprefix -> prefix for output  
-
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
 
     """
@@ -842,11 +843,14 @@ def mockcont(image,segmap,fluxlimits,num=200,spatwidth=3.5,outprefix='cmocks',fi
     while ind<num:
         
 	mflux=np.random.uniform(fluxlimits[0],fluxlimits[1])
+	if ZP != -1:
+	  mflux=10**(-0.4*(mflux-ZP))
+	
         xc=np.random.uniform(minx,maxx)
         yc=np.random.uniform(miny,maxy)
 	
-	sizex = int(np.ceil(2*sigmax))
-	sizey = int(np.ceil(2*sigmay)) 
+	sizex = int(np.ceil(3*sigmax))
+	sizey = int(np.ceil(3*sigmay)) 
 	
 	#Verify availablity in seg map
 	thisseg = np.sum(segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
