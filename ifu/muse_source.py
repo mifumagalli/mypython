@@ -850,7 +850,7 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
     return
 
 
-def mockcont(image,segmap,fluxlimits,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.):
+def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.):
 
     """
 
@@ -890,6 +890,15 @@ def mockcont(image,segmap,fluxlimits,num=100,ZP=-1,spatwidth=3.5,outprefix='cmoc
     
     seghdu = fits.open(segmap)
     segima = seghdu[0].data
+    seghdu.close()
+    
+    if(badmask):
+      #Open badmask image
+      badhdu = fits.open(badmask)
+      badmask = badhdu[0].data
+      badhdu.close()      
+    else:
+      badmask = np.zeros_like(segima)
     
     minx=20
     maxx=imahdu[0].header['NAXIS1']-20
@@ -925,7 +934,8 @@ def mockcont(image,segmap,fluxlimits,num=100,ZP=-1,spatwidth=3.5,outprefix='cmoc
 	#Verify availablity in seg map
 	thisseg = np.sum(segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
 	thisima = np.sum(newimage[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
-	if thisseg > 0 or np.isnan(thisima):
+	thisbad = np.sum(badmask[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+	if thisseg > 0 or thisbad>0 or np.isnan(thisima):
 	   continue
 	else:
 	  segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex] = 1 
