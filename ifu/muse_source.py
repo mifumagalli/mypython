@@ -4,8 +4,8 @@ These are sets of utilities to handle muse sources
 """
 
 def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
-                minarea=10.,regmask=None,invregmask=False,clean=True,outspec='Spectra',marz=False, 
-		rphot=False, sname='MUSE'):
+                minarea=10.,regmask=None,invregmask=False,fitsmask=None, clean=True,
+		outspec='Spectra',marz=False,rphot=False, sname='MUSE'):
 
     """      
 
@@ -27,6 +27,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     minarea -> minimum area for extraction 
     regmask -> ds9 region file (image) of regions to be masked before extraction [e.g. edges]
     invregmask -> if True invert the mask (region defines good area)
+    fitsmask -> Fits file with good mask, overrides regmask
     clean   -> clean souces 
     outspec -> where to store output spectra 
     marz    -> write spectra in also marz format (spectra needs to be true). 
@@ -84,8 +85,17 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
 	return -1
 
     #create bad pixel mask
-    if(regmask):
-        Mask=msk.PyMask(ney,nex,regmask,header=img[0].header)
+    if(fitsmask):
+        print("Using FITS image for badmask")
+        hdumsk = fits.open(fitsmask)
+	try:
+	  badmask = hdumsk[1].data
+	except:
+	  badmask = hdumsk[0].data
+	badmask=badmask.byteswap(True).newbyteorder()
+    elif(regmask):
+        print("Using region file for badmask")
+	Mask=msk.PyMask(ney,nex,regmask,header=img[0].header)
         for ii in range(Mask.nreg):
             Mask.fillmask(ii)
             if(ii == 0):
@@ -96,7 +106,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     else:
         badmask=np.zeros((nex,ney))
     
-    if (regmask) and (invregmask):
+    if (regmask) and (invregmask) and not (fitsmask):
         badmask = 1-badmask
     
     if(check):
