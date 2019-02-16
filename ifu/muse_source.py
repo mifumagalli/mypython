@@ -3,7 +3,7 @@ These are sets of utilities to handle muse sources
 
 """
 
-def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.,
+def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
                 minarea=10.,regmask=None,invregmask=False,clean=True,outspec='Spectra',marz=False, 
 		rphot=False, sname='MUSE'):
 
@@ -17,9 +17,10 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     Use SEP utilities http://sep.readthedocs.org/en/stable/
 
     image   -> fits file of image to process
+    cube    -> the cube used to extract spectra
+    varima  -> the noise image corresponding to the science image (std), optional
     check   -> if true write a bunch of check mages
     output  -> where to dump the output
-    cube    -> the cube used to extract spectra
     spectra -> if True, extract spectra in VACUUM wave!!
     helio   -> pass additional heliocentric correction
     nsig    -> number of skyrms used for source id 
@@ -58,11 +59,29 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     except:
         #white cubex images
         data=img[0].data
+	
     data=data.byteswap(True).newbyteorder()
     #grab effective dimension
     nex,ney=data.shape
     #close fits
     img.close()
+    
+    if(varima):
+      var=fits.open(varima)
+      try:
+          datavar=var[1].data
+      except:
+          datavar=var[0].data
+          
+      datavar=datavar.byteswap(True).newbyteorder()
+      #grab effective dimension
+      stdx,stdy=datavar.shape
+      #close fits
+      var.close()
+      
+      if (stdx != nex) or (stdy != ney):
+        print("The noise image does not have the same dimensions as the science image")
+	return -1
 
     #create bad pixel mask
     if(regmask):
@@ -88,10 +107,10 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
     
 
     #check background level, but do not subtract it
-    print 'Checking background levels'
+    print('Checking background levels')
     bkg = sep.Background(data,mask=badmask)    
-    print 'Residual background level ', bkg.globalback
-    print 'Residual background rms ', bkg.globalrms
+    print('Residual background level ', bkg.globalback)
+    print('Residual background rms ', bkg.globalrms)
 
     if(check):
         print 'Dumping sky...'
@@ -104,11 +123,19 @@ def findsources(image,cube,check=False,output='./',spectra=False,helio=0,nsig=2.
         hdulist = fits.HDUList([hdumain,hdubk,hdurms])
         hdulist.writeto(output+"/skyprop.fits",overwrite=True)
 
-    #extracting sources at nsigma
-    thresh = nsig * bkg.globalrms
-    segmap = np.zeros((header["NAXIS1"],header["NAXIS2"]))
-    objects,segmap=sep.extract(data,thresh,segmentation_map=True,
+    if(varima):
+        #Use nsiogma threshold and a pixel by pixel effective treshold based on variance map
+        thresh = nsig
+        objects,segmap=sep.extract(data,thresh,var=datavar,segmentation_map=True,
                                minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
+    else:
+        #extracting sources at nsigma, use constant threshold
+        thresh = nsig * bkg.globalrms
+        #segmap = np.zeros((header["NAXIS1"],header["NAXIS2"]))
+        objects,segmap=sep.extract(data,thresh,segmentation_map=True,
+                               minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
+    
+    
     print "Extracted {} objects... ".format(len(objects))
     
     
