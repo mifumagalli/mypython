@@ -850,7 +850,7 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
     return
 
 
-def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.):
+def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.,exp=False, expscale=1.5):
 
     """
 
@@ -859,19 +859,20 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 
 
     image -> a MUSE image [filename] to use for mock 
-    fluxlimits -> mock sources will be drawn in range [min,max] in units of image [default 1e-20] 
-                  if ZP is -1, in mag units otherwise
+    fluxlimits -> mock sources will be drawn in range [min,max] in units of 
+                  image [default 1e-20] if ZP is -1, in mag units otherwise
     ZP -> Zero point for magnitude to flux conversion, if -1 do the mock in flux
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
-    wavelimits -> [min,max] slices in which mocks are populated 
-    spatwidth -> FWHM in spatial direction, in pixels 
-    wavewidth -> FWHM in spectral direction, in slices
+    spatwidth -> spatial FWHM for Gaussian model in pixel
     outprefix -> prefix for output  
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+    exp -> use an exponential profile in x,y. If false, use point sources
+    expscale -> exponential scale lenght in pixels, this is convolved with the Gaussian FWHM (seeing)
 
     """
     
     from astropy.io import fits 
+    from astropy.convolution import convolve, Gaussian2DKernel
     import numpy as np
     import matplotlib.pyplot as plt
     import os
@@ -910,14 +911,21 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     #open output to store mocks
     fl=open("{}_{}_catalogue.txt".format(outprefix,os.path.basename(image).split('.fits')[0]),'w')
     
+    if(exp):
+      #input is scalelength directly
+      sigmax=expscale
+      sigmay=expscale
+    else:
+      #go from fwhm to sigma for Gaussian
+      sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+      sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+    
     ind = 0
-    
-    #go from fwhm to sigma 
-    sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
-    sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
-    
+   
     #loop on mocks
     print('Injecting mock sources')
+    
+    mockimage = np.zeros_like(newimage)
     
     while ind<num:
         
@@ -935,6 +943,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 	thisseg = np.sum(segima[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
 	thisima = np.sum(newimage[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
 	thisbad = np.sum(badmask[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+	
 	if thisseg > 0 or thisbad>0 or np.isnan(thisima):
 	   continue
 	else:
@@ -943,23 +952,33 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 	
         norm=mflux/(sigmax*sigmay*(2*np.pi))
 
-        #now evaluate Gaussian at pixel center [can do better with Gauss integral]
+        #now evaluate model (Gaussian or Exponential) at pixel center 
         allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
         ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
 
         fl.write("{} {} {} \n".format(xc,yc,mflux))
-        
 
         for xx in allx:
             for yy in ally:
-
                     if((xx > minx) & (yy > miny) & (xx < maxx) & (yy < maxy)):
-                        #eval, ask why 0.5 offsets
-                        pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+
-                                             (((yy-yc)**2)/(2.*sigmay**2))))
+                        #evaluate model at pixel
+			if(exp):
+			    pix=norm*np.exp(-1.*(( abs((xx-xc)) /sigmax )+( abs((yy-yc)) /sigmay )))
+			else:
+			    pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+(((yy-yc)**2)/(2.*sigmay**2))))
                               
                         #store
-                        newimage[int(yy),int(xx)]=newimage[int(yy),int(xx)]+pix
+                        mockimage[int(yy),int(xx)]=mockimage[int(yy),int(xx)]+pix
+    
+    
+    if(exp):
+      #The mock exponential profiles need to be convolved with a gaussian 2D filter to simulate PSF effects.
+      #go from FWHM to sigma for the Kernel
+      kern = Gaussian2DKernel(spatwidth/(2*np.sqrt(2*np.log(2))))
+      mockimage = convolve(mockimage, kern)
+      
+    
+    newimage += mockimage
     
     print('Done.. writing!')
 
