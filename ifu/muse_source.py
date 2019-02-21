@@ -5,7 +5,7 @@ These are sets of utilities to handle muse sources
 
 def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
                 minarea=10.,regmask=None,invregmask=False,fitsmask=None, clean=True,
-		outspec='Spectra',marz=False,rphot=False, sname='MUSE'):
+		outspec='Spectra',marz=False,rphot=False, detphot=False, sname='MUSE'):
 
     """      
 
@@ -32,6 +32,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     outspec -> where to store output spectra 
     marz    -> write spectra in also marz format (spectra needs to be true). 
                If set to numerical value, this is used as an r-band magnitude limit.
+    detphot -> perform aperture phtometry on the detection image and add magnitues to the catalogue	       
     rphot   -> perform r-band aperture photometry and add r-band magnitudes to the catalogue
     sname   -> prefix for the source names. Default = MUSE
 
@@ -141,7 +142,6 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     else:
         #extracting sources at nsigma, use constant threshold
         thresh = nsig * bkg.globalrms
-        #segmap = np.zeros((header["NAXIS1"],header["NAXIS2"]))
         objects,segmap=sep.extract(data,thresh,segmentation_map=True,
                                minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
     
@@ -202,10 +202,15 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     tab.add_column(table.Column(ids),0,name='ID')
     tab.write(output+'/catalogue.fits',overwrite=True)
     
-    #cols = fits.ColDefs(objects)
-    #cols.add_col(fits.Column(name, format='A'))
-    #tbhdu = fits.BinTableHDU.from_columns(cols)
-    #tbhdu.writeto(output+'/catalogue.fits',clobber=True)
+    if (detphot):
+       #Run source photometry on the extraction image
+       whiteimg, whitevar, whitewcsimg = utl.cube2img(cube, write=output+'/Image_white.fits')
+       phot_det = sourcephot(output+'/catalogue.fits', output+'/Image_white.fits', output+'/segmap.fits', image, zpab=28.35665)
+       phot_det.add_column(table.Column(name),1,name='name')
+       tbhdu = fits.open(output+'/catalogue.fits')
+       tbhdu.append(fits.BinTableHDU(phot_det))
+       tbhdu[-1].header['PHOTBAND'] = 'Detection'
+       tbhdu.writeto(output+'/catalogue.fits',overwrite=True)
     
     #rband photometry
     if (rphot):
@@ -213,10 +218,10 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         phot_r = sourcephot(output+'/catalogue.fits', output+'/Image_R.fits', output+'/segmap.fits', image)
         phot_r.add_column(table.Column(name),1,name='name')
 
-        tbhdu = fits.open(output+'/catalogue.fits')[1]
-        tbhdu2 = fits.BinTableHDU(phot_r)
-        hdulist = fits.HDUList([fits.PrimaryHDU(), tbhdu, tbhdu2])
-        hdulist.writeto(output+'/catalogue.fits',overwrite=True)	
+        tbhdu = fits.open(output+'/catalogue.fits')
+        tbhdu.append(fits.BinTableHDU(phot_r))
+	tbhdu[-1].header['PHOTBAND'] = 'SDSS_r'
+        tbhdu.writeto(output+'/catalogue.fits',overwrite=True)	
     
     if((marz) & (spectra)):
         #if marz is True but no magnitude limit set, create marz file for whole catalogue
@@ -471,7 +476,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
         #dump the transformed segmap for checking 
         hdumain  = fits.PrimaryHDU(segmasktrans,header=img[1].header)
         hdulist = fits.HDUList(hdumain)
-        hdulist.writeto("{}_segremap.fits".format(rname),clobber=True)
+        hdulist.writeto("{}_segremap.fits".format(rname),overwrite=True)
     else:
         #no transformation needed
         segmasktrans=segmask
@@ -682,7 +687,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     #dump the aperture check image 
     hdumain  = fits.PrimaryHDU(checkaperture,header=img[1].header)
     hdulist = fits.HDUList(hdumain)
-    hdulist.writeto("{}_aper.fits".format(rname),clobber=True)
+    hdulist.writeto("{}_aper.fits".format(rname),overwrite=True)
 
     #close
     cat.close()
@@ -842,7 +847,7 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
         hdulist[2].header=cubhdu[2].header
 
     write=  output + "{}_{}".format(outprefix,cube_name)    #'{}_{}'.format(outprefix,cube)
-    hdulist.writeto(write,clobber=True)
+    hdulist.writeto(write,overwrite=True)
     
 
     fl.close()
@@ -995,11 +1000,11 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
         hdulist[1].header=imahdu[1].header
 
     write='{}_{}'.format(outprefix,os.path.basename(image))
-    hdulist.writeto(write,clobber=True)
+    hdulist.writeto(write,overwrite=True)
     
     hdusegout = fits.ImageHDU(segima)
     write='{}_{}'.format(outprefix,os.path.basename(segmap))
-    hdusegout.writeto(write, clobber=True)
+    hdusegout.writeto(write, overwrite=True)
 
     fl.close()
               
