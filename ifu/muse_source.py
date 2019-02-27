@@ -193,13 +193,18 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     rastr  = coord.ra.to_string(u.hour, precision=2, sep='', pad=True)
     decstr = coord.dec.to_string(u.degree, precision=1, sep='', alwayssign=True, pad=True)
     name = [sname+'J{0}{1}'.format(rastr[k], decstr[k]) for k in range(len(rastr))]
-    ids  = np.arange(len(name))
+    ids  = np.arange(len(name))+1
+    
+    #Generate a column to be used to flag the sources to be used in the analysis
+    #True for all sources at this point
+    use_source = np.ones_like(name, dtype=bool)
     
     #write source catalogue
     print 'Writing catalogue..'
     tab = table.Table(objects)
     tab.add_column(table.Column(name),0,name='name')
     tab.add_column(table.Column(ids),0,name='ID')
+    tab.add_column(table.Column(use_source),name='use_source')
     tab.write(output+'/catalogue.fits',overwrite=True)
     
     if (detphot):
