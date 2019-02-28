@@ -703,7 +703,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     return phot
 
 
-def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6., exp=False,scalelimits=None):
+def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6., exp=False,scalelimits=None):
 
     """
 
@@ -713,7 +713,7 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
     cube -> a MUSE cube [filename] to use for mock 
     fluxlimits -> mock sources will be drawn in range [min,max] in units of CUBE [default 1e-20]
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
-    wavelimits -> [min,max] slices in which mocks are populated 
+    wavelimits -> [min,max] slices in which mocks are populated in pixel coordinates
     spatwidth -> FWHM in spatial direction, in pixels 
     wavewidth -> FWHM in spectral direction, in slices
     outprefix -> prefix for output  
@@ -724,12 +724,14 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
     """
     
     from astropy.io import fits 
+    import os
     import numpy as np
     import matplotlib.pyplot as plt
     from astropy.cosmology import FlatLambdaCDM
-    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
     from astropy import units as u
-
+    
+    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+    
     #open the cube 
     cubhdu=fits.open(cube)
     
@@ -740,6 +742,22 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
         newcube=cubhdu[1].data
         var=cubhdu[2].data
         ext=1
+
+    #Open segmentation image
+    
+    seghdu = fits.open(segmap)
+    segima = seghdu[0].data
+    seghdu.close()
+    
+    segcube = np.repeat(segima[np.newaxis,...], np.shape(newcube)[0], axis=0)
+    
+    if(badmask):
+      #Open badmask image
+      badhdu = fits.open(badmask)
+      badmask = badhdu[0].data
+      badhdu.close()      
+    else:
+      badmask = np.zeros_like(segima)
     
     #find ranges
     if not wavelimits:
@@ -752,90 +770,110 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
     if scalelimits:
         mins = scalelimits[0]
         maxs = scalelimits[1]
-   
+    
     minx=20
     maxx=cubhdu[0].header['NAXIS1']-20
     miny=20
     maxy=cubhdu[0].header['NAXIS2']-20
-    
-    #now draw random distributions
-    mflux=np.random.uniform(fluxlimits[0],fluxlimits[1],num)
-    mx=np.random.uniform(minx,maxx,num)
-    my=np.random.uniform(miny,maxy,num)
-    ms_kpc=np.random.uniform(mins,maxs,num)
-    #sort wave for convinience in comparison
-    mlambda=np.random.uniform(minw,maxw,num)
-    mlambda=np.sort(mlambda)
-
-    #convert scale length to pixels
-    z=3.5
-    lum_dist = (cosmo.luminosity_distance(z)).value #Mpc
-    ms_rad = ((ms_kpc *(1+z)**2)/(lum_dist*1e3)) 
-    ms_arcsec = (ms_rad*(180/np.pi)*3600)
-    ms=ms_arcsec/0.2 #MUSE resolution = 0.2as
-
-    #construct the x,y,lambda index images
-    #xindex=np.arange(0,cubhdu[0].header['NAXIS1'])
-    #yindex=np.arange(0,cubhdu[0].header['NAXIS2'])
-    #windex=np.arange(0,cubhdu[0].header['NAXIS3'])
-    #xmap=np.tile(xindex,(cubhdu[0].header['NAXIS2'],1))+0.5
-    #ymap=np.tile(yindex,(cubhdu[0].header['NAXIS1'],1))
-    #ymap=ymap.transpose()+0.5
-    
-    folder = cube.split('COMBINED')[0]
-    cube_name = cube.split(folder)[1]
 
     #open output to store mocks
-    fl=open(output + "{}_{}_catalogue.txt".format(outprefix,cube_name.split('.fits')[0]),'w')
+    fl=open(output+"{}_{}_catalogue.txt".format(outprefix,os.path.basename(cube).split('.fits')[0]),'w')
+    
+    #compute Gaussian parameters 
+    sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+    sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+    sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
     
     #loop on mocks
-    print('Looping on mock sources')
-    for mm in range(num):
+    print('Injecting mock sources')
+    
+    mockcube = np.zeros_like(newcube)
+    
+    ind = 0
+    
+    while ind<num:
 
-        #compute Gaussian parameters 
-        sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
-        sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
-        sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
-        xc=mx[mm]
-        yc=my[mm]
-        wc=mlambda[mm]
-        if exp:
-            norm=mflux[mm]/((ms[mm]**2)*sigmaw*(2*np.pi)**(3./2.))
-        else:
-            norm=mflux[mm]/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
-        #now evaluate Gaussian at pixel center [can do better with Gauss integral]
-        if exp:
-            allx=np.round(np.arange(np.floor(xc-fill*ms[mm]),xc+fill*ms[mm],1))
-            ally=np.round(np.arange(np.floor(yc-fill*ms[mm]),yc+fill*ms[mm],1))
-        else:
-            allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
-            ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
-        allw=np.round(np.arange(np.floor(wc-fill*sigmaw),wc+fill*sigmaw,1))
+      #now draw random distributions
+      mflux    = np.random.uniform(fluxlimits[0],fluxlimits[1])
+      xc       = np.random.uniform(minx,maxx)
+      yc       = np.random.uniform(miny,maxy)
+      wc       = np.random.uniform(minw,maxw)
 
-        fl.write("{} {} {} {}\n".format(xc,yc,wc,mflux[mm]))
-        
-        for xx in allx:
-            for yy in ally:
-                for ww in allw:
+      if exp:
+      	#convert scale length to pixels
+      	ms_kpc = np.random.uniform(mins,maxs)
+      	z=3.5
+      	lum_dist = (cosmo.luminosity_distance(z)).value #Mpc
+      	ms_rad = ((ms_kpc *(1+z)**2)/(lum_dist*1e3)) 
+      	ms_arcsec = (ms_rad*(180/np.pi)*3600)
+      	ms=ms_arcsec/0.2 #MUSE resolution = 0.2as
 
-                    if((xx > minx) & (yy > miny) & (ww > minw) & 
-                       (xx < maxx) & (yy < maxy) & (ww < maxw)):
-                        #evaluate 
+      sizex = int(np.ceil(3*sigmax))
+      sizey = int(np.ceil(3*sigmay))
+      sizew = int(np.ceil(3*sigmaw)) 
 
-                        if exp:
-                            pix= norm*np.exp(-1.*(( abs((xx-xc)) /ms[mm] )+
-                                                  ( abs((yy-yc)) /ms[mm] )+
-                                                  (((ww-wc)**2)/(2.*sigmaw**2))))
-                        
-                        else:
-                            pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+
-                                             (((yy-yc)**2)/(2.*sigmay**2))+
-                                             (((ww-wc)**2)/(2.*sigmaw**2))))      
-                     
-                        #store
-                        newcube[int(ww),int(yy),int(xx)]=newcube[int(ww),int(yy),int(xx)]+pix
+      #Verify availablity in seg map
+      thisseg = np.sum(segcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+      thiscub = np.sum(newcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+      thisbad = np.sum(badmask[int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
+
+      if thisseg > 0 or thisbad>0 or np.isnan(thiscub):
+         continue
+      else:
+        segcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex] = 1 
+        ind += 1  
+
+      if exp:
+          norm=mflux/((ms**2)*sigmaw*(2*np.pi)**(3./2.))
+      else:
+          norm=mflux/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
+      
+      #now evaluate Gaussian at pixel center [can do better with Gauss integral]
+      if exp:
+          allx=np.round(np.arange(np.floor(xc-fill*ms),xc+fill*ms,1))
+          ally=np.round(np.arange(np.floor(yc-fill*ms),yc+fill*ms,1))
+      else:
+          allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
+          ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
+      #This is in common
+      allw=np.round(np.arange(np.floor(wc-fill*sigmaw),wc+fill*sigmaw,1))
+    
+      fl.write("{} {} {} {}\n".format(xc,yc,wc,mflux))
+      
+      for xx in allx:
+              for yy in ally:
+        	  for ww in allw:
+    
+        	      if((xx > minx) & (yy > miny) & (ww > minw) & 
+        		 (xx < maxx) & (yy < maxy) & (ww < maxw)):
+        		  #evaluate 
+    
+        		  if exp:
+        		      pix= norm*np.exp(-1.*(( abs((xx-xc)) /ms )+
+        					    ( abs((yy-yc)) /ms )+
+        					    (((ww-wc)**2)/(2.*sigmaw**2))))
+        		  
+        		  else:
+        		      pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+
+        				       (((yy-yc)**2)/(2.*sigmay**2))+
+        				       (((ww-wc)**2)/(2.*sigmaw**2))))      
+        	       
+        		  #store
+        		  mockcube[int(ww),int(yy),int(xx)]=mockcube[int(ww),int(yy),int(xx)]+pix
+    
+    if(exp):
+      #The mock exponential profiles need to be convolved with a gaussian 2D filter to simulate PSF effects.
+      #go from FWHM to sigma for the Kernel
+      kern = Gaussian2DKernel(spatwidth/(2*np.sqrt(2*np.log(2))))
+      for ii in range(np.shape(newcube)[0]):
+        mockcube[ii,...] = convolve(mockcube[ii,...], kern)
+    
+    
+    newcube += mockcube
+
     
     print('Done.. writing!')
+    
 
     #store output
     if(ext==0):
@@ -851,10 +889,9 @@ def mocklines(cube,fluxlimits,output='./',num=500,wavelimits=None,spatwidth=3.5,
         hdulist[1].header=cubhdu[1].header
         hdulist[2].header=cubhdu[2].header
 
-    write=  output + "{}_{}".format(outprefix,cube_name)    #'{}_{}'.format(outprefix,cube)
+    write=  output + "{}_{}".format(outprefix,os.path.basename(cube))   
     hdulist.writeto(write,overwrite=True)
     
-
     fl.close()
               
     return
