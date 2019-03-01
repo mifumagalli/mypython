@@ -813,19 +813,12 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
         segcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex] = 1 
         ind += 1  
 
-      if exp:
-          norm=mflux/((ms**2)*sigmaw*(2*np.pi)**(3./2.))
-      else:
-          norm=mflux/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
+      norm=mflux/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
       
       #now evaluate Gaussian at pixel center [can do better with Gauss integral]
-      if exp:
-          allx=np.round(np.arange(np.floor(xc-fill*ms),xc+fill*ms,1))
-          ally=np.round(np.arange(np.floor(yc-fill*ms),yc+fill*ms,1))
-      else:
-          allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
-          ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
-      #This is in common
+      
+      allx=np.round(np.arange(np.floor(xc-fill*sigmax),xc+fill*sigmax,1))
+      ally=np.round(np.arange(np.floor(yc-fill*sigmay),yc+fill*sigmay,1))
       allw=np.round(np.arange(np.floor(wc-fill*sigmaw),wc+fill*sigmaw,1))
     
       fl.write("{} {} {} {}\n".format(xc,yc,wc,mflux))
