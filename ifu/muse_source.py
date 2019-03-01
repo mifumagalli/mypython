@@ -703,7 +703,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     return phot
 
 
-def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6., exp=False,scalelimits=None):
+def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits=None,spatwidth=3.5,wavewidth=2,outprefix='mocks',fill=6., exp=False):
 
     """
 
@@ -719,7 +719,6 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     outprefix -> prefix for output  
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
     exp -> use an exponential profile in x,y. If false, use point sources
-    scalelimits -> [min,max] scale lengths of exponential disc
 
     """
     
@@ -727,10 +726,8 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     import os
     import numpy as np
     import matplotlib.pyplot as plt
-    from astropy.cosmology import FlatLambdaCDM
     from astropy import units as u
-    
-    cosmo = FlatLambdaCDM(H0=70, Om0=0.3)
+    from scipy.ndimage import filters
     
     #open the cube 
     cubhdu=fits.open(cube)
@@ -780,8 +777,13 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     fl=open(output+"{}_{}_catalogue.txt".format(outprefix,os.path.basename(cube).split('.fits')[0]),'w')
     
     #compute Gaussian parameters 
-    sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
-    sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+    if exp:
+       sigmax=exp
+       sigmay=exp
+    else:
+       sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+       sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
+    
     sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
     
     #loop on mocks
@@ -798,15 +800,6 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
       xc       = np.random.uniform(minx,maxx)
       yc       = np.random.uniform(miny,maxy)
       wc       = np.random.uniform(minw,maxw)
-
-      if exp:
-      	#convert scale length to pixels
-      	ms_kpc = np.random.uniform(mins,maxs)
-      	z=3.5
-      	lum_dist = (cosmo.luminosity_distance(z)).value #Mpc
-      	ms_rad = ((ms_kpc *(1+z)**2)/(lum_dist*1e3)) 
-      	ms_arcsec = (ms_rad*(180/np.pi)*3600)
-      	ms=ms_arcsec/0.2 #MUSE resolution = 0.2as
 
       sizex = int(np.ceil(3*sigmax))
       sizey = int(np.ceil(3*sigmay))
@@ -849,8 +842,8 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
         		  #evaluate 
     
         		  if exp:
-        		      pix= norm*np.exp(-1.*(( abs((xx-xc)) /ms )+
-        					    ( abs((yy-yc)) /ms )+
+        		      pix= norm*np.exp(-1.*(( abs((xx-xc)) /sigmax )+
+        					    ( abs((yy-yc)) /sigmay )+
         					    (((ww-wc)**2)/(2.*sigmaw**2))))
         		  
         		  else:
@@ -864,10 +857,8 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     if(exp):
       #The mock exponential profiles need to be convolved with a gaussian 2D filter to simulate PSF effects.
       #go from FWHM to sigma for the Kernel
-      kern = Gaussian2DKernel(spatwidth/(2*np.sqrt(2*np.log(2))))
-      for ii in range(np.shape(newcube)[0]):
-        mockcube[ii,...] = convolve(mockcube[ii,...], kern)
-    
+      kern = kern = (0,spatwidth/(2*np.sqrt(2*np.log(2))),spatwidth/(2*np.sqrt(2*np.log(2))))
+      mockcube =  filters.gaussian_filter(mockcube, kern, order=0)    
     
     newcube += mockcube
 
