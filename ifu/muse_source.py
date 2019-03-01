@@ -794,7 +794,7 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     while ind<num:
 
       #now draw random distributions
-      mflux    = np.random.uniform(fluxlimits[0],fluxlimits[1])
+      mflux    = 10**np.random.uniform(np.log10(fluxlimits[0]),np.log10(fluxlimits[1]))
       xc       = np.random.uniform(minx,maxx)
       yc       = np.random.uniform(miny,maxy)
       wc       = np.random.uniform(minw,maxw)
