@@ -764,9 +764,6 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     if wavelimits:
         minw = wavelimits[0]
         maxw = wavelimits[1]
-    if scalelimits:
-        mins = scalelimits[0]
-        maxs = scalelimits[1]
     
     minx=20
     maxx=cubhdu[0].header['NAXIS1']-20
