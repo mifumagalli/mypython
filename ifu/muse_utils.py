@@ -659,3 +659,52 @@ def make_expmap_image(expmap_cube, outima, imtype='mean'):
     hdu1 = fits.PrimaryHDU(ima, header=hdu[0].header)
     hdu1.writeto(outima)
     
+def smoothcube(cube, smoothcube, spatsig, lamsig,  smethod='median'):
+    
+    from astropy.io import fits
+    from scipy.ndimage import filters
+    
+    '''
+    This function allow to smooth an input cube of a given number of pixels (nsm)
+    It has 3 different ways of smooth cubes: Gaussian (style='gauss'), boxcar (style='boxcar'), median (style='median').
+    '''
+    
+    qb = fits.open(cube)
+    next = len(qb)
+    
+    if next==1:
+       dataext = 0
+       varext  = None
+    elif next==2:
+       dataext = 1
+       varext  = None
+    elif next==3:
+       dataext = 1
+       varext  = 2
+    else:
+       print('Cube extensions not understood.')
+       return         
+    
+    print('Starting '+smethod+' style smoothing with kernel size {0:3.2f}x{1:3.2f}x{2:3.2f} pixels'.format(lamsig,spatsig,spatsig))
+    
+    if smethod == 'gauss':
+    
+       kern = (lamsig,spatsig,spatsig)
+    
+       qb[dataext].data =  filters.gaussian_filter(qb[dataext].data, kern, order=0)
+       if varext is not None:
+         qb[varext].data = filters.gaussian_filter(qb[varext].data, kern, order=0)#/(nsm**2)
+       
+      
+    if smethod == 'boxcar':
+    
+       kern = (lamsig,spatsig,spatsig)
+       
+       qb[dataext].data =  filters.uniform_filter(qb[dataext].data, kern, order=0)
+       if varext is not None:
+         qb[varext].data = filters.uniform_filter(qb[varext].data, kern, order=0)#/(nsm**2)
+   
+    
+    qb.writeto(smoothcube, overwrite=True)
+        
+
