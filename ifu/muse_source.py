@@ -135,7 +135,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         hdulist.writeto(output+"/skyprop.fits",overwrite=True)
 
     if(varima):
-        #Use nsiogma threshold and a pixel by pixel effective treshold based on variance map
+        #Use nsigma threshold and a pixel by pixel effective treshold based on variance map
         thresh = nsig
         objects,segmap=sep.extract(data,thresh,var=datavar,segmentation_map=True,
                                minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
@@ -147,32 +147,43 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     
     
     print "Extracted {} objects... ".format(len(objects))
-    
+    ids  = np.arange(len(objects))+1    
     
     if(spectra):
         if not os.path.exists(outspec):
             os.makedirs(outspec)
 
     if((check) | (spectra)):
-        #create a detection mask alla cubex
-        srcmask=np.zeros((1,data.shape[0],data.shape[1]))
-        nbj=1
+        #create a detection mask a'la cubex
+        srcmask=np.zeros((data.shape[0],data.shape[1]))
         print('Generating spectra...')
         #loop over detections
-        for obj in objects:
-            #init mask
+        for nbj in ids:
+            obj = objects[nbj-1]
+	    #init mask
             tmpmask=np.zeros((data.shape[0],data.shape[1]),dtype=np.bool)
-            tmpmask3d=np.zeros((1,data.shape[0],data.shape[1]),dtype=np.bool)
             #fill this mask
             sep.mask_ellipse(tmpmask,obj['x'],obj['y'],obj['a'],obj['b'],obj['theta'],r=2)
-            tmpmask3d[0,:,:]=tmpmask[:,:]
-            srcmask=srcmask+tmpmask3d*nbj
-            if(spectra):
-                savename="{}/id{}.fits".format(outspec,nbj)
-                utl.cube2spec(cube,obj['x'],obj['y'],None,write=savename,
-                              shape='mask',helio=helio,mask=tmpmask3d,tovac=True)
-            #go to next
-            nbj=nbj+1
+            #add in global mask
+	    srcmask=srcmask+tmpmask*nbj
+	    #verify conflicts, resolve using segmentation map
+	    if np.nanmax(srcmask)>nbj:
+	       blended = (srcmask>nbj)
+	       srcmask[blended] = segmap[blended]
+	    
+        #Now loop again and extract spectra if required
+	if(spectra):
+           #Verify that the source mask has the same number of objects as the object list
+	   if not len(np.unique(srcmask[srcmask>0])) == len(objects):
+	      print("Mismatch between number of objects and number of spectra to extract.")
+	   for nbj in ids:
+	      savename="{}/id{}.fits".format(outspec,nbj)
+	      tmpmask3d=np.zeros((1,data.shape[0],data.shape[1]))
+	      tmpmask3d[0,:,:]=srcmask[:,:]
+	      tmpmask3d[tmpmask3d != nbj] = 0
+	      tmpmask3d[tmpmask3d > 0] = 1
+	      tmpmask3d = np.array(tmpmask3d, dtype=np.bool)
+              utl.cube2spec(cube,None,None,None,write=savename,shape='mask',helio=helio,mask=tmpmask3d,tovac=True)
 
     if(check):
         print 'Dumping source mask...'
@@ -193,7 +204,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     rastr  = coord.ra.to_string(u.hour, precision=2, sep='', pad=True)
     decstr = coord.dec.to_string(u.degree, precision=1, sep='', alwayssign=True, pad=True)
     name = [sname+'J{0}{1}'.format(rastr[k], decstr[k]) for k in range(len(rastr))]
-    ids  = np.arange(len(name))+1
+    
     
     #Generate a column to be used to flag the sources to be used in the analysis
     #True for all sources at this point
@@ -306,12 +317,13 @@ def marz_file(imagefile, catalogue, specdir, output,r_lim=False):
     nspectra = len(filelist)
 
     id     = np.arange(len(filelist)) + 1  # Integer array - id of object
+    name   = catalog[1].data['name']
     x      = catalog[1].data['x']          # Array of object image x-coords
     y      = catalog[1].data['y']          # Array of object image y-coords
     world_coords = wref.wcs_pix2world(np.transpose(np.array([x,y])), 0)
     ra     = world_coords[:,0]             # Array of object R.A.s
     dec    = world_coords[:,1]             # Array of object Dec.s
-
+    
     # Initialize flux, variance & sky arrays (sky not mandatory)
     intensity = np.zeros((nspectra,naxis3))
     variance = np.zeros((nspectra,naxis3))
@@ -345,7 +357,7 @@ def marz_file(imagefile, catalogue, specdir, output,r_lim=False):
     marz_hdu[3].header.set('extname', 'WAVELENGTH')
     
     # Add in source parameters as fits table
-    c1 = fits.Column(name='source_id', format='80A', array=id)
+    c1 = fits.Column(name='NAME', format='80A', array=name)
     c2 = fits.Column(name='RA', format='D', array=ra)
     c3 = fits.Column(name='DEC', format='D',array=dec)
     c4 = fits.Column(name='X', format='J',array=x)
