@@ -4,7 +4,7 @@ These are sets of utilities to handle muse sources
 """
 
 def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
-                minarea=10.,regmask=None,invregmask=False,fitsmask=None, clean=True,
+                minarea=10.,deblend_cont=0.0001,regmask=None,invregmask=False,fitsmask=None,clean=True,
 		outspec='Spectra',marz=False,rphot=False, detphot=False, sname='MUSE'):
 
     """      
@@ -138,12 +138,12 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         #Use nsigma threshold and a pixel by pixel effective treshold based on variance map
         thresh = nsig
         objects,segmap=sep.extract(data,thresh,var=datavar,segmentation_map=True,
-                               minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
+                               minarea=minarea,clean=clean,mask=badmask,deblend_cont=deblend_cont,deblend_nthresh=32)
     else:
         #extracting sources at nsigma, use constant threshold
         thresh = nsig * bkg.globalrms
         objects,segmap=sep.extract(data,thresh,segmentation_map=True,
-                               minarea=minarea,clean=clean,mask=badmask,deblend_cont=0.0001)
+                               minarea=minarea,clean=clean,mask=badmask,deblend_cont=deblend_cont,deblend_nthresh=32)
     
     
     print "Extracted {} objects... ".format(len(objects))
@@ -213,6 +213,8 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     #write source catalogue
     print 'Writing catalogue..'
     tab = table.Table(objects)
+    tab.add_column(table.Column(dec),0,name='DEC')
+    tab.add_column(table.Column(ra),0,name='RA')
     tab.add_column(table.Column(name),0,name='name')
     tab.add_column(table.Column(ids),0,name='ID')
     tab.add_column(table.Column(use_source),name='use_source')
@@ -241,89 +243,62 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     
     if((marz) & (spectra)):
         #if marz is True but no magnitude limit set, create marz file for whole catalogue
-        if marz==True:
-            marz_file(image, output+'/catalogue.fits', outspec, output)
+        if marz>10 and (rphot):
+	    #Requires testing
+	    hdu = fits.open(output+'/catalogue.fits')
+	    hdu[1].data['use_source'][hdu[2].data['MAGSEG']>marz] = False
+	    hdu.writeto(output+'/catalogue.fits',overwrite=True)
+	    
+            marz_file(output+'/catalogue.fits', outspec, output, r_lim=marz)
         else:
-            #create folder and catalogue with just sources brighter than mag limit
-            if os.path.exists(output + '/spectra_r' + str(marz)):
-	            files = glob.glob(output +  '/spectra_r' + 
-                          str(marz) +'/*')
-	            for f in files:
-       		        os.remove(f)
-            else:
-	            os.mkdir(output +  '/spectra_r' + str(marz))
-            
-            mag = phot_r['MAGSEG']
-
-            #add in x y pixels from original catalogue
-            x, y = tbhdu.data['x'], tbhdu.data['y']
-            phot_r['x'], phot_r['y'] = x, y
-
-            #add in ra,dec 
-            img = fits.open(image)
-            mywcs = wcs.WCS(img[0].header)
-            ra, dec = mywcs.all_pix2world(x,y,0)
-            phot_r['RA'] = ra
-            phot_r['dec'] = dec
-
-            for i in range(len(mag)):
-	            if mag[i] < marz:
-		            copyfile((output + '/spectra/id' + str(i+1) 
-                              + '.fits'), (output + '/spectra_r' + 
-                              str(marz) + '/id' + str(i+1) + '.fits'))
-
-            #Write photometry catalog with objects below magnitude limit excluded
-            phot_r.remove_rows(phot_r['MAGSEG'] > marz)
-            catalogue_lim_name = (output + '/catalogue_r' + 
-                                  str(marz) +'.fits')
-            if os.path.exists(catalogue_lim_name):
-                os.remove(catalogue_lim_name)
-            phot_r.write(catalogue_lim_name)
-
-            outspec = output + '/spectra_r' + str(marz)
-            marz_file(image, output+'/catalogue_r' + str(marz) +'.fits', outspec, output, r_lim=marz)
-
-    
+	    marz_file(output+'/catalogue.fits', outspec, output)
+	
     print 'All done'
     return objects
     
 
-def marz_file(imagefile, catalogue, specdir, output,r_lim=False):
+def marz_file(catalogue, specdir, outdir, r_lim=False):
     
     import glob
     from astropy.io import fits
     from astropy import wcs
     import numpy as np
     
-    #Makes a list of spectra files ** MUST be all and only spectra 
-    #from catalogue**
+    #Makes a list of spectra files ** MUST include the spectra from catalogue**
     filelist = glob.glob(specdir+'/*')
-    #resort the filelist into numeric order
-    filelist.sort(key=lambda f: int(filter(str.isdigit, f)))  
+    
     #Need catalogue of spectra objects            
     catalog = fits.open(catalogue)   
+    
     #name of MARZ file
     if r_lim:
-        marzfile = output+'/spectra_marz_r' + str(r_lim) + '.fits'    
+        marzfile = outdir+'/spectra_marz_r' + str(r_lim) + '.fits'    
     else:
-        marzfile = output+'/spectra_marz.fits'                                  
+        marzfile = outdir+'/spectra_marz.fits'                                  
 
-    #Some image from MUSE cube, to get coordinates
-    image = fits.open(imagefile)
-    wref = wcs.WCS(image[0].header)
 
     s0 = fits.open(filelist[0])
     naxis3=len(s0[0].data)
-    nspectra = len(filelist)
 
-    id     = np.arange(len(filelist)) + 1  # Integer array - id of object
-    name   = catalog[1].data['name']
-    x      = catalog[1].data['x']          # Array of object image x-coords
-    y      = catalog[1].data['y']          # Array of object image y-coords
-    world_coords = wref.wcs_pix2world(np.transpose(np.array([x,y])), 0)
-    ra     = world_coords[:,0]             # Array of object R.A.s
-    dec    = world_coords[:,1]             # Array of object Dec.s
+    id         = catalog[1].data['ID']         # Integer array - id of object
+    name       = catalog[1].data['name']
+    x          = catalog[1].data['x']	       # Array of object image x-coords
+    y          = catalog[1].data['y']	       # Array of object image y-coords
+    ra         = catalog[1].data['RA']         # Array of object R.A.s
+    dec        = catalog[1].data['DEC']        # Array of object Dec.s
+    use_source = catalog[1].data['use_source']
     
+    nspectra = len(id[use_source])
+    
+    id   = id[use_source]
+    name = name[use_source]
+    x    = x[use_source]
+    y    = y[use_source]
+    ra   = ra[use_source]
+    dec  = dec[use_source]   
+    
+    print ("Generating MARZ file for {} spectra".format(nspectra))
+        
     # Initialize flux, variance & sky arrays (sky not mandatory)
     intensity = np.zeros((nspectra,naxis3))
     variance = np.zeros((nspectra,naxis3))
@@ -333,13 +308,13 @@ def marz_file(imagefile, catalogue, specdir, output,r_lim=False):
     # Fill the flux, variance and sky arrays here.
     type = []
 
-    for filename in enumerate(filelist):
-        data = fits.open(filename[1])
+    for ii in range(nspectra):
+        data = fits.open(specdir+'/id{}.fits'.format(id[ii]))
         type.append('P')
-        intensity[filename[0],:] = data[0].data
-        variance[filename[0],:]  = data[1].data
-        sky[filename[0],:]       = data[0].data*0.0
-	wavelength[filename[0],:] = data[2].data
+        intensity[ii,:]  = data[0].data
+        variance[ii,:]   = data[1].data
+        sky[ii,:]        = data[0].data*0.0
+	wavelength[ii,:] = data[2].data
 
     intensity[np.logical_not(np.isfinite(intensity))] = np.nan
     variance[np.logical_not(np.isfinite(variance))] = np.nan
