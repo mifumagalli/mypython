@@ -6,7 +6,7 @@ from scipy import ndimage
 from scipy import signal
 from scipy import interpolate as inter
 import multiprocessing as mp
-import os
+import os, sys
 import glob
 import datetime
 
@@ -19,57 +19,56 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     
     #now load the exposures
     dataexp=np.zeros((nexp,wend-wstart+1,nx,ny))
-    datamas=np.zeros((nexp,nx,ny))
     
-    iexp=0
-    for exp in allexposures:
-        dataexp[iexp]=fits.open(exp)[1].data[wstart:wend+1,:,:]
-        iexp=iexp+1
-
-    iexp=0
-    if(masks):
-        for exp in allmasks:
-            datamas[iexp]=fits.open(exp)[0].data[:,:]
-            iexp=iexp+1
+    for exp in range(nexp):
+        dataexp[exp]=fits.open(allexposures[exp])[1].data[wstart:wend+1,:,:]
+        #If requested apply mask on the fly
+	if(masks):
+	  tmpmask=fits.open(allmasks[exp])[0].data[:,:]
+	  dataexp[exp,:,(tmpmask==0)] = np.nan
 
     print('Proc {}: All data loaded'.format(iproc))        
-
+    sys.stdout.flush()
+    
     #make space for output
     newvar=np.zeros((wend-wstart+1,nx,ny))
 
 
     #select evaluator
     if(median): 
-        from numpy import median as evaluator
+        try:
+	  from bottleneck import nanmedian as evalcent 
+	except:
+	  from numpy import median as evalcent
     else:
-        from numpy import mean as evaluator
-
-
+        try:
+	  from bottleneck import nanmean as evalcent
+	except:
+	  from numpy import mean as evalcent
+    
+    try:
+      from bottleneck import nanvar as evalvar
+    except:
+      from numpy import var as evalvar
+    
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
-       
-        #giant loop on pixels - not all pixels are the same length 
+	
+        #giant loop on pixels - necessary otherwise the memory goes off the roof
         for xx in range(nx):
             for yy in range(ny):
-                #ingest mask pixel
-                if(masks):
-                    maskpix=datamas[:,xx,yy]
-                else:
-                    maskpix=np.zeros(nexp)+1
                     
                 #ingest flux 
                 fluxpix=dataexp[:,ww-wstart,xx,yy]
-                
-                #apply mask
-                fluxpix=fluxpix[np.where((maskpix > 0) & (np.isfinite(fluxpix)))]
-                npix=len(fluxpix)
+                fluxpix=fluxpix[np.isfinite(fluxpix)]
+		npix=len(fluxpix)
 
                 #bootstrap
                 if(npix > 1):
                     #bootstrap
                     rindex=np.random.randint(npix,size=(nsamp,npix))
-                    newvar[ww-wstart,xx,yy]=np.std(evaluator(fluxpix[rindex],axis=1))**2
+                    newvar[ww-wstart,xx,yy]=evalvar(evalcent(fluxpix[rindex],axis=1))
                 else:
                     newvar[ww-wstart,xx,yy]=np.nan
                     
@@ -186,7 +185,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     data=fits.open(cube, memmap=memmap)
     
     if(bootstrap):
-        bscube=fits.open(bootstrap)
+        bscube=fits.open(bootstrap, memmap=memmap)
         
     # #check if AO data (not really needed but that's ok)
     # mode=(data[0].header['ESO INS MODE']).strip()
