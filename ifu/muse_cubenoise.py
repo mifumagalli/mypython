@@ -54,6 +54,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
+	sys.stdout.flush()
 	
         #giant loop on pixels - necessary otherwise the memory goes off the roof
         for xx in range(nx):
