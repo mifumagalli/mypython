@@ -83,8 +83,8 @@ def parse_xml(path='./',nproc=12,pipecal=False):
             currentlist=np.array(currentlist)
             #now handle by keyword according to calibration plan
             if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
-                #grab daily calibrations 
-                recent=np.where(delta_time <= 14.)
+                #grab daily calibrations, avoid attached calibrations for standard reduction
+                recent=np.where((delta_time <= 14.) and (delta_time >1))
                 xml_info[kk]=currentlist[recent[0]]
                 print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
@@ -94,7 +94,8 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 print 'Found {0} {1} taken within 20 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
             else:
-                #pick closest
+                print kk
+		#pick closest
                 mintm=np.argmin(delta_time)
                 xml_info[kk]=[currentlist[mintm]]
                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
