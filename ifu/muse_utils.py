@@ -421,7 +421,7 @@ def cubestat(cube,region=None,delta=10,mask=None):
     rms=rms*1e-20/pixbin**2
     return wrms,rms
 
-def readcube(cube, helio=0):
+def readcube(cube, helio=0,mmap=False):
 
     """
     Read a cube, expanding wcs and wavelegth
@@ -442,7 +442,7 @@ def readcube(cube, helio=0):
     import numpy as np
 
     #open file 
-    cfits=fits.open(cube)
+    cfits=fits.open(cube,mmap=mmap)
     
     #grab the data
     try:
