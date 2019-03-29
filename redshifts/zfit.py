@@ -810,7 +810,7 @@ class zfitwin(Tkinter.Tk):
             ax.plot(xval,yval)
             ax.plot(xval,yerr,color='red',linestyle="--",zorder=1)
             ax.plot(xg,fitg,color='black',linestyle=":")
-            ax.set_title("{0}{1} z = {2:.5} +/- {3:.5}".format(lines_good_name[ii],int(lines_good_wave_rest[ii]),czfit,czfiterr))
+            ax.set_title("{0}{1} z = {2:.6} +/- {3:.5}".format(lines_good_name[ii],int(lines_good_wave_rest[ii]),czfit,czfiterr))
 
         #send message to user  and reset redshift 
         bestz=np.median(np.array(czall))
