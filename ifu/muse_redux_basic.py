@@ -84,14 +84,20 @@ def parse_xml(path='./',nproc=12,pipecal=False):
             #now handle by keyword according to calibration plan
             if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
                 #grab daily calibrations, avoid attached calibrations for standard reduction
-                recent=np.where((delta_time <= 14.) & (delta_time >1))
+		offtime = 14
+                recent=np.where((delta_time <= offtime) & (delta_time >1.))
+		#If nothing found it might be a glitch in the ESO calibration plan, extend 
+		#allowed time for search
+		if len(recent[0]) == 0:
+		  offtime = 24
+		  recent = np.where((delta_time <= offtime))
                 xml_info[kk]=currentlist[recent[0]]
-                print 'Found {0} {1} taken within 1 day'.format(len(recent[0]),kk)
+                print 'Found {0} {1} taken within {2} hours'.format(len(recent[0]),kk, offtime)
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
                 #grab within 30 days
                 recent=np.where(delta_time <= 30*12.)
                 xml_info[kk]=currentlist[recent[0]]
-                print 'Found {0} {1} taken within 20 days'.format(len(recent[0]),kk)
+                print 'Found {0} {1} taken within 30 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
             else:
                 print kk
