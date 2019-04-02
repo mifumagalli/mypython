@@ -496,37 +496,46 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg):
     """
 
     from astropy.io import fits
+    from astropy import wcs
 
     #open 
     fithdu=fits.open(data,mode='update')
+    Next = len(fithdu)
     
-    try:
+    for ext in range(Next):
+       if 'CRVAL1' in fithdu[ext].header.keys():
+         
+         Naxis = fithdu[ext].header['NAXIS']
+	 
+	 #Save old card values but do this only if it has not done before
+	 if not 'OLDCRV1' in fithdu[ext].header.keys():
+	     
+	     fithdu[ext].header['OLDCRV1']=fithdu[ext].header['CRVAL1']
+             fithdu[ext].header['OLDCRV2']=fithdu[ext].header['CRVAL2'] 
+             fithdu[ext].header['OLDCPX1']=fithdu[ext].header['CRPIX1'] 
+             fithdu[ext].header['OLDCPX2']=fithdu[ext].header['CRPIX2'] 
+             
+	     imgwcs = wcs.WCS(fithdu[ext].header)
+	     if Naxis==3:
+	        ra_orig, dec_orig, dummy = imgwcs.wcs_pix2world(0,0,0,0)
+	     elif Naxis==2:
+	        ra_orig, dec_orig = imgwcs.wcs_pix2world(0,0,0)
 
-        #save old 
-        fithdu[1].header['OLDCRV1']=fithdu[1].header['CRVAL1']
-        fithdu[1].header['OLDCRV2']=fithdu[1].header['CRVAL2'] 
-        fithdu[1].header['OLDCPX1']=fithdu[1].header['CRPIX1'] 
-        fithdu[1].header['OLDCPX2']=fithdu[1].header['CRPIX2'] 
-
-        #write new 
-        fithdu[1].header['CRVAL1']=rag 
-        fithdu[1].header['CRVAL2']=deg
-        fithdu[1].header['CRPIX1']=xpix 
-        fithdu[1].header['CRPIX2']=ypix
-        
-    except:
-
-        #save old
-        fithdu[0].header['OLDCRV1']=fithdu[0].header['CRVAL1'] 
-        fithdu[0].header['OLDCRV2']=fithdu[0].header['CRVAL2'] 
-        fithdu[0].header['OLDCPX1']=fithdu[0].header['CRPIX1'] 
-        fithdu[0].header['OLDCPX2']=fithdu[0].header['CRPIX2'] 
-        
-        #write new 
-        fithdu[0].header['CRVAL1']=rag 
-        fithdu[0].header['CRVAL2']=deg
-        fithdu[0].header['CRPIX1']=xpix 
-        fithdu[0].header['CRPIX2']=ypix
+         #write new 
+         fithdu[ext].header['CRVAL1']=rag 
+         fithdu[ext].header['CRVAL2']=deg
+         fithdu[ext].header['CRPIX1']=xpix 
+         fithdu[ext].header['CRPIX2']=ypix
+	 
+	 imgwcs = wcs.WCS(fithdu[ext].header)
+	 if Naxis==3:
+	    ra_new, dec_new, dummy = imgwcs.wcs_pix2world(0,0,0,0)
+	 elif Naxis==2:
+	    ra_new, dec_new = imgwcs.wcs_pix2world(0,0,0)
+	 
+	 if not 'RASHIFT' in fithdu[ext].header.keys():
+            fithdu[ext].header['RASHIFT']  = ra_new-ra_orig 
+            fithdu[ext].header['DECSHIFT'] = dec_new-dec_orig
 
     #save 
     fithdu.flush()
