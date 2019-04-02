@@ -479,7 +479,7 @@ def readcube(cube, helio=0,mmap=False):
     return cubdata,vardata,wcsc,wavec,regions
 
 
-def adjust_wcsoffset(data,xpix,ypix,rag,deg):
+def adjust_wcsoffset(data,xpix,ypix,rag,deg,shiftoffsets=None):
 
 
     """
@@ -515,32 +515,53 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg):
              fithdu[ext].header['OLDCPX1']=fithdu[ext].header['CRPIX1'] 
              fithdu[ext].header['OLDCPX2']=fithdu[ext].header['CRPIX2'] 
              
-	     imgwcs = wcs.WCS(fithdu[ext].header)
-	     if Naxis==3:
-	        ra_orig, dec_orig, dummy = imgwcs.wcs_pix2world(0,0,0,0)
-	     elif Naxis==2:
-	        ra_orig, dec_orig = imgwcs.wcs_pix2world(0,0,0)
+	     oldheader = fithdu[ext].header
+         
+	 else:
+	     
+	     oldheader = fithdu[ext].header
+	     oldheader['CRVAL1'] = oldheader['OLDCRV1']
+	     oldheader['CRVAL2'] = oldheader['OLDCRV2']
+	     oldheader['CRPIX1'] = oldheader['OLDCPX1']
+	     oldheader['CRPIX2'] = oldheader['OLDCPX2']
 
+         #extract 0,0 position for Original WCS	  
+	 imgwcs = wcs.WCS(fithdu[ext].header)
+	 if Naxis==3:
+	    ra_orig, dec_orig, dummy = imgwcs.wcs_pix2world(0,0,0,0)
+	 elif Naxis==2:
+	    ra_orig, dec_orig = imgwcs.wcs_pix2world(0,0,0)
+		
          #write new 
          fithdu[ext].header['CRVAL1']=rag 
          fithdu[ext].header['CRVAL2']=deg
          fithdu[ext].header['CRPIX1']=xpix 
          fithdu[ext].header['CRPIX2']=ypix
 	 
+	 #extract 0,0 position for New WCS	  
 	 imgwcs = wcs.WCS(fithdu[ext].header)
 	 if Naxis==3:
 	    ra_new, dec_new, dummy = imgwcs.wcs_pix2world(0,0,0,0)
 	 elif Naxis==2:
 	    ra_new, dec_new = imgwcs.wcs_pix2world(0,0,0)
 	 
-	 if not 'RASHIFT' in fithdu[ext].header.keys():
-            fithdu[ext].header['RASHIFT']  = ra_new-ra_orig 
-            fithdu[ext].header['DECSHIFT'] = dec_new-dec_orig
+	 rashift  = ra_orig-ra_new
+	 decshift = dec_orig-dec_new
+	 
+	 #Allow for this to be rewritten in case you refine the solution at a second time
+	 fithdu[ext].header['RASHIFT']  = rashift
+         fithdu[ext].header['DECSHIFT'] = decshift
 
     #save 
     fithdu.flush()
     fithdu.close()
-
+    
+    if shiftoffsets:
+        offhdu = fits.open(shiftoffsets)
+	offhdu[1].data['RA_OFFSET'] += rashift
+	offhdu[1].data['DEC_OFFSET'] += decshift
+        offhdu.writeto(shiftoffsets.replace('.fits', '_ABS.fits'), overwrite=True)
+    
 
 def unpack_pixtab(flag):
     
