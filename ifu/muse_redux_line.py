@@ -55,6 +55,110 @@ def individual_resample(listob,refpath='./',nproc=24):
         #loop on exposures and reduce frame with sky subtraction 
         for exp in range(nsci):
             
+            #define some output names for final cube 
+            cname="DATACUBE_FINAL_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            pname="PIXTABLE_REDUCED_LINEWCS_EXP{0:d}.fits".format(exp+1)
+            iname="IMAGE_FOV_LINEWCS_EXP{0:d}.fits".format(exp+1)
+ 
+            if not os.path.isfile(cname):
+                print("Processing exposure {0:d} to align to reference".format(exp+1))
+                
+                #copy sof file written for basic reduction
+                sof_old=open("../../Script/scipost_{0:d}.sof".format(exp+1))
+                sof_name="../../Script/scipost_line_{0:d}.sof".format(exp+1)
+                sofedit=open(sof_name,'w')
+                
+                #now apply offsets to pixel table
+                print ('Apply offsets...')
+                pixtablist=[]
+                for ll in sof_old:
+                    if('STD_' in ll or 'PIXTABLE_OBJECT' in ll):
+                        fil,tag=ll.split(' ')
+                        sofedit.write("../Basic/"+fil+" "+tag)
+                    else:
+                        sofedit.write(ll)
+		
+		#Check existence of ABSOLUTE offset list otherwise fall back onto the relative one
+		if os.path.isfile('../../../{}/OFFSET_LIST_ABS.fits'.format(refpath)):
+		   sofedit.write('../../../{}/OFFSET_LIST_ABS.fits OFFSET_LIST\n'.format(refpath))
+		else:
+		   sofedit.write('../../../{}/OFFSET_LIST.fits OFFSET_LIST\n'.format(refpath))   
+
+                #append reference frame to sof file 
+                sofedit.write('../../../{}/DATACUBE_FINAL.fits OUTPUT_WCS\n'.format(refpath))
+                sofedit.close()
+                sof_old.close()
+            
+                
+                #Write the command file 
+                scr=open("../../Script/make_scipost_line_{0:d}.sh".format(exp+1),"w")
+                scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
+                
+                scr.write('esorex --log-file=scipost_line_{0:d}.log muse_scipost --filter=white  --skymethod="none" --save=cube,individual ../../Script/scipost_line_{0:d}.sof'.format(exp+1))
+                scr.close()
+                
+                #Run pipeline 
+                subprocess.call(["sh", "../../Script/make_scipost_line_{0:d}.sh".format(exp+1)])    
+                subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+            else:
+                print("Exposure {0:d} exists.. skip! ".format(exp+1))
+     
+
+        #back to top
+        os.chdir(topdir)
+
+
+
+
+def old_individual_resample(listob,refpath='./',nproc=24):
+
+    """
+    Loop over each OB and re-run scipost using a final coadded cube as
+    a reference for WCS. This produces cubes that are all regridded to 
+    a common 3D grid with a single interpolation. 
+
+
+    listob -> OBs to process
+    refpath -> where reference path is for WCS resampling
+    nproc -> numer of processors in parallel runs 
+
+    """
+      
+    import os
+    import glob
+    import subprocess
+    import shutil
+    from astropy.io import fits
+    import muse_utils as mut 
+    import numpy as np
+
+    #grab top dir
+    topdir=os.getcwd()
+
+    #now loop over each folder and make the final sky-subtracted cubes
+    for ob in listob:
+        
+        #change dir
+        os.chdir(ob+'/Proc/')
+
+        #make cubex folder
+        if not os.path.exists('Line'):
+            os.makedirs('Line')
+
+        #change dir
+        os.chdir('Line')
+
+        print('Processing {} for resampling on reference cube'.format(ob))
+ 
+        #Search how many exposures are there
+        scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
+        nsci=len(scils)
+        
+        #loop on exposures and reduce frame with sky subtraction 
+        for exp in range(nsci):
+            
             if not os.path.isfile('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1)):
                 print("Compute offsets...")
                             
