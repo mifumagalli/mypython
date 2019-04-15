@@ -29,6 +29,10 @@ class LumFun:
             self.param=self.KhostovanOII2015()
         elif('KhostovanOIII2015' in self.whichlf):
             self.param=self.KhostovanOIII2015()
+        elif('Herenz2019' in self.whichlf):
+            self.param=self.Herenz2019()
+        elif('Drake2017' in self.whichlf):
+            self.param=self.Drake2017()
         else:
             raise TypeError('LF {} not known'.format(self.whichlf))
             
@@ -116,6 +120,36 @@ class LumFun:
 
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
 
+
+    def Drake2017(self):
+
+        """
+        This evaluates the Lya luminosity function from Drake et al. 2017,
+        Astronomy & Astrophysics, Volume 608, id.A6, 15 pp.
+        Assumes Schecter fit between z~3-4
+        
+        """
+        alpha=-2.03
+        phistar=0.0007943
+        Mstar=42.72
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+
+    def Herenz2019(self):
+
+        """
+        This evaluates the Lya luminosity function from Herenz et al. 2019,
+        AA Volume 621, id.A107, 22       
+        Assumes Schecter fit
+        
+        """
+        alpha=-1.84
+        phistar=0.0019498
+        Mstar=42.66
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
 
 
     def KhostovanOII2015(self):
