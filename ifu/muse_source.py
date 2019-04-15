@@ -263,6 +263,8 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
     from astropy.io import fits
     from astropy import wcs
     import numpy as np
+    from mypython.ifu import muse_utils as utl
+
     
     #Makes a list of spectra files ** MUST include the spectra from catalogue**
     filelist = glob.glob(specdir+'/*')
@@ -306,6 +308,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
     wavelength = np.zeros((nspectra,naxis3))
 
     # Fill the flux, variance and sky arrays here.
+    # Apparently MARZ does not really like vacuum waves so we turn them back into air
     type = []
 
     for ii in range(nspectra):
@@ -314,7 +317,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
         intensity[ii,:]  = data[0].data
         variance[ii,:]   = data[1].data
         sky[ii,:]        = data[0].data*0.0
-	wavelength[ii,:] = data[2].data
+	wavelength[ii,:] = utl.vactoair(data[2].data)
 
     intensity[np.logical_not(np.isfinite(intensity))] = np.nan
     variance[np.logical_not(np.isfinite(variance))] = np.nan

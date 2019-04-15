@@ -1,3 +1,29 @@
+import numpy as np
+
+def airtovac(waveair):
+     
+    #save current wave
+    waveair=np.array(waveair, dtype=np.float64)
+    
+    sigma2 = (1e4/waveair)**2.	
+    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
+    fact[waveair<2000] = 1.
+    
+    return waveair*fact  
+
+def vactoair(wavevac):
+
+     #save current wave
+    wavevac=np.array(wavevac, dtype=np.float64)
+    
+    sigma2 = (1e4/wavevac)**2.	
+    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
+    fact[wavevac<2000] = 1.
+    
+    return wavevac/fact  
+
+
+
 def aligntocat(cube,catalogue):
 
     """ 
@@ -323,14 +349,8 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     
     #if set, convert to vacuum using airtovac.pro conversion
     if(tovac):
-        #save current wave
-        wavec=np.array(wavec,dtype=np.float64)
-        wave_air=wavec
-        
-        sigma2 = (1e4/wavec)**2.    
-        fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
-        wavec = wavec*fact  
-
+         wavec = airtovac(wavec)
+	  
     #tested and working
     #fl=open('test.txt','w') 
     #for rr in range(len(wavec)):
