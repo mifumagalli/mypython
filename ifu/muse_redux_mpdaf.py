@@ -264,10 +264,10 @@ def zapskysub(listob, skymask=None):
             mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=srchdu[0].header)
             for ii in range(mysky.nreg):
                 mysky.fillmask(ii)
-                srcmask=srcmsk+mysky.mask
+                srcmsk=srcmsk+mysky.mask
 	    
 	    outhdu = fits.PrimaryHDU(srcmsk)
-	    outhdu.writeto(skyfitsmask)
+	    outhdu.writeto(skyfitsmask, overwrite=True)
 	    
 	    srchdu.close()
 

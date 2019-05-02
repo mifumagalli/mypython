@@ -363,7 +363,7 @@ class Muse(object):
         ex.selfcalibrate(listob,deepwhite,refpath=refpath,nproc=nproc)
     
         #now perform sky subtraction on cubes with zap 
-        ex.zapskysub(listob, skymask)
+        ex.zapskysub(listob, skymask=skymask)
 
         #finally, coadd data
         ex.coaddcubes(listob)
