@@ -321,7 +321,7 @@ class Muse(object):
         print("All done!")
 
 
-    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',nproc=24):
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',skymask=None,nproc=24):
 
         """
 
@@ -332,6 +332,8 @@ class Muse(object):
                      otherwise the cube itself is used 
                    
         deepwhite -> the best white image available to mask sources
+        
+	skymask -> mask this region before running zap (ds9 region in image units)
 
         nproc -> number of processors 
 
@@ -361,7 +363,7 @@ class Muse(object):
         ex.selfcalibrate(listob,deepwhite,refpath=refpath,nproc=nproc)
     
         #now perform sky subtraction on cubes with zap 
-        ex.zapskysub(listob)
+        ex.zapskysub(listob, skymask)
 
         #finally, coadd data
         ex.coaddcubes(listob)

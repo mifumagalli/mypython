@@ -218,7 +218,7 @@ def coaddcubes(listob,nclip=2.5):
 
 
 
-def zapskysub(listob):
+def zapskysub(listob, skymask=None):
     
     """
 
@@ -238,7 +238,7 @@ def zapskysub(listob):
     import numpy as np
     import sep
     import zap
-    
+    from mypython.fits import pyregmask as pmk
 
     #grab top dir
     topdir=os.getcwd()
@@ -251,7 +251,29 @@ def zapskysub(listob):
 
         #use source mask already available 
         srcmask='selfcalib_mask.fits'
+        
+	if(skymask):
+            skyfitsmask = 'skysrc_mask.fits'
+	    
+	    srchdu = fits.open(srcmask)
+	    srcmsk = srchdu[0].data
+	    nx=srchdu[0].header['NAXIS1']
+            ny=srchdu[0].header['NAXIS2']
+	    
+	    #construct the sky region mask
+            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=srchdu[0].header)
+            for ii in range(mysky.nreg):
+                mysky.fillmask(ii)
+                srcmask=srcmsk+mysky.mask
+	    
+	    outhdu = fits.PrimaryHDU(srcmsk)
+	    outhdu.writeto(skyfitsmask)
+	    
+	    srchdu.close()
 
+	else:
+	    skyfitsmask=srcmask    
+	    	
         #now loop over exposures and apply self calibration
         scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
         nsci=len(scils)
@@ -271,7 +293,7 @@ def zapskysub(listob):
 
             if not os.path.isfile(cubezap):
                 print('Reconstruct cube {} with ZAP'.format(cubezap))
-                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=srcmask)
+                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=skyfitsmask)
 
                 #create white image from zap cube
                 cube=fits.open(cubezap)
@@ -496,7 +518,7 @@ def individual_resample(listob,refpath='./',nproc=24):
                    if('STD_' in ll or 'PIXTABLE_OBJECT' in ll):
                         fil,tag=ll.split(' ')
                         sofedit.write("../Basic/"+fil+" "+tag)
-                    else:
+                   else:
                         sofedit.write(ll)
 		
 		#Check existence of ABSOLUTE offset list otherwise fall back onto the relative one
