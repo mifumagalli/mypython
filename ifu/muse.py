@@ -202,7 +202,7 @@ class Muse(object):
         print('All done with cubex redux')
         
 
-    def eso_process(self):
+    def eso_process(self, combine=True):
 
         """
 
@@ -226,22 +226,24 @@ class Muse(object):
         #dumping fully reduced pixel table 
         ex.individual_skysub(listob)
         
-        #now make space as needed for final products
-        if not os.path.exists('esocombine'):
-            os.makedirs('esocombine')
+        if (combine):
+	  #now make space as needed for final products
+          if not os.path.exists('esocombine'):
+              os.makedirs('esocombine')
 
-        #change dir
-        currdir=os.getcwd()
-        os.chdir('esocombine')
-        print('Changing dir to esocombine...')
+          #change dir
+          currdir=os.getcwd()
+          os.chdir('esocombine')
+          print('Changing dir to esocombine...')
 
-        #coadd all obs after aligment 
-        ex.coaddall(listob)
+          #coadd all obs after aligment 
+          ex.coaddall(listob)
 
-        #back to original place
-        print('Back to top level...')
-        os.chdir(currdir)
-        print('All done!')
+          #back to original place
+          print('Back to top level...')
+          os.chdir(currdir)
+        
+	print('All done!')
         
 
     def line_process(self,skymode='internal',refpath='./esocombine/',skymask=None,lmin=4900,lmax=9000,

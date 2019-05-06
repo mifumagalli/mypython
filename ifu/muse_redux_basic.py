@@ -100,7 +100,6 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 print 'Found {0} {1} taken within 30 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
             else:
-                print kk
 		#pick closest
                 mintm=np.argmin(delta_time)
                 xml_info[kk]=[currentlist[mintm]]
