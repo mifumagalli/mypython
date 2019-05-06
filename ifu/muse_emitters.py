@@ -8,6 +8,7 @@ Depend on proprietary code [cubex]
 """
 
 import subprocess
+import os 
 
 def preprocess_cubes(cubeslist,zmin,zmax,xpsf=None,ypsf=None,inpath='./',outpath='./'):
 
@@ -52,3 +53,48 @@ def preprocess_cubes(cubeslist,zmin,zmax,xpsf=None,ypsf=None,inpath='./',outpath
         subprocess.call(["Cube2Im","-cube",outname])
         
         
+def run_cubex(cubeslist,varlist,zrange,cubexpar,mask=None,outdir='./'):
+
+    """
+
+    Utility that prepare the cubes for cubex extraction
+      > select range
+      > substract psf
+      > subtract background
+
+    cubeslist -> array of cubes to process [trim, and extract from [0]]
+    varlist   -> associated variance cube list
+    zrange -> min,max slice to select 
+    cubexpar -> parameter file for cubex
+    outpath -> path where cubes are written 
+    
+    """
+    
+    #make space for output if needed
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+ 
+    
+
+    #trim cubes to desired lenght
+    for cub in cubeslist:
+        subprocess.call(["CubeSel", "-InpFile", cub, "-out", outdir+cub.replace('.fits', '_sel.fits'), "-zmin", "{}".format(zrange[0]), "-zmax", "{}".format(zrange[1])])
+
+    #trim associated variance to desired lenght 
+    for var in varlist:
+        subprocess.call(["CubeSel", "-InpFile", var, "-out", outdir+var.replace('.VAR.fits', '_sel.VAR.fits'), "-zmin", "{}".format(zrange[0]), "-zmax", "{}".format(zrange[1])])
+
+        
+    #mv to new location
+    olddir=os.getcwd()
+    os.chdir(outdir)
+    
+    #no run with option of masking 
+    if(mask):
+        subprocess.call(["CubEx", cubexpar, "-InpFile", cubeslist[0].replace('.fits', '_sel.fits'), "-Catalogue", "MUDF_cubex_{}_{}.cat".format(zrange[0], zrange[1]), "-SourceMask", mask, "-var", varlist[0].replace('.VAR.fits', '_sel.VAR.fits')])
+    else:
+        subprocess.call(["CubEx", cubexpar, "-InpFile", cubeslist[0].replace('.fits', '_sel.fits'), "-Catalogue", "MUDF_cubex_{}_{}.cat".format(zrange[0], zrange[1]),"-var", varlist[0].replace('.VAR.fits', '_sel.VAR.fits')])
+     
+
+    #back to where we were
+    os.chdir(olddir)
