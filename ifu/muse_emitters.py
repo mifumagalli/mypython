@@ -33,7 +33,7 @@ def preprocess_cubes(cubeslist,zmin,zmax,xpsf=None,ypsf=None,inpath='./',outpath
     cubeslist -> array of cubes to process
     zmin -> min slice to select 
     zmax -> max slice to select
-    x,ypsf -> x,y centroid of psf to subtract [can be None]
+    x,ypsf -> x,y centroid of psf to subtract [can be None or array]
     inpath -> path where original cubes reside
     outpath -> path where cubes are written 
     
@@ -52,10 +52,15 @@ def preprocess_cubes(cubeslist,zmin,zmax,xpsf=None,ypsf=None,inpath='./',outpath
 
         #psf if desired
         inname=outname
-        if(xpsf):
-            outname="{}/{}{}".format(outpath,rootname,"_trim_psfsub.fits")
-            subprocess.call(["CubePSFSub","-cube",inname,"-out",outname,"-withvar",".false.","-x","{}".format(xpsf),"-y","{}".format(ypsf)])
-            subprocess.call(["Cube2Im","-cube",outname])
+        if(xpsf is not None):
+            xpsf=np.asarray(xpsf)
+            ypsf=np.asarray(ypsf)
+            
+            for ii in range(len(xpsf)): 
+                outname="{}/{}{}".format(outpath,rootname,"_trim_psfsub.fits")
+                subprocess.call(["CubePSFSub","-cube",inname,"-out",outname,"-withvar",".false.","-x","{}".format(xpsf[ii]),"-y","{}".format(ypsf[ii])])
+                subprocess.call(["Cube2Im","-cube",outname])
+                inname=outname
 
         #background
         inname=outname
