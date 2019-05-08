@@ -15,6 +15,7 @@ import mypython as mp
 from mypython.ifu import muse
 from mypython.ifu import muse_utils as utl
 from mypython.ifu import muse_source as msc
+from mypython.spectra import onedutils as spc
 from astropy.io import fits, ascii
 from astropy.table import Column, vstack, Table, join
 import sys    
@@ -108,38 +109,6 @@ def run_cubex(cubeslist,varlist,zrange,cubexpar,mask=None,outdir='./'):
     #back to where we were
     os.chdir(olddir)
     
-
-def lambda_vac2air(wlambda):
-    
-    """
-
-    Utility function that takes wave in vac [A} and converts it into air
-
-    wlambda -> vacuum wave in A
-
-    """
-
-    sigma2 = (1e4/wlambda)**2.    
-    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
-    
-    return wlambda/fact 
-
-
-def lambda_air2vac(wlambda):
-    
-    """
-
-    Utility function that takes wave in air [A} and converts it into vac
-
-    wlambda -> air wave in A 
-
-    """
-
-    sigma2 = (1e4/wlambda)**2.    
-    fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
-    
-    return wlambda*fact 
-
 
 def read_cubex_catalog(catname):
 
@@ -283,7 +252,7 @@ def velocityoffset(wave_air, ztarg, rest_line):
     """
 
     #go to vacuum frame for redshift measurement
-    wave_vac=lambda_air2vac(wave_air)
+    wave_vac=spc.airtovac(wave_air)
     z_vac = (wave_vac/rest_line)-1
         
     vel_offset = (z_vac-ztarg)/(1.+ztarg)*299792.458
@@ -295,7 +264,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
                        cov_poly=None,working_dir='./',fcube_median=None,fcube_odd=None,
                        fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
                        fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
-                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True):
+                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True):
     
     """
     
@@ -330,6 +299,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     SNEOcut  -> array of SN cut for even odd exposure
     fracnpix -> [optional] if set, cuts object with less than fracnpix in segmap within 5x5x5 region
     derived  -> if true, compute derived quantities (SN etc..)
+    checkimg -> if true generate image cut outs 
 
     """
 
@@ -352,15 +322,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     catalog.add_columns([ksig, ksig_odd, ksig_even, ksig_med, kcov_fac, kconfidence, kveloffset,
                          kdeltasn,kfraction,kcontinuum])
     
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    catalog=catalog[0:10]
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
-    print('DEBUG ONLY!!!!!!!!!... REMOVE FOR REAL USE!!!!!!')
+    #catalog=catalog[0:100]
     
     #Calculate covariance
     if cov_poly is None:
@@ -428,68 +390,83 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
         print("Calculating independent SNR and additional metrics")
         catalog = independent_SNR(catalog, covariance, segmap, cube, cube_var, cube_med=cube_median,cube_odd=cube_odd, cube_even=cube_even, var_med=cube_median_var,var_odd=cube_odd_var, var_even=cube_even_var,apermap=apermap,contzcat=contzcat)
         
+    #Computing and adding velocity offset
+    if(target_z is not None):
+        veloff = velocityoffset(catalog['lambda_fluxw'], target_z, rest_line)
+        catalog['veloffset'] = veloff
+
+    #Compute EOSN 
+    if(fcube_even is not None):
+        rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
+        catalog['EODeltaSN'] = rel_diff_halves
+
+        
+    #Write full catalogue with SNR and derived quantities
+    print("Writing full catalog to disk")
+    catalog.write(working_dir+catname.split(".cat")[0]+"_all_SNR.fits", format="fits", overwrite=True)
+
+    
+    #make simplest cut to catalogue to reject unwanted sources
+    select=catalog['SNR']>=np.amin(SNcut)
+    catalog=catalog[select]
     
     #loop over classes and assign
+    print("Assigning classes")
     for iclass,iSN in enumerate(SNcut):
+
         #case of SN,DeltaSN,fractpix,continnum
         if((fcube_even is not None) & (fracnpix is not None) & (fsource_img is not None)):
-            rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (rel_diff_halves<EOSNcut[icalss]) & (catalog['OveContinuum'] == False) & (catalog['BoxFraction'] > fracnpix))
+            thisclass=((catalog['SNR'] >= iSN) & (catalog['SNR_odd'] >= SNEOcut[iclass]) & (catalog['SNR_even'] >= SNEOcut[iclass]) & (catalog['EODeltaSN'] <= DeltaEOSNcut[iclass]) & (catalog['OverContinuum'] == False) & (catalog['BoxFraction'] >= fracnpix))
             catalog['confidence'][thisclass] = iclass+1
-            #case of SN,DeltaSN,fractpix
+
+        #case of SN,DeltaSN,fractpix
         elif ((fcube_even is not None) & (fracnpix is not None)):
-            rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (rel_diff_halves<EOSNcut[icalss]) & (catalog[BoxFraction] > fracnpix))
+            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog[BoxFraction] > fracnpix))
             catalog['confidence'][thisclass] = iclass+1
-            #case of SN,DeltaSN
+        
+        #case of SN,DeltaSN
         elif(fcube_even is not None):
-            rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (rel_diff_halves<EOSNcut[icalss]))
+            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]))
             catalog['confidence'][thisclass] = iclass+1
+        
+        #remaining cases
         else:
             thisclass=(catalog['SNR'] > iSN) 
             catalog['confidence'][thisclass] = iclass+1
         
         
-    #Computing and adding velocity offset
-    if(target_z):
-        veloff = velocityoffset(catalog['lambda_fluxw'], target_z, rest_line)
-        catalog['veloffset'] = veloff
-
-
     #Write full catalogue with SNR and derived quantities
-    catalog.write(working_dir+catname.split(".cat")[0]+"_SNR.fits", format="fits", overwrite=True)
+    catalog.write(working_dir+catname.split(".cat")[0]+"_select_SNR.fits", format="fits", overwrite=True)
 
-    
-    exit()
-
-
-    print("Extracting images and spectra of sources")
-    #loop over detections
+    #make space for checks
     if not os.path.isdir(working_dir+"/objs"):
-           os.mkdir(working_dir+"/objs")
+        os.mkdir(working_dir+"/objs")
 
-    for ii in range(len(catalog_ok)):
+    if(checkimg):
+        print("Extracting images of sources")
+        #loop over detections
+        
+        for ii in range(len(catalog)):
+            
+            #folder for this object
+            objid = catalog['id'][ii]
+            
+            objdir = working_dir+"/objs/id{}/".format(objid)
+            if not os.path.isdir(objdir):
+                os.mkdir(objdir)
 
-        objid = catalog_ok['id'][ii]
-        print("Running spectrum {}".format(objid))
+            #make images
+            hcubelist=[fsegmap,fcube,fcube_median,fcube_odd,fcube_even]
+            namelist=[working_dir+thc for thc in hcubelist]
+            taglist=['Image_id{}_det','Image_id{}_mean', 'Image_id{}_median', 'Image_id{}_half1', 'Image_id{}_half2']
+            
+            make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=-1)
+            make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=50)
 
-        #extract images
-        objdir = working_dir+"/objs/id{}/".format(objid)
-        if not os.path.isdir(objdir):
-            os.mkdir(objdir)
-
-
-        make_cubex_images([fsegmap,fcube,fcube_median,fcube_odd,fcube_even], fsegmap, objid, objdir, \
-                           outformat=['Image_id{}_det','Image_id{}_mean', 'Image_id{}_median', 'Image_id{}_half1', 'Image_id{}_half2'], padding=-1)
-
-        make_cubex_images([fsegmap,fcube,fcube_median,fcube_odd,fcube_even], fsegmap, objid, objdir, \
-                           outformat=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'Pstamp_id{}_half1', 'Pstamp_id{}_half2'], padding=50)
-
-
-        #Extract spectrum
-        savename = objdir+"/spectrum.fits".format(objid)
-        utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, twod=True, tovac=True, write=savename, idsource=objid)
+            #Extract spectrum
+            if(fcube_orig is not None):
+                savename = objdir+"/spectrum.fits".format(objid)
+                utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, twod=True, tovac=True, write=savename, idsource=objid)
 
 
 
