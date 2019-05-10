@@ -465,7 +465,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
             namelist=[working_dir+thc for thc in hcubelist]
             taglist=['Image_id{}_det','Image_id{}_mean', 'Image_id{}_median', 'Image_id{}_half1', 'Image_id{}_half2']
             make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=-1)
-            taglist=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'PStamp_id{}_half1', 'Pstamp_id{}_half2']
+            taglist=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'Pstamp_id{}_half1', 'Pstamp_id{}_half2']
             make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=50)
 
             #Extract spectrum
