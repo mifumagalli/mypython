@@ -312,8 +312,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     #Load cubex catalog
     catalog = read_cubex_catalog(working_dir+catname)
 
-    catalog=catalog[0:10]
-
+    
     #create space for bunch of keywords [some may not be used]
     ksig	   = Column(np.zeros(len(catalog), dtype=float), name='SNR')
     ksig_odd    = Column(np.zeros(len(catalog), dtype=float), name='SNR_odd')
