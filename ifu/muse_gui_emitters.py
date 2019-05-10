@@ -187,8 +187,8 @@ class Window(Tkinter.Tk):
         self.currentpage_w.grid(column=3,row=0)
 
         # creating a save command
-        self.firstButton_w = Tkinter.Button(self.menuframe, text="First",command=self.gotofirst).grid(row=0,column=4)
-        self.lastButton_w = Tkinter.Button(self.menuframe, text="Last",command=self.gotolast).grid(row=0,column=5)
+        self.firstButton_w = Tkinter.Button(self.menuframe, text="First",command=self.gotofirst).grid(row=0,column=5)
+        self.lastButton_w = Tkinter.Button(self.menuframe, text="Last",command=self.gotolast).grid(row=0,column=6)
 
 
         #create inspect option
