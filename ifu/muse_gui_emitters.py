@@ -106,10 +106,11 @@ class TableFix(Tkinter.Frame):
 
 class Window(Tkinter.Tk):
 
-    def __init__(self,parent,startfile=None):
+    def __init__(self,parent,startfile=None,white=None):
         
         #store file name
         self.startfile=startfile
+        self.white=white
 
         #start tk
         self.tk=Tk()
@@ -193,7 +194,6 @@ class Window(Tkinter.Tk):
 
         #create inspect option
         self.inspectButton_w = Tkinter.Button(self.menuframe, text="Inspect Current",command=self.inspect_current).grid(row=1,column=0,columnspan=2)
-
 
 
         #set header table properties
@@ -317,13 +317,23 @@ class Window(Tkinter.Tk):
         focusid=self.table_data.get(row,idid)        
         #launch displays
         try:
-            ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs','objs/id{}/Pstamp_id{}_mean.fits'.format(focusid,focusid),'-smooth'])
-        
+            #control ds9
+            rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
+            if(self.white is not None):
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+            else:
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+
+            #control spectra gui
             spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(self.table_data.get(row,idred))])
             
+            #view cube
+            ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid,focusid),'-3d','vp','90','0'])
+
             #collect processes
             self.processes.append(ds9)
             self.processes.append(spc)
+            self.processes.append(ds93d)
 
         except:
             pass
@@ -331,8 +341,6 @@ class Window(Tkinter.Tk):
 #ds9 mean_detection.Objects_Id.fits &
 
 #python $MYPYTHON/redshifts/zfit.py -i id$1/spectrum.fits -z 4.9
-
-    
 
 
     def gotofirst(self):
@@ -420,9 +428,9 @@ class Window(Tkinter.Tk):
         #write to disk 
         self.catdata.write(self.startfile,format='fits',overwrite=True)
 
-def start(startfile):
+def start(startfile,white):
 
-    app = Window(None,startfile=startfile)
+    app = Window(None,startfile=startfile,white=white)
     app.title('Emitter classifier')
     app.mainloop()
 
@@ -432,8 +440,10 @@ if __name__=="__main__":
     
     parser = argparse.ArgumentParser(description='Process input')
     parser.add_argument('ifile',default=None,help='Input file')
+    parser.add_argument('-w','--white',default=None,help='White image')
+
     args = parser.parse_args()
-    start(args.ifile)
+    start(args.ifile,args.white)
 
 
 

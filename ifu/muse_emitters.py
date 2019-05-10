@@ -312,6 +312,8 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     #Load cubex catalog
     catalog = read_cubex_catalog(working_dir+catname)
 
+    catalog=catalog[0:10]
+
     #create space for bunch of keywords [some may not be used]
     ksig	   = Column(np.zeros(len(catalog), dtype=float), name='SNR')
     ksig_odd    = Column(np.zeros(len(catalog), dtype=float), name='SNR_odd')
@@ -468,6 +470,18 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
             taglist=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'Pstamp_id{}_half1', 'Pstamp_id{}_half2']
             make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=50)
 
+            #trim segmap
+            x=int(catalog['x_geow'][ii])
+            y=int(catalog['y_geow'][ii])
+            z=int(catalog['z_geow'][ii])
+            mz,my,mx=segmap.shape
+            segmapshort=segmap[max(z-10,0):min(z+10,mz),max(y-25,0):min(y+25,my),max(x-25,0):min(x+25,mx)]
+            print(x,y,z,segmapshort.shape)
+            savename = objdir+"/segcube.fits".format(objid)
+            hdu=fits.PrimaryHDU(segmapshort)
+            hdul=fits.HDUList([hdu])
+            hdul.writeto(savename,overwrite=True)
+            
             #Extract spectrum
             if(fcube_orig is not None):
                 savename = objdir+"/spectrum.fits".format(objid)
