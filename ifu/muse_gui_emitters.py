@@ -206,7 +206,7 @@ class Window(Tkinter.Tk):
         llab.grid(column=2,row=1)
         self.sortlist = Tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','SNR','redshift','type')
+        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','SNR','confidence','redshift','type','optimal')
         self.sortlist_w.grid(column=3,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
@@ -323,24 +323,22 @@ class Window(Tkinter.Tk):
                 ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
             else:
                 ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+            #collect processes
+            self.processes.append(ds9)
+            
 
             #control spectra gui
             spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(self.table_data.get(row,idred))])
-            
+            self.processes.append(spc)
+          
+  
             #view cube
             ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid,focusid),'-3d','vp','90','0'])
-
-            #collect processes
-            self.processes.append(ds9)
-            self.processes.append(spc)
             self.processes.append(ds93d)
 
         except:
             pass
 
-#ds9 mean_detection.Objects_Id.fits &
-
-#python $MYPYTHON/redshifts/zfit.py -i id$1/spectrum.fits -z 4.9
 
 
     def gotofirst(self):
@@ -387,7 +385,10 @@ class Window(Tkinter.Tk):
         self.record_changes()
                 
         #sort table
-        self.catdata.sort(self.sortlist.get())
+        if('optimal' in self.sortlist.get()):
+            self.catdata.sort(['confidence','SNR'])
+        else:
+            self.catdata.sort(self.sortlist.get())
         
         #reset page number and update display 
         self.currentpage.set(1)
