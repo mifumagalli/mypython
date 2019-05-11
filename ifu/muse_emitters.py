@@ -299,7 +299,8 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     source_img -> [optional] if set to aperture image (and marzred set), exclude emitters projected against 
                   continuum source of known redshift
     marzred  -> [optional] redshift file for continuum sources, ala marz (see above)
-    SNcut    -> array of SN cuts on main detection, that defines classes
+    SNcut    -> array of SN cuts on main detection, that defines classes. NB classes are assigned 
+                in order of which condition they meet first.
     DeltaEOSNcut -> array of percentage change in even/odd SN allowed (if even/odd cubes provided)
     SNEOcut  -> array of SN cut for even odd exposure
     fracnpix -> [optional] if set, cuts object with less than fracnpix in segmap within 5x5x5 region
@@ -422,22 +423,22 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
 
         #case of SN,DeltaSN,fractpix,continnum
         if((fcube_even is not None) & (fracnpix is not None) & (fsource_img is not None)):
-            thisclass=((catalog['SNR'] >= iSN) & (catalog['SNR_odd'] >= SNEOcut[iclass]) & (catalog['SNR_even'] >= SNEOcut[iclass]) & (catalog['EODeltaSN'] <= DeltaEOSNcut[iclass]) & (catalog['OverContinuum'] == False) & (catalog['BoxFraction'] >= fracnpix))
+            thisclass=((catalog['SNR'] >= iSN) & (catalog['SNR_odd'] >= SNEOcut[iclass]) & (catalog['SNR_even'] >= SNEOcut[iclass]) & (catalog['EODeltaSN'] <= DeltaEOSNcut[iclass]) & (catalog['OverContinuum'] == False) & (catalog['BoxFraction'] >= fracnpix) & (catalog['confidence'] == 0))
             catalog['confidence'][thisclass] = iclass+1
 
         #case of SN,DeltaSN,fractpix
         elif ((fcube_even is not None) & (fracnpix is not None)):
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog[BoxFraction] > fracnpix))
+            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog[BoxFraction] > fracnpix) & (catalog['confidence'] == 0))
             catalog['confidence'][thisclass] = iclass+1
         
         #case of SN,DeltaSN
         elif(fcube_even is not None):
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]))
+            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog['confidence'] == 0))
             catalog['confidence'][thisclass] = iclass+1
         
         #remaining cases
         else:
-            thisclass=(catalog['SNR'] > iSN) 
+            thisclass=((catalog['SNR'] > iSN) & (catalog['confidence'] == 0)) 
             catalog['confidence'][thisclass] = iclass+1
         
         
