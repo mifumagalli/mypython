@@ -476,7 +476,6 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
             z=int(catalog['z_geow'][ii])
             mz,my,mx=segmap.shape
             segmapshort=segmap[max(z-10,0):min(z+10,mz),max(y-25,0):min(y+25,my),max(x-25,0):min(x+25,mx)]
-            print(x,y,z,segmapshort.shape)
             savename = objdir+"/segcube.fits".format(objid)
             hdu=fits.PrimaryHDU(segmapshort)
             hdul=fits.HDUList([hdu])
