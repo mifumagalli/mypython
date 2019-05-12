@@ -197,8 +197,8 @@ class Window(Tkinter.Tk):
 
 
         #set header table properties
-        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','confidence','EODeltaSN','BoxFraction','OverContinuum','redshift','type']
-        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','Confid','EODSN','BoxFrac','Continu','redshift','type']
+        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','confidence','redshift','type']
+        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','confid','redshift','type']
         self.tabncol=len(self.keycol)
 
         #create sort by option
@@ -206,7 +206,7 @@ class Window(Tkinter.Tk):
         llab.grid(column=2,row=1)
         self.sortlist = Tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','SNR','confidence','redshift','type','optimal')
+        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type')
         self.sortlist_w.grid(column=3,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
@@ -257,17 +257,20 @@ class Window(Tkinter.Tk):
         idred=self.keycol.index('redshift')
         idtype=self.keycol.index('type')
         idid=self.keycol.index('id')
+        idconf=self.keycol.index('confidence')
 
         #scan them 
         for r in range(self.rowppage):
             myid=self.table_data.get(r,idid)
             myred=self.table_data.get(r,idred)
             mytype=self.table_data.get(r,idtype)
+            myconf=self.table_data.get(r,idconf)
             #store in table by searching for id (allow for blanks)
             try:
                 cidx=np.where(self.catdata['id'] == int(myid))
                 self.catdata['redshift'][cidx]=myred
                 self.catdata['type'][cidx]=mytype
+                self.catdata['confidence'][cidx]=myconf
             except:
                 pass
 
@@ -298,6 +301,8 @@ class Window(Tkinter.Tk):
                 if('redshift' in self.keycol[c]):
                     self.table_data.unlock(r,c)
                 elif('type' in self.keycol[c]):
+                    self.table_data.unlock(r,c)
+                elif('confidence' in self.keycol[c]):
                     self.table_data.unlock(r,c)
                 else:
                     self.table_data.lock(r,c)
@@ -333,7 +338,7 @@ class Window(Tkinter.Tk):
           
   
             #view cube
-            ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid,focusid),'-3d','vp','90','0'])
+            ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
             self.processes.append(ds93d)
 
         except:
@@ -392,6 +397,7 @@ class Window(Tkinter.Tk):
         
         #reset page number and update display 
         self.currentpage.set(1)
+        self.statuspage.set("Page {}/{}".format(self.currentpage.get(),self.allpages.get()))
         self.update_tabdisplay()
         
     def reversetab(self):
@@ -401,6 +407,9 @@ class Window(Tkinter.Tk):
 
         #reverse and update
         self.catdata.reverse()
+
+        self.currentpage.set(1)
+        self.statuspage.set("Page {}/{}".format(self.currentpage.get(),self.allpages.get()))
         self.update_tabdisplay()
 
     def client_exit(self):
@@ -424,10 +433,11 @@ class Window(Tkinter.Tk):
         #record changes
         self.record_changes()
 
-        #sort again table in id 
-        self.catdata.sort('id')
+        #sort again table in id -- make copy not to interfere with current sorting 
+        tmpcopy=self.catdata.copy()
+        tmpcopy.sort('id')
         #write to disk 
-        self.catdata.write(self.startfile,format='fits',overwrite=True)
+        tmpcopy.write(self.startfile,format='fits',overwrite=True)
 
 def start(startfile,white):
 
