@@ -206,7 +206,7 @@ class Window(Tkinter.Tk):
         llab.grid(column=2,row=1)
         self.sortlist = Tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type')
+        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw')
         self.sortlist_w.grid(column=3,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
