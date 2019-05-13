@@ -265,11 +265,17 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     #if mask extract all True pixels 
     if('mask' in shape):
         if(idsource):
-            goodpix=np.nonzero(mask == idsource)
+            #create a masked cube
+            maskedcube=np.ma.masked_array(mask,mask=np.logical_not(mask == idsource))
+            maskproj=np.ma.sum(maskedcube,axis=0)
         else:
-            goodpix=np.nonzero(mask)
-        xpix=goodpix[1]
-        ypix=goodpix[2]
+            #project everything in 2D
+            maskproj=np.sum(mask,axis=0)
+
+        #find x,y pixels non zero 
+        goodpix=np.nonzero(maskproj)
+        xpix=goodpix[0]
+        ypix=goodpix[1]
     else:
         #If user defined region, grab inner pixels
         #cut region of interest according to shape
@@ -316,11 +322,11 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
         twodspec=np.zeros((nwv,npix))
         twoderr=np.zeros((nwv,npix))
 
-    #loop over all wavelength to fill in spectrum
+    #loop over all wavelengths to fill in spectrum
     for ii,ww in enumerate(wavec):
         #get the total spec in the aperture, 
         #summing over all the pixels 
-        spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])  ##this can be wrong for mask as may be summing on x,y on different z and attributing the sum to a single z slice. Need to fix this!
+        spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])
         spec_var[ii]=np.sum(vardata[ii,xpix,ypix])
         spec_med[ii]=np.median(cubdata[ii,xpix,ypix])
         
