@@ -320,7 +320,7 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     for ii,ww in enumerate(wavec):
         #get the total spec in the aperture, 
         #summing over all the pixels 
-        spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])
+        spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])  ##this can be wrong for mask as may be summing on x,y on different z and attributing the sum to a single z slice. Need to fix this!
         spec_var[ii]=np.sum(vardata[ii,xpix,ypix])
         spec_med[ii]=np.median(cubdata[ii,xpix,ypix])
         
