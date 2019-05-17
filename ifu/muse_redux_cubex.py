@@ -748,7 +748,7 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
         iname="COMBINED_IMAGE_FINAL_{}.fits".format(halfsetfinal)
         cmed="COMBINED_CUBE_MED_FINAL_{}.fits".format(halfsetfinal)
         imed="COMBINED_IMAGE_MED_FINAL_{}.fits".format(halfsetfinal)
-        expmap="COMBINED_EXPMAP_FINAL_{}.fits".format(halfset)
+        expmap="COMBINED_EXPMAP_FINAL_{}.fits".format(halfsetfinal)
         scriptname='runcombine_final_{}.sh'.format(halfsetfinal)
     else:
         cname="COMBINED_CUBE.fits"
