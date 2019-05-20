@@ -338,7 +338,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 
 def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., overwrite=False):
    
-    """
+   """
 
     Run several iterations of the mock injection and detection loop to build up a statistical
     sample of simulated objects.
@@ -361,7 +361,7 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
     overwrite -> If true append to the existing outfile instead of generating a new one.
 
-    """
+   """
 
 
    from mypython.ifu import muse_source as source
