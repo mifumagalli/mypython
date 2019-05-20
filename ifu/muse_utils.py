@@ -133,10 +133,13 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
         trim=np.where((wavec < wrange[0]) | (wavec > wrange[1]))
         mask[trim[0],:,:]=0
         
-        #set the trasmission T=1 for white/tophat image masking 5 pixel at edges
-        trans=np.zeros(len(wavec))+1
+        #set the trasmission T=1 for white/tophat image masking 5 pixel at edges, also mask
+        #channels made only of nans (laser notch filter for AO data)
+        trans=np.ones_like(wavec)
         trans[0:5]=0
         trans[-5:]=0
+        emptychan = np.all(np.logical_not(np.isfinite(cubdata)), axis=(1,2))
+        trans[emptychan]=0
 
         #set zeropoint 
         #now compute the zero point of the image

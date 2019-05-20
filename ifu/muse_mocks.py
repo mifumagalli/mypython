@@ -26,7 +26,6 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     from astropy.io import fits 
     import os
     import numpy as np
-    import matplotlib.pyplot as plt
     from astropy import units as u
     from scipy.ndimage import filters
     
@@ -188,12 +187,15 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 
 
     image -> a MUSE image [filename] to use for mock 
+    segmap -> Segmentation map of the input image
     fluxlimits -> mock sources will be drawn in range [min,max] in units of 
                   image [default 1e-20] if ZP is -1, in mag units otherwise
+    
+    badmask -> (Optional) injection will not happen on masked pixels (1)
     ZP -> Zero point for magnitude to flux conversion, if -1 do the mock in flux
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
     spatwidth -> spatial FWHM for Gaussian model in pixel
-    outprefix -> prefix for output  
+    outprefix -> prefix for temporary output files  
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
     exp -> use an exponential profile in x,y. If false, use point sources
     expscale -> exponential scale lenght in pixels, this is convolved with the Gaussian FWHM (seeing)
@@ -203,7 +205,6 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     from astropy.io import fits 
     from astropy.convolution import convolve, Gaussian2DKernel
     import numpy as np
-    import matplotlib.pyplot as plt
     import os
     
     #open the image 
@@ -335,23 +336,49 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     return
 
 
-def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10.):
-
-
-   #inima = '../Image_white.fits'
-   #invar = '../Image_white_rmsvar.fits'
-   #insegmap = '../segmap_forsims.fits'
-   #badmask  = '../Sex_reg10exp_rmsvar/badmask.fits'
-   #expmap = '../../v18final_cubexcombine/COMBINED_IMAGE_EXPMAP_FINAL.fits'
-      
-   #Whiteima effective wave = 7032A with laser notch
-   ZP = 28.35665
-
-   #Read expmap
-   hduexp = fits.open(expmap)
-   expima = hduexp[0].data
+def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., overwrite=False):
    
-   hduima = fits.open(inima)
+    """
+
+    Run several iterations of the mock injection and detection loop to build up a statistical
+    sample of simulated objects.
+
+    iters -> Number of injection/detection iterations to run
+    outfile -> Name of the output file
+    image -> a MUSE image [filename] to use for mock, must have ZPAB keyword in header
+    varima - > variance image for detection thresholding
+    segmap -> Segmentation map of the input image
+    
+    badmask -> (Optional) injection will not happen on masked pixels (1)
+    expmap -> (Optional) if supplied, the final catalogue will report the value of the expmap at
+              the position of the injected source
+    magrange -> mock sources will be drawn in range [min,max] in AB mag units
+    SNRdet -> SNR for detection
+    FWHM_pix -> spatial FWHM for Gaussian model in pixel
+    EXP_scale -> exponential scale lenght in pixels, this is convolved with the Gaussian FWHM (seeing)
+    exp -> use an exponential profile in x,y. If false, use point sources
+    num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
+    fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+    overwrite -> If true append to the existing outfile instead of generating a new one.
+
+    """
+
+
+   from mypython.ifu import muse_source as source
+   from astropy.io import fits, ascii
+   from astropy.table import Table
+   import numpy as np
+   import os
+
+   hduima = fits.open(image)
+   ZP = hduima[0].header['ZPAB']
+   
+   #Read expmap
+   if expmap:
+    hduexp = fits.open(expmap)
+    expima = hduexp[0].data
+   else:
+    expima = np.ones_like(hduima[0].data)
 
    mockxc   = []
    mockyc   = []
@@ -363,29 +390,38 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
    sexyc    = []
    sexflux  = []
    sexmag   = []
-
+   
+   if not overwrite:
+      with open(outfile, mode='w') as f:
+        f.write('#mockxc mockyc mockexp mockflux mockmag sexdet sexxc sexyc sexflux sexmag \n')
+   
+   #Define more filenames
+   cmocks_injcat = 'cmocks_{}_catalogue.txt'.format(os.path.basename(image).split('.fits')[0])
+   cmocks_image  = 'cmocks_{}'.format(os.path.basename(image))
+   cmocks_segmap = 'cmocks_{}'.format(os.path.basename(segmap))
+      
    for repeat in range(iters):
    	 
    	 print("Iteration {}".format(repeat))
    	 
    	 #Inject sources and read master catalogue
-   	 source.mockcont(inima, insegmap, magrange, badmask=badmask, num=num, ZP=ZP, spatwidth=FWHM_pix, fill=fill, exp=exp, expscale=EXP_scale)
-   	 tmpmock = ascii.read('cmocks_{}_catalogue.txt'.format(os.path.basename(inima).split('.fits')[0]))
+   	 mockcont(image, segmap, magrange, badmask=badmask, num=num, ZP=ZP, spatwidth=FWHM_pix, fill=fill, exp=exp, expscale=EXP_scale)
+   	 tmpmock = ascii.read(cmocks_injcat, names=['Xpos', 'Ypos', 'Flux'])
    	 
    	 #Run sextractor
-   	 source.findsources('cmocks_{}'.format(os.path.basename(inima)), inima, nsig=3., fitsmask=badmask, varima=invar)
+   	 source.findsources(cmocks_image, image, nsig=SNRdet, fitsmask=badmask, varima=varima)
    	 sexcat = fits.open('catalogue.fits')[1].data
    	 
    	 for mockob in range(len(tmpmock)):
    	   
-   	   thisxc = tmpmock['col1'][mockob]
-   	   thisyc = tmpmock['col2'][mockob]
+   	   thisxc = tmpmock['Xpos'][mockob]
+   	   thisyc = tmpmock['Ypos'][mockob]
    	   
    	   mockxc.append(thisxc)
    	   mockyc.append(thisyc)
-   	   mockflux.append(tmpmock['col3'][mockob])
+   	   mockflux.append(tmpmock['Flux'][mockob])
+	   mockmag.append(-2.5*np.log10(tmpmock['Flux'][mockob])+ZP)
    	   mockexp.append(expima[int(thisyc), int(thisxc)])
-	   mockmag.append(-2.5*np.log10(tmpmock['col3'][mockob])+ZP)
    	   
    	   distarray = np.sqrt((sexcat.x-thisxc)**2+(sexcat.y-thisyc)**2)
    		   
@@ -423,10 +459,61 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
 	      sexflux  = []
   	      sexmag   = [] 
  
+   os.remove('catalogue.fits')
+   os.remove(cmocks_image)
+   os.remove(cmocks_injcat)
+   os.remove(cmocks_segmap)
 
 
+def analyse_mockcont(infile, exprange=None, nbins=250, complfrac=0.9):
+  
+  from astropy.io import fits, ascii
+  import numpy as np
+  
+  """
 
+    Analyse the mock table and return the detection fraction histogram in 
+    nbins.
 
+    infile -> Mock table
+    exprange -> (Optional) Limit the analysis to the sources injected where
+    the expmap is (min,max) exposures
+    nbins -> Number of bins for the histogram
+    complfrac -> fraction of detected sources that defines the magnitude limit
     
+  """
+  data = ascii.read(infile)
+  
+  mockxc   = data['mockxc']
+  mockyc   = data['mockyc']   
+  mockflux = data['mockflux']
+  mockexp  = data['mockexp'] 
+  sexdet   = data['sexdet']   
+  sexxc    = data['sexxc']     
+  sexyc    = data['sexyc']     
+  sexflux  = data['sexflux']  
+  mockmag  = data['mockmag']
+  sexmag   = data['sexmag'] 
+  
+  detected = (sexdet==1)
+
+  if exprange==None:
+     exprange = (np.min(mockexp),np.max(mockexp))
+  
+  okexp = (mockexp>exprange[0]) & (mockexp<=exprange[1])
+ 
+  bin_edges_mag = np.linspace(np.min(mockmag),np.max(mockmag), nbins)
+  bin_cent_mag  = (bin_edges_mag[1:]+bin_edges_mag[:-1])/2.
+  
+  hist_all_mag, bin_dummy = np.histogram(mockmag[okexp], bins=bin_edges_mag)
+  hist_det_mag, bin_dummy = np.histogram(mockmag[(detected) & (okexp)], bins=bin_edges_mag)
+
+  det_frac_mag = 1.*hist_det_mag/hist_all_mag
+
+  #Find first time from the left that the poly goes above 0.9
+  maglim = bin_cent_mag[np.argmin(det_frac_mag>complfrac)]
+  
+  return det_frac_mag, bin_edges_mag, maglim
+  
 
     
