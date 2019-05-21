@@ -182,7 +182,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 
     """
 
-    Inject mock line emission in a image using a flat distribution between fluxlimits
+    Inject mock continuum emission in a image using a flat distribution between fluxlimits
     and a three dimensional Gaussian with x/y FWHM = spatwidth and lambda FWHM = wavewidth
 
 
@@ -336,7 +336,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     return
 
 
-def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., overwrite=False):
+def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., minarea=10.,overwrite=False):
    
    """
 
@@ -359,6 +359,7 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
     exp -> use an exponential profile in x,y. If false, use point sources
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
+    minarea -> minimum area for detection
     overwrite -> If true append to the existing outfile instead of generating a new one.
 
    """
@@ -409,7 +410,7 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
    	 tmpmock = ascii.read(cmocks_injcat, names=['Xpos', 'Ypos', 'Flux'])
    	 
    	 #Run sextractor
-   	 source.findsources(cmocks_image, image, nsig=SNRdet, fitsmask=badmask, varima=varima)
+   	 source.findsources(cmocks_image, image, nsig=SNRdet, fitsmask=badmask, varima=varima, minarea=minarea)
    	 sexcat = fits.open('catalogue.fits')[1].data
    	 
    	 for mockob in range(len(tmpmock)):
