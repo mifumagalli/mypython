@@ -336,7 +336,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     return
 
 
-def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., minarea=10.,overwrite=False):
+def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., minarea=10.,append=False):
    
    """
 
@@ -360,7 +360,7 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
     num -> number of mock sources [high numbers give better statistics but can lead to shadowing]
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
     minarea -> minimum area for detection
-    overwrite -> If true append to the existing outfile instead of generating a new one.
+    append -> If true append to the existing outfile instead of generating a new one.
 
    """
 
@@ -392,7 +392,7 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
    sexflux  = []
    sexmag   = []
    
-   if not overwrite:
+   if not append:
       with open(outfile, mode='w') as f:
         f.write('#mockxc mockyc mockexp mockflux mockmag sexdet sexxc sexyc sexflux sexmag \n')
    
