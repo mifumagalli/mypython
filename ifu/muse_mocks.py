@@ -470,6 +470,7 @@ def analyse_mockcont(infile, exprange=None, nbins=250, complfrac=0.9):
   
   from astropy.io import fits, ascii
   import numpy as np
+  import datetime
   
   """
 
@@ -483,7 +484,10 @@ def analyse_mockcont(infile, exprange=None, nbins=250, complfrac=0.9):
     complfrac -> fraction of detected sources that defines the magnitude limit
     
   """
-  data = ascii.read(infile)
+  
+  #Format fast_basic + supplying column names is 2x faster but the first line of valid
+  #data is lost
+  data = ascii.read(infile, format='fast_commented_header')
   
   mockxc   = data['mockxc']
   mockyc   = data['mockyc']   
