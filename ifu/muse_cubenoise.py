@@ -141,7 +141,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
         p.join()
     
     #reconstruct variance array 
-    allvar=np.zeros((nw,nx,ny))
+    allvar=np.zeros((nw,nx,ny), dtype=np.float32)
     for iproc in range(nproc):
         thisproc=np.load("boostrapvar_tmpout_proc{}.npz".format(iproc))
         allvar[thisproc['wstart']:thisproc['wend']+1,:,:]=thisproc['newvar']
