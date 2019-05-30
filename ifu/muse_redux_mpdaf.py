@@ -218,7 +218,7 @@ def coaddcubes(listob,nclip=2.5):
 
 
 
-def zapskysub(listob, skymask=None):
+def zapskysub(listob, extmask=None, extmaskonly=False):
     
     """
 
@@ -249,30 +249,41 @@ def zapskysub(listob, skymask=None):
         #change dir
         os.chdir(ob+'/Proc/MPDAF')
 
-        #use source mask already available 
+        #use source mask already available (should we assume it is always available?)
         srcmask='selfcalib_mask.fits'
         
-	if(skymask):
-            skyfitsmask = 'skysrc_mask.fits'
+	if(extmask):
+            extfitsmask = 'ext_mask.fits'
 	    
 	    srchdu = fits.open(srcmask)
-	    srcmsk = srchdu[0].data
+            srcmsk = srchdu[0].data
+	    extmsk = np.zeros_like(srcmsk)
 	    nx=srchdu[0].header['NAXIS1']
             ny=srchdu[0].header['NAXIS2']
 	    
 	    #construct the sky region mask
-            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=srchdu[0].header)
+            mysky=pmk.PyMask(nx,ny,"../../../"+extmask,header=srchdu[0].header)
             for ii in range(mysky.nreg):
                 mysky.fillmask(ii)
-                srcmsk=srcmsk+mysky.mask
+                extmsk=extmsk+mysky.mask
 	    
-	    outhdu = fits.PrimaryHDU(srcmsk)
-	    outhdu.writeto(skyfitsmask, overwrite=True)
+	    outhdu = fits.PrimaryHDU(extmsk)
+	    outhdu.writeto(extfitsmask, overwrite=True)
 	    
 	    srchdu.close()
 
-	else:
-	    skyfitsmask=srcmask    
+	if(extmask and extmaskonly):
+	    namecombmask = 'extsrc_mask.fits'
+	    
+	    finalmsk = extmsk+srcmsk
+            finalmsk[finalmsk>0] = 1
+	    outhdu = fits.PrimaryHDU(finalmsk)
+	    outhdu.writeto(namecombmask, overwrite=True) 
+	    finalmask = namecombmask
+	elif(extmask and not extmaskonly):
+            finalmask = extfitsmask
+        else:
+	    finalmask=srcmask    
 	    	
         #now loop over exposures and apply self calibration
         scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
@@ -293,7 +304,7 @@ def zapskysub(listob, skymask=None):
 
             if not os.path.isfile(cubezap):
                 print('Reconstruct cube {} with ZAP'.format(cubezap))
-                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=skyfitsmask)
+                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=finalmask)
 
                 #create white image from zap cube
                 cube=fits.open(cubezap)
@@ -322,7 +333,7 @@ def zapskysub(listob, skymask=None):
         os.chdir(topdir)
 
 
-def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,skymask=None,extmaskonly=False):
+def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,extmask=None,extmaskonly=False):
     
     """
 
@@ -332,8 +343,8 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,skymask=None,ex
     deepwhite -> the best white image available to mask sources
     refpath -> where to find a white image to be used as reference wcs grid
     nproc -> number of processors
-    skymask -> ds9 region file in image coordinates defining the regions to be masked
-    extmaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
+    extmask -> ds9 region file in image coordinates defining the regions to be masked
+    extmaskonly -> if true ose only the mask supplied externally, if false merge sextractor and extmasks
 
     """
     import os
@@ -345,7 +356,8 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,skymask=None,ex
     import numpy as np
     import sep
     from mpdaf.drs import PixTable
-
+    from mypython.fits import pyregmask as pmk
+    
     #grab top dir
     topdir=os.getcwd()
 
@@ -386,35 +398,40 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,skymask=None,ex
             hdu=fits.PrimaryHDU(segmap,header=datheader)
             hdu.writeto(srcmask,overwrite=True)
 
-	if(skymask):
-            skyfitsmask = 'skyext_mask.fits'
+	if(extmask):
+            extfitsmask = 'ext_mask.fits'
 	    
 	    #Read geometry from automatic mask
 	    srchdu = fits.open(srcmask)
-	    skymsk = np.zeros_like(srchdu[0].data)
-	    nx=srchdu[0].header['NAXIS1']
-            ny=srchdu[0].header['NAXIS2']
+            srchead = srchdu[0].header
+            srcmsk = srchdu[0].data
+	    extmsk = np.zeros_like(srcmsk)
+	    nx=srchead['NAXIS1']
+            ny=srchead['NAXIS2']
 	    
 	    #construct the sky region mask
-            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=srchdu[0].header)
+            mysky=pmk.PyMask(nx,ny,"../../../"+extmask,header=srchdu[0].header)
             for ii in range(mysky.nreg):
                 mysky.fillmask(ii)
-                skymsk=skymsk+mysky.mask
+                extmsk=extmsk+mysky.mask
 	    
-	    outhdu = fits.PrimaryHDU(skymsk)
-	    outhdu.writeto(skyfitsmask, overwrite=True)
+	    outhdu = fits.PrimaryHDU(extmsk, header=srchead)
+	    outhdu.writeto(extfitsmask, overwrite=True)
 	    
 	    srchdu.close()
 
 	
-	if(skymask and extmaskonly):
-	    namecombmask = 'skysrc_mask.fits'
+	if(extmask and not extmaskonly):
+            namecombmask = 'extsrc_mask.fits'
 	    
-	    finalmsk = skymsk+segmap
-	    outhdu = fits.PrimaryHDU(finalmsk)
+	    finalmsk = extmsk+srcmsk
+            finalmsk[finalmsk>0] = 1
+	    outhdu = fits.PrimaryHDU(finalmsk, header=srchead)
 	    outhdu.writeto(namecombmask, overwrite=True) 
 	    finalmask = namecombmask
-	else:
+	elif(extmask and extmaskonly):
+            finalmask = extfitsmask
+        else:
 	    finalmask=srcmask    
 
         #now loop over exposures and apply self calibration

@@ -323,7 +323,7 @@ class Muse(object):
         print("All done!")
 
 
-    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',skymask=None,skymaskonly=False,nproc=24):
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',extmask=None,extmaskonly=False,nproc=24):
 
         """
 
@@ -337,7 +337,7 @@ class Muse(object):
         
 	skymask -> mask this region in the mpdaf reduction (selfcalibrate and zap) Format: ds9 region in image units
 	
-	skymaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
+	extmaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
 
         nproc -> number of processors 
 
@@ -364,10 +364,10 @@ class Muse(object):
         ex.individual_resample(listob,refpath=refpath)
         
         #now perform self-calibration on pixel table 
-        ex.selfcalibrate(listob,deepwhite,refpath=refpath,nproc=nproc)
+        ex.selfcalibrate(listob,deepwhite,refpath=refpath,extmask=extmask,extmaskonly=extmaskonly,nproc=nproc)
     
         #now perform sky subtraction on cubes with zap 
-        ex.zapskysub(listob, skymask=skymask)
+        ex.zapskysub(listob, extmask=extmask, extmaskonly=extmaskonly)
 
         #finally, coadd data
         ex.coaddcubes(listob)
