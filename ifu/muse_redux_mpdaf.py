@@ -322,7 +322,7 @@ def zapskysub(listob, skymask=None):
         os.chdir(topdir)
 
 
-def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
+def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24,skymask=None,extmaskonly=False):
     
     """
 
@@ -332,6 +332,8 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
     deepwhite -> the best white image available to mask sources
     refpath -> where to find a white image to be used as reference wcs grid
     nproc -> number of processors
+    skymask -> ds9 region file in image coordinates defining the regions to be masked
+    extmaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
 
     """
     import os
@@ -358,6 +360,7 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
 
         #make source mask 
         srcmask='selfcalib_mask.fits'
+	
         if(os.path.isfile(srcmask)):
             print("Source mask already exists!")
         else:
@@ -365,10 +368,6 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
   
             #open the ifu mask to create a good mask 
             deepdata=fits.open("../../../"+deepwhite)
-
-            ##define geometry 
-            #nx=deepdata[0].header["NAXIS1"]
-            #ny=deepdata[0].header["NAXIS2"]
 
             #now flag the sources (allow cubex/eso images)
             try:
@@ -387,6 +386,36 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
             hdu=fits.PrimaryHDU(segmap,header=datheader)
             hdu.writeto(srcmask,overwrite=True)
 
+	if(skymask):
+            skyfitsmask = 'skyext_mask.fits'
+	    
+	    #Read geometry from automatic mask
+	    srchdu = fits.open(srcmask)
+	    skymsk = np.zeros_like(srchdu[0].data)
+	    nx=srchdu[0].header['NAXIS1']
+            ny=srchdu[0].header['NAXIS2']
+	    
+	    #construct the sky region mask
+            mysky=pmk.PyMask(nx,ny,"../../"+skymask,header=srchdu[0].header)
+            for ii in range(mysky.nreg):
+                mysky.fillmask(ii)
+                skymsk=skymsk+mysky.mask
+	    
+	    outhdu = fits.PrimaryHDU(skymsk)
+	    outhdu.writeto(skyfitsmask, overwrite=True)
+	    
+	    srchdu.close()
+
+	
+	if(skymask and extmaskonly):
+	    namecombmask = 'skysrc_mask.fits'
+	    
+	    finalmsk = skymsk+segmap
+	    outhdu = fits.PrimaryHDU(finalmsk)
+	    outhdu.writeto(namecombmask, overwrite=True) 
+	    finalmask = namecombmask
+	else:
+	    finalmask=srcmask    
 
         #now loop over exposures and apply self calibration
         scils=glob.glob("../Basic/OBJECT_RED_0*.fits*")
@@ -403,7 +432,7 @@ def selfcalibrate(listob,deepwhite,refpath='esocombine',nproc=24):
                 pix=PixTable("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(exp+1))
                 
                 #create mask
-                maskpix=pix.mask_column(srcmask)
+                maskpix=pix.mask_column(finalmask)
                 maskpix.write("PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}_mask.fits".format(exp+1))
                 #selfcalibrate
                 autocalib=pix.selfcalibrate(pixmask=maskpix)

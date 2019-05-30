@@ -323,7 +323,7 @@ class Muse(object):
         print("All done!")
 
 
-    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',skymask=None,nproc=24):
+    def mpdaf_process(self,refpath='./esocombine/',deepwhite='./esocombine/IMAGE_FOV_0001.fits',skymask=None,skymaskonly=False,nproc=24):
 
         """
 
@@ -335,7 +335,9 @@ class Muse(object):
                    
         deepwhite -> the best white image available to mask sources
         
-	skymask -> mask this region before running zap (ds9 region in image units)
+	skymask -> mask this region in the mpdaf reduction (selfcalibrate and zap) Format: ds9 region in image units
+	
+	skymaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
 
         nproc -> number of processors 
 
