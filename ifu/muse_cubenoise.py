@@ -4,13 +4,24 @@ from astropy.io import fits
 import sep
 from scipy import ndimage
 from scipy import signal
+from scipy import stats
 from scipy import interpolate as inter
 import multiprocessing as mp
 import os, sys
 import glob
-import datetime
 
-def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median):
+def run_standard(fluxpix, nsamp, npix):
+     rindex=np.random.randint(npix,size=(nsamp,npix))
+     return evalvar(evalcent(fluxpix[rindex],axis=1))
+
+def run_clipping(fluxpix, nsamp, npix):
+     rindex=np.random.randint(npix,size=(nsamp,npix))
+     dummy, low, high = stats.sigmaclip(fluxpix, low=5, high=5)
+     data = fluxpix[rindex]
+     data[(data>low) & (data<high)] = np.nan
+     return evalvar(evalcent(data, axis=1))
+
+def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip):
     
     """
     Utility function that evaluates boostrap noise
@@ -51,6 +62,11 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     except:
       from numpy import var as evalvar
     
+    if(sigclip):
+       run_boot = run_clipping
+    else:
+       run_boot = run_standard   
+    
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
@@ -67,9 +83,8 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
 
                 #bootstrap
                 if(npix > 1):
-                    #bootstrap
-                    rindex=np.random.randint(npix,size=(nsamp,npix))
-                    newvar[ww-wstart,xx,yy]=evalvar(evalcent(fluxpix[rindex],axis=1))
+                    #run bootstrap
+                    newvar[ww-wstart,xx,yy]=run_boot(fluxpix,nsamp,npix)
                 else:
                     newvar[ww-wstart,xx,yy]=np.nan
                     
@@ -78,7 +93,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     print("Proc {}: Done!".format(iproc))
 
 
-def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50,median=False):
+def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50,median=False,sigclip=False):
 
     """
     
@@ -127,7 +142,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
         wend=np.minimum(wend,nw-1)
         print('Proc {}: Start slice {} End slice {}'.format(iproc,wstart,wend))
         p=mp.Process(target=evaluatenoise,args=(iproc,wstart,wend,nx,ny,nexp,
-                                                nsamp,allexposures,allmasks,masks,median))
+                                                nsamp,allexposures,allmasks,masks,median,sigclip))
         processes.append(p)
         p.start()
         
