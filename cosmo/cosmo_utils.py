@@ -28,6 +28,8 @@ class Cosmocal:
 
         if('Planck13' in basic):
             from astropy.cosmology import Planck13 as apcosmo
+        elif('Planck15' in basic):
+            from astropy.cosmology import Planck15 as apcosmo
         elif('WMAP5' in basic):
             from astropy.cosmology import WMAP5 as apcosmo
         elif('WMAP7' in basic):
