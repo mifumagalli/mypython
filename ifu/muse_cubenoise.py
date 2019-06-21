@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits 
 import sep
+import datetime
 from scipy import ndimage
 from scipy import signal
 from scipy import stats
@@ -9,17 +10,6 @@ from scipy import interpolate as inter
 import multiprocessing as mp
 import os, sys
 import glob
-
-def run_standard(fluxpix, nsamp, npix):
-     rindex=np.random.randint(npix,size=(nsamp,npix))
-     return evalvar(evalcent(fluxpix[rindex],axis=1))
-
-def run_clipping(fluxpix, nsamp, npix):
-     rindex=np.random.randint(npix,size=(nsamp,npix))
-     dummy, low, high = stats.sigmaclip(fluxpix, low=5, high=5)
-     data = fluxpix[rindex]
-     data[(data>low) & (data<high)] = np.nan
-     return evalvar(evalcent(data, axis=1))
 
 def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip):
     
@@ -61,12 +51,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
       from bottleneck import nanvar as evalvar
     except:
       from numpy import var as evalvar
-    
-    if(sigclip):
-       run_boot = run_clipping
-    else:
-       run_boot = run_standard   
-    
+        
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
@@ -80,11 +65,17 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
                 fluxpix=dataexp[:,ww-wstart,xx,yy]
                 fluxpix=fluxpix[np.isfinite(fluxpix)]
 		npix=len(fluxpix)
-
+                
+                if(sigclip) and (npix>4):
+                   dummy, low, high = stats.sigmaclip(fluxpix, low=3, high=3)
+                   fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
+                   npix=len(fluxpix)
+                
                 #bootstrap
                 if(npix > 1):
                     #run bootstrap
-                    newvar[ww-wstart,xx,yy]=run_boot(fluxpix,nsamp,npix)
+                    rindex=np.random.randint(npix,size=(nsamp,npix))
+                    newvar[ww-wstart,xx,yy]=evalvar(evalcent(fluxpix[rindex], axis=1))
                 else:
                     newvar[ww-wstart,xx,yy]=np.nan
                     
