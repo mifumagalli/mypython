@@ -11,7 +11,40 @@ import multiprocessing as mp
 import os, sys
 import glob
 
-def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,sigma_lo=3,sigma_up=3):
+def sigclip_cubex(array, sigma_lower=3, sigma_upper=3, maxiters=1000, minnum=3, cenfunc=None, stdfunc=None, return_bounds=False):
+    
+    '''
+    Function that replicates the sigma clipping scheme used in CubEx
+    Written for speed, no checks are done on the consistency of the inputs
+    
+    Returns clipped array (outliers removed), if return_bounds is True returns also the lower and upper bounds.
+    
+    '''
+    
+    npoints = len(array)
+    niter   = 0
+    stopit  = 0
+    
+    if cenfunc==None:
+       from numpy import nanmedian as cenfunc
+    if stdfunc==None:
+       from numpy import nanstd as stdfunc   
+    
+    while(niter<maxiters and npoints>minnum and stopit==0):
+       bounds = cenfunc(array)+np.array((-1*sigma_lower,sigma_upper))*stdfunc(array)
+       array = array[(array>bounds[0]) & (array<bounds[1])]
+       if len(array)<npoints:
+          npoints=len(array)
+	  niter += 1
+       else:
+          stopit = 1	  
+    
+    if return_bounds:
+      return array, bounds[0], bounds[1]     
+    else:
+      return array
+
+def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,sigma_lo=3,sigma_up=3,maxiters=5,minnum=4):
     
     """
     Utility function that evaluates boostrap noise
@@ -51,6 +84,17 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
       from bottleneck import nanvar as evalvar
     except:
       from numpy import var as evalvar
+    
+    if(sigclip):
+        try:
+          from bottleneck import nanstd as clipstd
+        except:
+          from numpy import std as clipstd
+        try:
+	  from bottleneck import nanmedian as clipmedian 
+	except:
+	  from numpy import median as clipmedian
+    
         
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
@@ -67,9 +111,10 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
 		npix=len(fluxpix)
                 
                 if(sigclip) and (npix>4):
-                   dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
-                   fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
-                   npix=len(fluxpix)
+                   #dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
+                   #fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
+                   fluxpix = sigclip_cubex(fluxpix, sigma_lower=sigma_lo, sigma_upper=sigma_up, maxiters=maxiters, minnum=minnum, cenfunc=clipmedian, stdfunc=clipstd)
+		   npix=len(fluxpix)
                 
                 #bootstrap
                 if(npix > 1):
