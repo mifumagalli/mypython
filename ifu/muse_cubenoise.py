@@ -11,7 +11,7 @@ import multiprocessing as mp
 import os, sys
 import glob
 
-def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip):
+def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,sigma_lo=3,sigma_up=3):
     
     """
     Utility function that evaluates boostrap noise
@@ -67,7 +67,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
 		npix=len(fluxpix)
                 
                 if(sigclip) and (npix>4):
-                   dummy, low, high = stats.sigmaclip(fluxpix, low=3, high=3)
+                   dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
                    fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
                    npix=len(fluxpix)
                 
