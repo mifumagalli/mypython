@@ -210,7 +210,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     print('All done at {}'.format(datetime.datetime.now()))
 
 
-def applybootnoise(cube, bootcube, outcube, varscale=1.)
+def applybootnoise(cube, bootcube, outcube, varscale=1.):
     
     """
     
@@ -235,7 +235,7 @@ def applybootnoise(cube, bootcube, outcube, varscale=1.)
        data[2].data *= varscale
        
     data.writeto(outcube, overwrite=True)   
-    
+    print('All data saved!')
 
 def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
     
