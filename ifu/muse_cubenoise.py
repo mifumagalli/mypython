@@ -17,7 +17,8 @@ def sigclip_cubex(array, sigma_lower=3, sigma_upper=3, maxiters=1000, minnum=3, 
     Function that replicates the sigma clipping scheme used in CubEx
     Written for speed, no checks are done on the consistency of the inputs
     
-    Returns clipped array (outliers removed), if return_bounds is True returns also the lower and upper bounds.
+    Returns clipped array (outliers removed), if return_bounds is True returns 
+    also the lower and upper bounds.
     
     '''
     
@@ -134,7 +135,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     """
     
     Take a list of exposures and estimate variance with boostrap
-    at pixel level
+    at pixel level. Generates an output bootstrap cube.
 
     cubes -> list of input cubes
     masks -> list of associated masks
@@ -208,6 +209,33 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
 
     print('All done at {}'.format(datetime.datetime.now()))
 
+
+def applybootnoise(cube, bootcube, outcube, varscale=1.)
+    
+    """
+    
+    Get and input cube (.e.g from cubex pipeline) and a bootstrap
+    pre-computed variance cube to place as the new variance in the
+    input cube. An additional global scaling factor to the variance 
+    can be applied.
+    
+    cube -> the datacube including pipeline variance
+    bootcube -> the variance datacube from bootstrap resampling
+    outcube -> name of the output cube
+    varscale -> multiplicative factor to rescale variance before saving
+    
+    """
+    #open the data
+    data=fits.open(cube)
+    boot= fits.open(bootcube)
+    
+    data[2].data = boot[0].data
+    
+    if varscale != 1:
+       data[2].data *= varscale
+       
+    data.writeto(outcube, overwrite=True)   
+    
 
 def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
     
