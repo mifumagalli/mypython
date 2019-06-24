@@ -73,13 +73,22 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     if(median): 
         try:
 	  from bottleneck import nanmedian as evalcent 
+	  if iproc ==0:
+	     print("Proc 0: Using bottleneck for statistical functions")
 	except:
 	  from numpy import median as evalcent
+	  if iproc ==0:
+	     print("Proc 0: Using numpy for statistical functions")
     else:
         try:
 	  from bottleneck import nanmean as evalcent
+	  if iproc ==0:
+	     print("Proc 0: Using bottleneck for statistical functions")
 	except:
 	  from numpy import mean as evalcent
+	  if iproc ==0:
+	     print("Proc 0: Using numpy for statistical functions")
+	  
     
     try:
       from bottleneck import nanvar as evalvar
@@ -95,7 +104,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
 	  from bottleneck import nanmedian as clipmedian 
 	except:
 	  from numpy import median as clipmedian
-    
+     
         
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
