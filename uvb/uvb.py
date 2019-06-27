@@ -70,7 +70,7 @@ class UVB:
 
         #store
         self.wave=wavelength #AA
-        self.juvb=juvb #erg cm−2 s−1 Hz−1 sr−1
+        self.juvb=juvb #erg cm-2 s-1 Hz-1 sr-1
 
     def jintegral(self,minwave,maxwave):
 
@@ -82,8 +82,8 @@ class UVB:
 
         #from wave to freq
         clight=2.99792458e10
-        freq=np.flip(clight/(self.wave*1e-8)) # go to Hz
-        jnuflip=np.flip(self.juvb)
+        freq=np.flipud(clight/(self.wave*1e-8)) # go to Hz
+        jnuflip=np.flipud(self.juvb)
         minnu=clight/(maxwave*1e-8)
         maxnu=clight/(minwave*1e-8)
 
@@ -103,8 +103,8 @@ class UVB:
         #from wave to freq
         clight=2.99792458e10
         hplank=6.6260755e-27
-        freq=np.flip(clight/(self.wave*1e-8)) # go to Hz
-        jnuflip=np.flip(self.juvb)/(hplank*freq)
+        freq=np.flipud(clight/(self.wave*1e-8)) # go to Hz
+        jnuflip=np.flipud(self.juvb)/(hplank*freq)
         minnu=clight/(maxwave*1e-8)
         maxnu=clight/(minwave*1e-8)
 
