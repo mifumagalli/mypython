@@ -119,7 +119,7 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
                 fluxpix=dataexp[:,ww-wstart,xx,yy]
                 fluxpix=fluxpix[np.isfinite(fluxpix)]
 		npix=len(fluxpix)
-                
+                #print(ww,npix)
                 if(sigclip) and (npix>4):
                    #dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
                    #fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
@@ -165,6 +165,8 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
         allexposures.append(exp.strip())
         nexp=nexp+1
     print('Found {} exposures'.format(nexp))
+
+    
 
     if(masks):
         for exp in open(masks):
@@ -246,7 +248,7 @@ def applybootnoise(cube, bootcube, outcube, varscale=1.):
     data.writeto(outcube, overwrite=True)   
     print('All data saved!')
 
-def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
+def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,sthre=1.0,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
     
     """
 
@@ -260,6 +262,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     smooth -> s parameter in spline evaluation
     block -> width of wave window for outlier rejections
     disp -> define the dispersion in block above which rejection is applied
+    sthre -> absolute threshold below which data are rejected 
     bootstrap -> if set to a bootstrap variance cube perform rescaling using bootstrap resampling
                  rather than imposing rms
     expmap -> image file with number of exposures per pixel
@@ -447,8 +450,8 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     #plt.legend()
     #plt.show()
     
-    selectw=selectw[np.where((dist < 0.02) & (selectr > 1))]
-    selectr=selectr[np.where((dist < 0.02) & (selectr > 1))]
+    selectw=selectw[np.where((dist < 0.02) & (selectr > sthre))]
+    selectr=selectr[np.where((dist < 0.02) & (selectr > sthre))]
     
     #selectw=selectw[np.where((dist < 0.02) & (selectr > 0.88))]
     #selectr=selectr[np.where((dist < 0.02) & (selectr > 0.88))]
@@ -470,7 +473,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     plt.plot(np.arange(nw),filterscale,color='black',label='Final')
     plt.legend()
     if(savechecks):
-        plt.ylim([1.0,2.0])
+        plt.ylim([sthre*0.9,2.0])
         plt.savefig(savechecks+"_scaling.pdf")
     else:
         plt.show()
