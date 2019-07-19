@@ -7,7 +7,8 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 from __future__ import print_function
 import matplotlib.pyplot as plt
 from mypython.fits import pyregmask as msk
-    
+import shutil    
+
 def coaddcubes(listob,nclip=2.5):
 
     """
@@ -302,9 +303,63 @@ def zapskysub(listob, extmask=None, extmaskonly=False):
             cubezap="DATACUBE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
             imagezap="IMAGE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
 
+            
             if not os.path.isfile(cubezap):
+            
+                
                 print('Reconstruct cube {} with ZAP'.format(cubezap))
-                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=finalmask)
+                #check if first 50 slices are all nan (typically from mixing E and N modes)
+                currcube=fits.open(cubeselfcal)
+                slice50=currcube[1].data[0:50,:,:]
+                goodpix=np.count_nonzero(np.isfinite(slice50))
+                
+                if(goodpix < 1):
+                    #scan layers to find first with value
+                    endslice=1
+                    while(goodpix < 1):
+                        slice50=currcube[1].data[0:endslice,:,:]
+                        goodpix=np.count_nonzero(np.isfinite(slice50))
+                        endslice=endslice+1
+                    
+                    #find start index for good data
+                    endslice=endslice-2
+                    
+                    #write tmp trimmed cube
+                    hdu1=fits.PrimaryHDU([],header=currcube[0].header)
+                    hdu2=fits.ImageHDU(currcube[1].data[endslice:,:,:],header=currcube[1].header)
+                    hdu3=fits.ImageHDU(currcube[2].data[endslice:,:,:],header=currcube[2].header)
+                    
+                    #update wave solution 
+                    hdu2.header['CRVAL3']=currcube[1].header['CRVAL3']+endslice*currcube[1].header['CD3_3']
+                    hdu3.header['CRVAL3']=currcube[2].header['CRVAL3']+endslice*currcube[2].header['CD3_3']
+                    
+                    #write to new file
+                    hdul=fits.HDUList([hdu1,hdu2,hdu3])
+                    hdul.writeto('trimmed_'+cubeselfcal,overwrite=True)
+                    currcube.close()
+                    
+                    #now run zap
+                    zap.process('trimmed_'+cubeselfcal,outcubefits='trimmed_'+cubezap,clean=True,mask=finalmask)
+
+                    #make copy of original cube
+                    shutil.copy(cubeselfcal,cubezap)
+                    
+                    #now update
+                    longcube=fits.open(cubezap,mode='update')
+                    shortcube=fits.open('trimmed_'+cubezap)
+
+                    longcube[1].data[endslice:,:,:]=shortcube[1].data
+                    longcube[2].data[endslice:,:,:]=shortcube[2].data
+                    
+                    longcube.flush()
+                    longcube.close()
+                    shortcube.close()
+                    
+                else:
+                    #proceed with current data
+                    currcube.close()
+                    zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=finalmask)
+
 
                 #create white image from zap cube
                 cube=fits.open(cubezap)
