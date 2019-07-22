@@ -602,7 +602,9 @@ def individual_resample(listob,refpath='./',nproc=24):
             
             #define some output names for final cube 
             pname="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(exp+1)
- 
+            cname="DATACUBE_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            iname="IMAGE_FOV_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            
             if not os.path.isfile(pname):
                 print("Processing exposure {0:d} to align to reference".format(exp+1))
                 
@@ -637,12 +639,15 @@ def individual_resample(listob,refpath='./',nproc=24):
                 scr=open("../../Script/make_scipost_mpdaf_{0:d}.sh".format(exp+1),"w")
                 scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
                 
-                scr.write('esorex --log-file=scipost_mpdaf_{0:d}.log muse_scipost --skymethod="none" --save=individual ../../Script/scipost_mpdaf_{0:d}.sof'.format(exp+1))
+                scr.write('esorex --log-file=scipost_mpdaf_{0:d}.log muse_scipost --skymethod="none" --save=positioned,cube ../../Script/scipost_mpdaf_{0:d}.sof'.format(exp+1))
                 scr.close()
                 
                 #Run pipeline 
                 subprocess.call(["sh", "../../Script/make_scipost_mpdaf_{0:d}.sh".format(exp+1)])    
-                subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+                subprocess.call(["mv","PIXTABLE_POSITIONED_0001.fits",pname])
+                subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                
             else:
                 print("Exposure {0:d} exists.. skip! ".format(exp+1))
      
