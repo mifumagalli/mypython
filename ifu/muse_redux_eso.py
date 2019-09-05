@@ -6,7 +6,7 @@ eso recipies. Check out the MUSE reduction manual for details.
 """
     
 
-def individual_skysub(listob,nproc=12):
+def individual_skysub(listob,autocalib=False,nproc=12):
 
     """
     rerun scipost performing sky subtraction with eso recipies 
@@ -42,6 +42,12 @@ def individual_skysub(listob,nproc=12):
         #Search if there are sky models from emtpy regions
         skyls=glob.glob("SKY_SPECTRUM*.fits")
         nsky=len(skyls)
+        
+        #Define appropriate string for autocalibration
+        if autocalib:
+           autocalibstr='deepfield'
+        else:
+           autocalibstr='none'   
 
         #collect sky tags and sky times 
         skytags=[]
@@ -98,7 +104,7 @@ def individual_skysub(listob,nproc=12):
                         scr=open("../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
                         scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-                        scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --skymethod=subtract-model ../../Script/scipost_{0:d}_sky.sof'.format(exp+1))
+                        scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --skymethod=subtract-model --autocalib={1} ../../Script/scipost_{0:d}_sky.sof'.format(exp+1,autocalibstr))
                         scr.close()
 
                         #Run pipeline 
@@ -131,7 +137,7 @@ def individual_skysub(listob,nproc=12):
                     scr=open("../../Script/make_scipost_esosky_{0:d}.sh".format(exp+1),"w")
                     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
 
-                    scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual ../../Script/scipost_{0:d}.sof'.format(exp+1))
+                    scr.write('esorex --log-file=scipost_esosky_{0:d}.log muse_scipost --filter=white --save=cube,individual --autocalib={1} ../../Script/scipost_{0:d}.sof'.format(exp+1, autocalibstr))
                     scr.close()
 
                     #Run pipeline 
