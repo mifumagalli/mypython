@@ -7,7 +7,8 @@ These are sets of procedures optimised for almost empty fields using mpdaf proce
 from __future__ import print_function
 import matplotlib.pyplot as plt
 from mypython.fits import pyregmask as msk
-    
+import shutil    
+
 def coaddcubes(listob,nclip=2.5):
 
     """
@@ -302,9 +303,63 @@ def zapskysub(listob, extmask=None, extmaskonly=False):
             cubezap="DATACUBE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
             imagezap="IMAGE_RESAMPLED_EXP{0:d}_zap.fits".format(exp+1)
 
+            
             if not os.path.isfile(cubezap):
+            
+                
                 print('Reconstruct cube {} with ZAP'.format(cubezap))
-                zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=finalmask)
+                #check if first 50 slices are all nan (typically from mixing E and N modes)
+                currcube=fits.open(cubeselfcal)
+                slice50=currcube[1].data[0:50,:,:]
+                goodpix=np.count_nonzero(np.isfinite(slice50))
+                
+                if(goodpix < 1):
+                    #scan layers to find first with value
+                    endslice=1
+                    while(goodpix < 1):
+                        slice50=currcube[1].data[0:endslice,:,:]
+                        goodpix=np.count_nonzero(np.isfinite(slice50))
+                        endslice=endslice+1
+                    
+                    #find start index for good data
+                    endslice=endslice-2
+                    
+                    #write tmp trimmed cube
+                    hdu1=fits.PrimaryHDU([],header=currcube[0].header)
+                    hdu2=fits.ImageHDU(currcube[1].data[endslice:,:,:],header=currcube[1].header)
+                    hdu3=fits.ImageHDU(currcube[2].data[endslice:,:,:],header=currcube[2].header)
+                    
+                    #update wave solution 
+                    hdu2.header['CRVAL3']=currcube[1].header['CRVAL3']+endslice*currcube[1].header['CD3_3']
+                    hdu3.header['CRVAL3']=currcube[2].header['CRVAL3']+endslice*currcube[2].header['CD3_3']
+                    
+                    #write to new file
+                    hdul=fits.HDUList([hdu1,hdu2,hdu3])
+                    hdul.writeto('trimmed_'+cubeselfcal,overwrite=True)
+                    currcube.close()
+                    
+                    #now run zap
+                    zap.process('trimmed_'+cubeselfcal,outcubefits='trimmed_'+cubezap,clean=True,mask=finalmask)
+
+                    #make copy of original cube
+                    shutil.copy(cubeselfcal,cubezap)
+                    
+                    #now update
+                    longcube=fits.open(cubezap,mode='update')
+                    shortcube=fits.open('trimmed_'+cubezap)
+
+                    longcube[1].data[endslice:,:,:]=shortcube[1].data
+                    longcube[2].data[endslice:,:,:]=shortcube[2].data
+                    
+                    longcube.flush()
+                    longcube.close()
+                    shortcube.close()
+                    
+                else:
+                    #proceed with current data
+                    currcube.close()
+                    zap.process(cubeselfcal,outcubefits=cubezap,clean=True,mask=finalmask)
+
 
                 #create white image from zap cube
                 cube=fits.open(cubezap)
@@ -547,7 +602,9 @@ def individual_resample(listob,refpath='./',nproc=24):
             
             #define some output names for final cube 
             pname="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(exp+1)
- 
+            cname="DATACUBE_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            iname="IMAGE_FOV_RESAMPLED_EXP{0:d}.fits".format(exp+1)
+            
             if not os.path.isfile(pname):
                 print("Processing exposure {0:d} to align to reference".format(exp+1))
                 
@@ -582,12 +639,15 @@ def individual_resample(listob,refpath='./',nproc=24):
                 scr=open("../../Script/make_scipost_mpdaf_{0:d}.sh".format(exp+1),"w")
                 scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
                 
-                scr.write('esorex --log-file=scipost_mpdaf_{0:d}.log muse_scipost --skymethod="none" --save=individual ../../Script/scipost_mpdaf_{0:d}.sof'.format(exp+1))
+                scr.write('esorex --log-file=scipost_mpdaf_{0:d}.log muse_scipost --skymethod="none" --save=positioned,cube ../../Script/scipost_mpdaf_{0:d}.sof'.format(exp+1))
                 scr.close()
                 
                 #Run pipeline 
                 subprocess.call(["sh", "../../Script/make_scipost_mpdaf_{0:d}.sh".format(exp+1)])    
-                subprocess.call(["mv","PIXTABLE_REDUCED_0001.fits",pname])
+                subprocess.call(["mv","PIXTABLE_POSITIONED_0001.fits",pname])
+                subprocess.call(["mv","IMAGE_FOV_0001.fits",iname])
+                subprocess.call(["mv","DATACUBE_FINAL.fits",cname])
+                
             else:
                 print("Exposure {0:d} exists.. skip! ".format(exp+1))
      

@@ -521,6 +521,8 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg,shiftoffsets=None):
     ypix -> same but for y, or CRPIX2
     rag  -> ra in deg for reference pixel, or CRVAL1
     deg  -> dec in deg for reference pixel, or CRVAL2 
+    shiftoffsets -> if set to offset table, generate a new offset table with absolute 
+                    wcs which is needed to propagate correction in other reduction steps
 
     """
 

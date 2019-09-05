@@ -78,7 +78,9 @@ dec=22.51928
 data='esocombine/IMAGE_FOV_0001.fits'
 mut.adjust_wcsoffset(data,x,y,ra,dec)
 data='esocombine/DATACUBE_FINAL.fits'
-mut.adjust_wcsoffset(data,x,y,ra,dec)
+mut.adjust_wcsoffset(data,x,y,ra,dec,shiftoffsets='esocombine/OFFSET_LIST.fits')
+
+The addition of shiftoffsets is needed to propagate the WCS correction in the next steps (cubex, mpdaf, etc..)
 
 
 B. CUBEX_REDUCTION
