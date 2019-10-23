@@ -246,7 +246,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         if marz>10 and (rphot):
 	    #Requires testing
 	    hdu = fits.open(output+'/catalogue.fits')
-	    hdu[1].data['use_source'][hdu[2].data['MAGSEG']>marz] = False
+	    hdu[1].data['use_source'][hdu[2].data['MAGAP']>marz] = False
 	    hdu.writeto(output+'/catalogue.fits',overwrite=True)
 	    
             marz_file(output+'/catalogue.fits', outspec, output, r_lim=marz)

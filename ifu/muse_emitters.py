@@ -169,7 +169,7 @@ def independent_SNR(catalog, covariance, segmap, cube, var, cube_med=None, cube_
 
     #loop over sources
     for j in range(len(catalog)):
-
+ 
         #find pixels in seg map
 	Id = catalog['id'][j]
         okpix = (segmap == Id)
@@ -265,8 +265,8 @@ def velocityoffset(wave_air, ztarg, rest_line):
     return vel_offset
 
 
-def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
-                       cov_poly=None,working_dir='./',fcube_median=None,fcube_odd=None,
+def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=None,
+                       cov_poly=None,working_dir='./',output_dir='./',fcube_median=None,fcube_odd=None,
                        fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
                        fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
                        DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True):
@@ -280,22 +280,25 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
     4. generate inspection images and full spectra
     
 
-    fcube        -> cube used for cubex extraction
+    fcube        -> cube used for cubex extraction, assumed to be in working_dir
     fcube_var    -> var cube for cubex extraction
     catname      -> catalogue produced by cubex 
     target_z     -> [optional] if set and rest_line set, computes velocity offset from target z
                    assuming every detection is at rest_line
     rest_line    -> [optional] see target_z
+    vel_cut      -> [optional] if set, and target_z and rest_line are set as well, it will cut 
+                    the catalogue to include only detections within abs(target_z-source_z) <= vel_cut
     cov_poly     -> [optional] third order polinomial model for noise set as array with (N2,N1,N0)
                    If set, covariance is modelled
     working_dir  -> where cubex output is generated
+    output_dir   -> where the output of this function is generated
     fcube_median -> [optional] median cube for extraction of QA images
     fcube_odd    -> [optional] odd cube for extraction of QA image and even/odd SN cut
     fcube_even   -> [optional] even cube for extraction of QA image and even/odd SN cut
     fcube_median_var -> [optional] associated variance
     fcube_odd_var -> [optional] associated variance
     fcube_even_var -> [optional] associated variance
-    fcube_orig -> [optional] if set to full cube, used for spectral extraction
+    fcube_orig -> [optional] if set to full cube, used for spectral extraction, absolute path can be used.
     source_img -> [optional] if set to aperture image (and marzred set), exclude emitters projected against 
                   continuum source of known redshift
     marzred  -> [optional] redshift file for continuum sources, ala marz (see above)
@@ -339,17 +342,29 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
         covariance = np.polyval(cov_poly,size)
 
     #Open cubes
-    cube      = fits.open(working_dir+fcube)[0].data
-    cube_var  = fits.open(working_dir+fcube_var)[0].data
-
+    try:
+       cube      = fits.open(working_dir+fcube)[1].data
+    except:
+       cube      = fits.open(working_dir+fcube)[0].data
+    try:
+       cube_var  = fits.open(working_dir+fcube_var)[1].data
+    except:
+       cube_var  = fits.open(working_dir+fcube_var)[0].data
+        
     #reconstruct name of cubex segmentation cube and open
     fsegmap = os.path.basename(fcube).split('.fits')[0]+".Objects_Id.fits"
     segmap  = fits.open(working_dir+fsegmap)[0].data
     
     if(fcube_odd):
         try:
-            cube_odd          = fits.open(working_dir+fcube_odd)[0].data
-            cube_odd_var      = fits.open(working_dir+fcube_odd_var)[0].data
+            try:
+              cube_odd          = fits.open(working_dir+fcube_odd)[1].data
+            except:
+              cube_odd          = fits.open(working_dir+fcube_odd)[0].data
+            try:   
+              cube_odd_var      = fits.open(working_dir+fcube_odd_var)[1].data
+            except:
+              cube_odd_var      = fits.open(working_dir+fcube_odd_var)[0].data
         except:
             print('Have you set the right odd cube/variance?')
             exit()
@@ -359,8 +374,14 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
 
     if(fcube_even):
         try:
-            cube_even         = fits.open(working_dir+fcube_even)[0].data
-            cube_even_var     = fits.open(working_dir+fcube_even_var)[0].data
+            try:
+              cube_even          = fits.open(working_dir+fcube_even)[1].data
+            except:
+              cube_even          = fits.open(working_dir+fcube_even)[0].data
+            try:   
+              cube_even_var      = fits.open(working_dir+fcube_even_var)[1].data
+            except:
+              cube_even_var      = fits.open(working_dir+fcube_even_var)[0].data
         except:
             print('Have you set the right even cube/variance?')
             exit()
@@ -370,8 +391,14 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
 
     if(fcube_median):
         try:
-            cube_median       = fits.open(working_dir+fcube_median)[0].data
-            cube_median_var   = fits.open(working_dir+fcube_median_var)[0].data
+            try:
+              cube_median       = fits.open(working_dir+fcube_median)[1].data
+            except:
+              cube_median       = fits.open(working_dir+fcube_median)[0].data
+            try:
+              cube_median_var   = fits.open(working_dir+fcube_median_var)[1].data
+            except:
+              cube_median_var   = fits.open(working_dir+fcube_median_var)[0].data
         except:
             print('Have you set the right median cube/variance?')
             exit()
@@ -391,26 +418,34 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
         apermap=None
         contzcat=None
 
-
-    #now loop over sources and update the catalogue info 
-    if(derived):
-        print("Calculating independent SNR and additional metrics")
-        catalog = independent_SNR(catalog, covariance, segmap, cube, cube_var, cube_med=cube_median,cube_odd=cube_odd, cube_even=cube_even, var_med=cube_median_var,var_odd=cube_odd_var, var_even=cube_even_var,apermap=apermap,contzcat=contzcat)
-        
     #Computing and adding velocity offset
     if(target_z is not None):
         veloff = velocityoffset(catalog['lambda_fluxw'], target_z, rest_line)
         catalog['veloffset'] = veloff
-
+        
+        #Trim in velocity if requested
+        if(vel_cut is not None):
+           select=np.abs(catalog['veloffset'])<=vel_cut
+           catalog=catalog[select]
+           
+    #now loop over sources and update the catalogue info 
+    if(derived):
+        print("Calculating independent SNR and additional metrics for {} sources".format(len(catalog)))
+        catalog = independent_SNR(catalog, covariance, segmap, cube, cube_var, cube_med=cube_median,cube_odd=cube_odd, cube_even=cube_even, var_med=cube_median_var,var_odd=cube_odd_var, var_even=cube_even_var,apermap=apermap,contzcat=contzcat)
+        
     #Compute EOSN 
     if(fcube_even is not None):
         rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
         catalog['EODeltaSN'] = rel_diff_halves
 
+    
+    #make space for checks
+    if not os.path.isdir(output_dir):
+        os.mkdir(output_dir)
         
     #Write full catalogue with SNR and derived quantities
     print("Writing full catalog to disk")
-    catalog.write(working_dir+catname.split(".cat")[0]+"_all_SNR.fits", format="fits", overwrite=True)
+    catalog.write(output_dir+catname.split(".cat")[0]+"_all_SNR.fits", format="fits", overwrite=True)
 
     
     #make simplest cut to catalogue to reject unwanted sources
@@ -443,11 +478,11 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
         
         
     #Write full catalogue with SNR and derived quantities
-    catalog.write(working_dir+catname.split(".cat")[0]+"_select_SNR.fits", format="fits", overwrite=True)
+    catalog.write(output_dir+catname.split(".cat")[0]+"_select_SNR.fits", format="fits", overwrite=True)
 
     #make space for checks
-    if not os.path.isdir(working_dir+"/objs"):
-        os.mkdir(working_dir+"/objs")
+    if not os.path.isdir(output_dir+"/objs"):
+        os.mkdir(output_dir+"/objs")
 
     if(checkimg):
         print("Extracting images of sources")
@@ -458,7 +493,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,
             #folder for this object
             objid = catalog['id'][ii]
             
-            objdir = working_dir+"/objs/id{}/".format(objid)
+            objdir = output_dir+"/objs/id{}/".format(objid)
             if not os.path.isdir(objdir):
                 os.mkdir(objdir)
 

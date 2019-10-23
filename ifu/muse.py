@@ -203,7 +203,7 @@ class Muse(object):
         print('All done with cubex redux')
         
 
-    def eso_process(self, combine=True):
+    def eso_process(self, autocalib=False, combine=True):
 
         """
 
@@ -225,7 +225,7 @@ class Muse(object):
 
         #rerun pipe enabling skysubtraction and 
         #dumping fully reduced pixel table 
-        ex.individual_skysub(listob)
+        ex.individual_skysub(listob, autocalib=autocalib)
         
         if (combine):
 	  #now make space as needed for final products

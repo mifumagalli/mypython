@@ -5,7 +5,7 @@ def airtovac(waveair):
     #save current wave
     waveair=np.array(waveair, dtype=np.float64)
     
-    sigma2 = (1e4/waveair)**2.	
+    sigma2 = (1e4/waveair)**2.  
     fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
     fact[waveair<2000] = 1.
     
@@ -16,7 +16,7 @@ def vactoair(wavevac):
      #save current wave
     wavevac=np.array(wavevac, dtype=np.float64)
     
-    sigma2 = (1e4/wavevac)**2.	
+    sigma2 = (1e4/wavevac)**2.  
     fact = 1.+5.792105e-2/(238.0185-sigma2)+1.67917e-3/(57.362-sigma2)
     fact[wavevac<2000] = 1.
     
@@ -39,7 +39,7 @@ def aligntocat(cube,catalogue):
     import numpy as np
     from astropy import wcs
 
-    print "Processing cube {} for offsets".format(cube)
+    print("Processing cube {} for offsets".format(cube))
 
     #first project the cube to create a white image with wcs
     img, var, wcsimg = cube2img(cube)
@@ -77,9 +77,9 @@ def aligntocat(cube,catalogue):
     raoff=np.median(np.array(raoffcurrent))
     decoff=np.median(np.array(decoffcurrent))
      
-    print "Offsets for cube {} RA: {} Dec: {}".format(cube,raoff*3600.,decoff*3600.)
-    print "Error offsets for cube {} RA: {} Dec: {}".format(cube,np.std(np.array(raoffcurrent))*3600.,
-                                                            np.std(np.array(decoffcurrent))*3600.)
+    print("Offsets for cube {} RA: {} Dec: {}".format(cube,raoff*3600.,decoff*3600.))
+    print("Error offsets for cube {} RA: {} Dec: {}".format(cube,np.std(np.array(raoffcurrent))*3600.,
+                                                            np.std(np.array(decoffcurrent))*3600.))
                              
     return raoff,decoff
 
@@ -148,10 +148,10 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
         num,err=integrate.quad(lefffn,wrange[0],wrange[1])
         den,err=integrate.quad(trans_fnc,wrange[0],wrange[1])
         lmean=num/den
-        print 'Filter mean wavelength ', lmean 
+        print('Filter mean wavelength ', lmean)
         #Compute the ZP in AB - native image is in 1e-20 erg/s/cm2/A
         ZP=-2.5*np.log10(lmean*lmean/29979245800.*1e-8*1e-20)-48.6
-        print 'Filter zeropoint ',  ZP
+        print('Filter zeropoint ',  ZP)
         
     #implement filter transmission
     if(filt):
@@ -183,10 +183,10 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
         num,err=integrate.quad(lefffn,min(flwn),max(flwn))
         den,err=integrate.quad(trans_fnc,min(flwn),max(flwn))
         lmean=num/den
-        print 'Filter mean wavelength ', lmean 
+        print('Filter mean wavelength ', lmean) 
         #Compute the ZP AB - image is in 1e-20 erg/s/cm2/A
         ZP=-2.5*np.log10(lmean*lmean/29979245800.*1e-8*1e-20)-48.6
-        print 'Filter zeropoint ',  ZP
+        print('Filter zeropoint ',  ZP)
 
 
     ###############################
@@ -226,7 +226,7 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
     
     #if write, write
     if(write):
-        print 'Writing to ', write
+        print('Writing to ', write)
         header=wcsimg.to_header()
         header["ZPAB"]=ZP
         hduhead = fits.PrimaryHDU(img,header=header)
@@ -359,7 +359,7 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     #if set, convert to vacuum using airtovac.pro conversion
     if(tovac):
          wavec = airtovac(wavec)
-	  
+          
     #tested and working
     #fl=open('test.txt','w') 
     #for rr in range(len(wavec)):
@@ -484,7 +484,7 @@ def readcube(cube, helio=0,mmap=False):
     #compute the helio correction on the fly
     if(helio != 0):
         hel_corr = np.sqrt( (1. + helio/299792.458) / (1. - helio/299792.458) )
-        print 'Helio centric correction of {} km/s and lambda {}'.format(helio,hel_corr) 
+        print('Helio centric correction of {} km/s and lambda {}'.format(helio,hel_corr))
     else:
         hel_corr=1.0
 
@@ -537,50 +537,50 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg,shiftoffsets=None):
        if 'CRVAL1' in fithdu[ext].header.keys():
          
          Naxis = fithdu[ext].header['NAXIS']
-	 
-	 #Save old card values but do this only if it has not done before
-	 if not 'OLDCRV1' in fithdu[ext].header.keys():
-	     
-	     fithdu[ext].header['OLDCRV1']=fithdu[ext].header['CRVAL1']
+         
+         #Save old card values but do this only if it has not done before
+         if not 'OLDCRV1' in fithdu[ext].header.keys():
+             
+             fithdu[ext].header['OLDCRV1']=fithdu[ext].header['CRVAL1']
              fithdu[ext].header['OLDCRV2']=fithdu[ext].header['CRVAL2'] 
              fithdu[ext].header['OLDCPX1']=fithdu[ext].header['CRPIX1'] 
              fithdu[ext].header['OLDCPX2']=fithdu[ext].header['CRPIX2'] 
              
-	     oldheader = fithdu[ext].header
+             oldheader = fithdu[ext].header
          
-	 else:
-	     
-	     oldheader = fithdu[ext].header
-	     oldheader['CRVAL1'] = oldheader['OLDCRV1']
-	     oldheader['CRVAL2'] = oldheader['OLDCRV2']
-	     oldheader['CRPIX1'] = oldheader['OLDCPX1']
-	     oldheader['CRPIX2'] = oldheader['OLDCPX2']
+         else:
+             
+             oldheader = fithdu[ext].header
+             oldheader['CRVAL1'] = oldheader['OLDCRV1']
+             oldheader['CRVAL2'] = oldheader['OLDCRV2']
+             oldheader['CRPIX1'] = oldheader['OLDCPX1']
+             oldheader['CRPIX2'] = oldheader['OLDCPX2']
 
-         #extract 0,0 position for Original WCS	  
-	 imgwcs = wcs.WCS(fithdu[ext].header)
-	 if Naxis==3:
-	    ra_orig, dec_orig, dummy = imgwcs.wcs_pix2world(0,0,0,0)
-	 elif Naxis==2:
-	    ra_orig, dec_orig = imgwcs.wcs_pix2world(0,0,0)
-		
+         #extract 0,0 position for Original WCS   
+         imgwcs = wcs.WCS(fithdu[ext].header)
+         if Naxis==3:
+            ra_orig, dec_orig, dummy = imgwcs.wcs_pix2world(0,0,0,0)
+         elif Naxis==2:
+            ra_orig, dec_orig = imgwcs.wcs_pix2world(0,0,0)
+                
          #write new 
          fithdu[ext].header['CRVAL1']=rag 
          fithdu[ext].header['CRVAL2']=deg
          fithdu[ext].header['CRPIX1']=xpix 
          fithdu[ext].header['CRPIX2']=ypix
-	 
-	 #extract 0,0 position for New WCS	  
-	 imgwcs = wcs.WCS(fithdu[ext].header)
-	 if Naxis==3:
-	    ra_new, dec_new, dummy = imgwcs.wcs_pix2world(0,0,0,0)
-	 elif Naxis==2:
-	    ra_new, dec_new = imgwcs.wcs_pix2world(0,0,0)
-	 
-	 rashift  = ra_orig-ra_new
-	 decshift = dec_orig-dec_new
-	 
-	 #Allow for this to be rewritten in case you refine the solution at a second time
-	 fithdu[ext].header['RASHIFT']  = rashift
+         
+         #extract 0,0 position for New WCS        
+         imgwcs = wcs.WCS(fithdu[ext].header)
+         if Naxis==3:
+            ra_new, dec_new, dummy = imgwcs.wcs_pix2world(0,0,0,0)
+         elif Naxis==2:
+            ra_new, dec_new = imgwcs.wcs_pix2world(0,0,0)
+         
+         rashift  = ra_orig-ra_new
+         decshift = dec_orig-dec_new
+         
+         #Allow for this to be rewritten in case you refine the solution at a second time
+         fithdu[ext].header['RASHIFT']  = rashift
          fithdu[ext].header['DECSHIFT'] = decshift
 
     #save 
@@ -589,8 +589,8 @@ def adjust_wcsoffset(data,xpix,ypix,rag,deg,shiftoffsets=None):
     
     if shiftoffsets:
         offhdu = fits.open(shiftoffsets)
-	offhdu[1].data['RA_OFFSET'] += rashift
-	offhdu[1].data['DEC_OFFSET'] += decshift
+        offhdu[1].data['RA_OFFSET'] += rashift
+        offhdu[1].data['DEC_OFFSET'] += decshift
         offhdu.writeto(shiftoffsets.replace('.fits', '_ABS.fits'), overwrite=True)
     
 

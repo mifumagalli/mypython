@@ -426,7 +426,7 @@ class Window(Tkinter.Tk):
         
 
         #exit for good
-        exit()
+        self.destroy()
 
     def write_current(self):
         
