@@ -119,7 +119,10 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         for i in output:
             if('muse_bias -- version' in i):
                 pipeversion=i.split(" ")[-1].strip()
-        staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
+        if('2.8.0' in pipeversion):
+            staticalpath='/usr/share/esopipes/datastatic/muse-2.8/'
+        else:
+            staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
     elif('zwicky' in hostname):
         esorexpath=find_executable('esorex')
         staticalpath=esorexpath.split('/bin')[0]
