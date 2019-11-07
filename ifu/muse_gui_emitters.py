@@ -387,21 +387,29 @@ class Window(Tkinter.Tk):
         #query which ID it is
         idid=self.keycol.index('id')
         idred=self.keycol.index('redshift')
+        idlambda=self.keycol.index('lambda_fluxw')
         focusid=self.table_data.get(row,idid)        
         #launch displays
         try:
             #control ds9
             rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
             if(self.white is not None):
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
             else:
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
             #collect processes
             self.processes.append(ds9)
             
 
             #control spectra gui
-            spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(self.table_data.get(row,idred))])
+            tmpz=float(self.table_data.get(row,idred))
+            if(tmpz > 0):
+                pass
+            else:
+                currentl=float(self.rellam.get())
+                tmpz=float(self.table_data.get(row,idlambda))/currentl-1
+                print(tmpz)
+            spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(tmpz)])
             self.processes.append(spc)
           
   
