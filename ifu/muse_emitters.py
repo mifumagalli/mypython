@@ -389,6 +389,11 @@ def make_images_fast(cubelist, segcube, header, catentry, Id, outdir, outnamelis
     hdu = fits.PrimaryHDU(segima, header=imahdr)
     hdu.writeto(outima1, overwrite=True)
     
+    if padding>0: 
+       outima2 = outdir+'Pstamp_id{}_det'.format(Id)+".fits"
+       hdu = fits.PrimaryHDU(segima[ypad1:ypad2,xpad1:xpad2], header=imapadhdr)
+       hdu.writeto(outima2, overwrite=True)
+    
     #trim segcube and save it in 3D
     segmapshort=pixmask[zpad1:zpad2,ypad1:ypad2,xpad1:xpad2]
     savename = outdir+"/segcube.fits"
