@@ -250,7 +250,8 @@ class Window(Tkinter.Tk):
         self.timeio=os.path.getmtime(self.startfile)
         #check if lock file exists 
         if os.path.exists(self.startfile+'.lock'):
-            tkMessageBox.showinfo('I/O Warning','This catalogue is currently locked by another user. Proceed at your own risk.')
+            tkMessageBox.showinfo('I/O Warning','This catalogue is currently locked by another user. Best not to continue.')
+            self.client_abort(keeplock=True)
         else:
             #make one
             open(self.startfile+'.lock','a').close()
@@ -491,7 +492,7 @@ class Window(Tkinter.Tk):
         self.client_abort()
 
 
-    def client_abort(self):
+    def client_abort(self,keeplock=False):
         
         """
         Kill without saving
@@ -501,8 +502,12 @@ class Window(Tkinter.Tk):
         for pp in self.processes:
             pp.kill()
         
+            
         #clean lock file
-        os.remove(self.startfile+'.lock')
+        if(keeplock):
+            pass
+        else:
+            os.remove(self.startfile+'.lock')
 
         #exit for good
         self.destroy()
