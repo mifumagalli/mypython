@@ -185,6 +185,7 @@ class Muse(object):
         #prepare for intermediate combine 
         cx.drive_combine('INTERMEDIATE',listob)
 
+        #exit()
         #now do the final pass of cubex using the tmp combined cube for better masking
         cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,version=version)
 

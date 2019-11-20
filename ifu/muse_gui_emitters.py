@@ -9,6 +9,7 @@ from tkinter import *
 import Tkinter
 import tkFont
 from Tkinter import Tk
+import tkMessageBox
 import tkFileDialog
 import argparse
 import sys
@@ -120,8 +121,8 @@ class Window(Tkinter.Tk):
         self.minwinheight=300
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        self.preferwinwidth=int(screen_width*0.5)
-        self.preferwinheight=int(screen_height*0.5)
+        self.preferwinwidth=int(screen_width*0.6)
+        self.preferwinheight=int(screen_height*0.6)
         self.minsize(width=self.minwinwidth, height=self.minwinheight)
         self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
 
@@ -171,6 +172,10 @@ class Window(Tkinter.Tk):
         # creating a quite command
         self.quitButton_w = Tkinter.Button(self.menuframe, text="Quit",command=self.client_exit).grid(row=0,column=0)
         
+        # creating an abort command
+        self.abortButton_w = Tkinter.Button(self.menuframe, text="Abort",command=self.client_abort).grid(row=1,column=0)
+
+
         # creating a save command
         self.saveButton_w = Tkinter.Button(self.menuframe, text="Save",command=self.write_current).grid(row=0,column=1)
 
@@ -193,41 +198,79 @@ class Window(Tkinter.Tk):
 
 
         #create inspect option
-        self.inspectButton_w = Tkinter.Button(self.menuframe, text="Inspect Current",command=self.inspect_current).grid(row=1,column=0,columnspan=2)
+        self.inspectButton_w = Tkinter.Button(self.menuframe, text="Inspect Current",command=self.inspect_current).grid(row=1,column=1,columnspan=2)
 
 
         #set header table properties
-        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','confidence','redshift','type']
-        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','confid','redshift','type']
+        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','relvel','confidence','redshift','type','notes']
+        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','relvel','confid','redshift','type','notes']
         self.tabncol=len(self.keycol)
 
         #create sort by option
         llab = Tkinter.Label(self.menuframe, text="Sort by:")
-        llab.grid(column=2,row=1)
+        llab.grid(column=3,row=1)
         self.sortlist = Tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw')
-        self.sortlist_w.grid(column=3,row=1)
+        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw','notes','relvel')
+        self.sortlist_w.grid(column=4,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
 
         #create reverse option
         self.reverselist_w = Tkinter.Button(self.menuframe,text="Reverse",command=self.reversetab)
-        self.reverselist_w.grid(column=4,row=1)
+        self.reverselist_w.grid(column=5,row=1)
     
+        #redshift reference
+        zlab = Tkinter.Label(self.menuframe, text="z_ref = ")
+        zlab.grid(column=7,row=0)
+        self.relvel = Tkinter.StringVar()
+        self.relvelcntr = Tkinter.Entry(self.menuframe,textvariable=self.relvel)
+        self.relvelcntr.grid(column=8,row=0)
+        self.relvel.set("0.0000")
+        #set the redshift in a trace state
+        self.relvel.trace("w",self.updaterelvel)
+
+        
+        #reference lambda
+        llab = Tkinter.Label(self.menuframe, text="lam_ref = ")
+        llab.grid(column=7,row=1)
+        self.rellam = Tkinter.StringVar()
+        self.rellamcntr = Tkinter.Entry(self.menuframe,textvariable=self.rellam)
+        self.rellamcntr.grid(column=8,row=1)
+        self.rellam.set("1215.6701")
+        #set the redshift in a trace state
+        self.rellam.trace("w",self.updaterelvel)
+        
 
     def init_dataframe(self):
 
         #open the file
         self.catdata=Table.read(self.startfile,format='fits')
-        
+        #save the time stamp
+        self.timeio=os.path.getmtime(self.startfile)
+        #check if lock file exists 
+        if os.path.exists(self.startfile+'.lock'):
+            tkMessageBox.showinfo('I/O Warning','This catalogue is currently locked by another user. Best not to continue.')
+            self.client_abort(keeplock=True)
+        else:
+            #make one
+            open(self.startfile+'.lock','a').close()
+
         if('redshift' not in self.catdata.colnames):
             newcl=Column(np.zeros(len(self.catdata)))
             self.catdata.add_column(newcl,name='redshift')
         if('type' not in self.catdata.colnames):
             newcl=Column(np.full(len(self.catdata),'None',dtype="S25"))
             self.catdata.add_column(newcl,name='type')
-            
+        if('notes' not in self.catdata.colnames):
+            newcl=Column(np.full(len(self.catdata),'None',dtype="S25"))
+            self.catdata.add_column(newcl,name='notes')
+        if('relvel' not in self.catdata.colnames):
+            newcl=Column(np.zeros(len(self.catdata)))
+            self.catdata.add_column(newcl,name='relvel')
+            self.updaterelvel('firsttime')
+
+
         #find number of pages
         self.rowppage=15
         self.pagenum=len(self.catdata)/self.rowppage
@@ -258,6 +301,7 @@ class Window(Tkinter.Tk):
         idtype=self.keycol.index('type')
         idid=self.keycol.index('id')
         idconf=self.keycol.index('confidence')
+        idnote=self.keycol.index('notes')
 
         #scan them 
         for r in range(self.rowppage):
@@ -265,12 +309,15 @@ class Window(Tkinter.Tk):
             myred=self.table_data.get(r,idred)
             mytype=self.table_data.get(r,idtype)
             myconf=self.table_data.get(r,idconf)
+            mynote=self.table_data.get(r,idnote)
             #store in table by searching for id (allow for blanks)
             try:
                 cidx=np.where(self.catdata['id'] == int(myid))
                 self.catdata['redshift'][cidx]=myred
                 self.catdata['type'][cidx]=mytype
                 self.catdata['confidence'][cidx]=myconf
+                self.catdata['notes'][cidx]=mynote
+
             except:
                 pass
 
@@ -304,8 +351,29 @@ class Window(Tkinter.Tk):
                     self.table_data.unlock(r,c)
                 elif('confidence' in self.keycol[c]):
                     self.table_data.unlock(r,c)
+                elif('notes' in self.keycol[c]):
+                    self.table_data.unlock(r,c)
                 else:
                     self.table_data.lock(r,c)
+
+    def updaterelvel(self,*args):
+
+
+        #compute relative velocity with respect to reference 
+        currentz=float(self.relvel.get())
+        currentl=float(self.rellam.get())
+
+        zline=self.catdata['lambda_fluxw']/currentl-1
+        ratio=(1+currentz)/(1+zline)
+        self.catdata['relvel']=np.abs(299792.458*(ratio**2-1)/(1+ratio**2))
+        
+        if 'firsttime' in args:
+            pass
+        else:
+            #update entries if table has been drawn already
+            self.record_changes()
+            self.update_tabdisplay()
+
 
     def inspect_current(self):
         
@@ -319,21 +387,29 @@ class Window(Tkinter.Tk):
         #query which ID it is
         idid=self.keycol.index('id')
         idred=self.keycol.index('redshift')
+        idlambda=self.keycol.index('lambda_fluxw')
         focusid=self.table_data.get(row,idid)        
         #launch displays
         try:
             #control ds9
             rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
             if(self.white is not None):
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
             else:
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits','-smooth'])
+                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
             #collect processes
             self.processes.append(ds9)
             
 
             #control spectra gui
-            spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(self.table_data.get(row,idred))])
+            tmpz=float(self.table_data.get(row,idred))
+            if(tmpz > 0):
+                pass
+            else:
+                currentl=float(self.rellam.get())
+                tmpz=float(self.table_data.get(row,idlambda))/currentl-1
+                print(tmpz)
+            spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(tmpz)])
             self.processes.append(spc)
           
   
@@ -420,13 +496,30 @@ class Window(Tkinter.Tk):
         #trigger write current on exit
         self.write_current()
 
+        #exit
+        self.client_abort()
+
+
+    def client_abort(self,keeplock=False):
+        
+        """
+        Kill without saving
+        """
+
         #kill shell processes
         for pp in self.processes:
             pp.kill()
         
+            
+        #clean lock file
+        if(keeplock):
+            pass
+        else:
+            os.remove(self.startfile+'.lock')
 
         #exit for good
         self.destroy()
+
 
     def write_current(self):
         
@@ -436,8 +529,22 @@ class Window(Tkinter.Tk):
         #sort again table in id -- make copy not to interfere with current sorting 
         tmpcopy=self.catdata.copy()
         tmpcopy.sort('id')
-        #write to disk 
-        tmpcopy.write(self.startfile,format='fits',overwrite=True)
+        
+        #strip relvel column
+        tmpcopy.remove_column('relvel')
+
+        #check time stamp to avoid overwite of catalogue that has changed to disk
+        currenttime=os.path.getmtime(self.startfile)
+        if(currenttime > self.timeio):
+            #possible issues due to io
+            tkMessageBox.showinfo('I/O Warning','The catalogue may have changed to disk. Writing conflicting copy to disk. Resolve issue before proceding')
+            tmpcopy.write(self.startfile+'_conflicted',format='fits')
+            self.client_abort()
+        else:
+            #write to disk overwriting
+            tmpcopy.write(self.startfile,format='fits',overwrite=True)
+            #reset clock
+            self.timeio=os.path.getmtime(self.startfile)
 
 def start(startfile,white):
 

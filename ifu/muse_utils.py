@@ -233,7 +233,7 @@ def cube2img(cube,write=None,wrange=None,helio=0,filt=None):
         hduimg  = fits.ImageHDU(img)
         hduvar  = fits.ImageHDU(var)
         hdulist = fits.HDUList([hduhead,hduimg,hduvar])
-        hdulist.writeto(write,clobber=True)
+        hdulist.writeto(write,overwrite=True)
 
     return img, var, wcsimg
 
@@ -381,7 +381,7 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
             hdulist = fits.HDUList([hduflx,hduerr,hduwav,hdumed,hdu2flx,hdu2err,hduimg])
         else:
             hdulist = fits.HDUList([hduflx,hduerr,hduwav,hdumed])
-        hdulist.writeto(write,clobber=True)
+        hdulist.writeto(write,overwrite=True)
 
     return wavec, spec_flx, spec_err, spec_med
 

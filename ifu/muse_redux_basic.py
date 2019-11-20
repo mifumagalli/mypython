@@ -100,11 +100,15 @@ def parse_xml(path='./',nproc=12,pipecal=False):
                 print 'Found {0} {1} taken within 30 days'.format(len(recent[0]),kk)
             #This is when you want only the best one
             else:
-		#pick closest
-                mintm=np.argmin(delta_time)
-                xml_info[kk]=[currentlist[mintm]]
-                print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
-
+		try:
+                 #pick closest
+                 mintm=np.argmin(delta_time)
+                 xml_info[kk]=[currentlist[mintm]]
+                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
+                except:
+                 print 'No suitable calibration found for {}. Abort.'.format(kk)
+                 exit()
+                
     #set the calibration path relative and suffix
     xml_info["PATHCAL"]='../../Raw/'
     xml_info["SUFFIXCAL"]='.fits'
@@ -118,7 +122,10 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         for i in output:
             if('muse_bias -- version' in i):
                 pipeversion=i.split(" ")[-1].strip()
-        staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
+        if('2.8.0' in pipeversion):
+            staticalpath='/usr/share/esopipes/datastatic/muse-2.8/'
+        else:
+            staticalpath='/usr/share/esopipes/datastatic/muse-'+pipeversion+'/'
     elif('zwicky' in hostname):
         esorexpath=find_executable('esorex')
         staticalpath=esorexpath.split('/bin')[0]
