@@ -110,7 +110,6 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     xml_info["SUFFIXCAL"]='.fits'
 
 
-
     #grab some info on executable dir
     hostname=socket.gethostname()
     if('mad' in hostname):
