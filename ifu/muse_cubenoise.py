@@ -36,9 +36,9 @@ def sigclip_cubex(array, sigma_lower=3, sigma_upper=3, maxiters=1000, minnum=3, 
        array = array[(array>bounds[0]) & (array<bounds[1])]
        if len(array)<npoints:
           npoints=len(array)
-	  niter += 1
+          niter += 1
        else:
-          stopit = 1	  
+          stopit = 1      
     
     if return_bounds:
       return array, bounds[0], bounds[1]     
@@ -58,9 +58,9 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     for exp in range(nexp):
         dataexp[exp]=fits.open(allexposures[exp])[1].data[wstart:wend+1,:,:]
         #If requested apply mask on the fly
-	if(masks):
-	  tmpmask=fits.open(allmasks[exp])[0].data[:,:]
-	  dataexp[exp,:,(tmpmask==0)] = np.nan
+        if(masks):
+          tmpmask=fits.open(allmasks[exp])[0].data[:,:]
+          dataexp[exp,:,(tmpmask==0)] = np.nan
 
     print('Proc {}: All data loaded'.format(iproc))        
     sys.stdout.flush()
@@ -72,23 +72,23 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
     #select evaluator
     if(median): 
         try:
-	  from bottleneck import nanmedian as evalcent 
-	  if iproc ==0:
-	     print("Proc 0: Using bottleneck for statistical functions")
-	except:
-	  from numpy import median as evalcent
-	  if iproc ==0:
-	     print("Proc 0: Using numpy for statistical functions")
+          from bottleneck import nanmedian as evalcent 
+          if iproc ==0:
+             print("Proc 0: Using bottleneck for statistical functions")
+        except:
+          from numpy import median as evalcent
+          if iproc ==0:
+             print("Proc 0: Using numpy for statistical functions")
     else:
         try:
-	  from bottleneck import nanmean as evalcent
-	  if iproc ==0:
-	     print("Proc 0: Using bottleneck for statistical functions")
-	except:
-	  from numpy import mean as evalcent
-	  if iproc ==0:
-	     print("Proc 0: Using numpy for statistical functions")
-	  
+          from bottleneck import nanmean as evalcent
+          if iproc ==0:
+             print("Proc 0: Using bottleneck for statistical functions")
+        except:
+          from numpy import mean as evalcent
+          if iproc ==0:
+             print("Proc 0: Using numpy for statistical functions")
+          
     
     try:
       from bottleneck import nanvar as evalvar
@@ -101,16 +101,16 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
         except:
           from numpy import std as clipstd
         try:
-	  from bottleneck import nanmedian as clipmedian 
-	except:
-	  from numpy import median as clipmedian
+          from bottleneck import nanmedian as clipmedian 
+        except:
+          from numpy import median as clipmedian
      
         
     #loop over slices (include tail)
     for ww in range(wstart,wend+1):
         print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
-	sys.stdout.flush()
-	
+        sys.stdout.flush()
+        
         #giant loop on pixels - necessary otherwise the memory goes off the roof
         for xx in range(nx):
             for yy in range(ny):
@@ -118,13 +118,13 @@ def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks
                 #ingest flux 
                 fluxpix=dataexp[:,ww-wstart,xx,yy]
                 fluxpix=fluxpix[np.isfinite(fluxpix)]
-		npix=len(fluxpix)
+                npix=len(fluxpix)
                 #print(ww,npix)
                 if(sigclip) and (npix>4):
                    #dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
                    #fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
                    fluxpix = sigclip_cubex(fluxpix, sigma_lower=sigma_lo, sigma_upper=sigma_up, maxiters=maxiters, minnum=minnum, cenfunc=clipmedian, stdfunc=clipstd)
-		   npix=len(fluxpix)
+                   npix=len(fluxpix)
                 
                 #bootstrap
                 if(npix > 1):
@@ -247,8 +247,69 @@ def applybootnoise(cube, bootcube, outcube, varscale=1.):
        
     data.writeto(outcube, overwrite=True)   
     print('All data saved!')
+    
 
-def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,sthre=1.0,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=True,savechecks=None):
+def globalscalenoise(cube, outcube, memmap=False):
+
+    """
+    Read a cube and compute a global scaling factor to the variance
+    such that the variance in the data is consistent with the 
+    variance extension. The scaling factor is calculated in regions
+    of the spectrum free from skylines.
+    
+    """
+
+    #Read cube 
+    hdu = fits.open(cube, memmap=memmap)
+
+    data = hdu[1].data
+    std = np.sqrt(hdu[2].data)
+
+    nz, ny, nx = np.shape(data)
+    
+    wave = hdu[1].header['CRVAL3']+np.arange(nz)*hdu[1].header['CD3_3']
+  
+    #compress into image
+    image=np.nanmedian(data, axis=0)
+    nx,ny=image.shape
+
+    #mask edges
+    edges=np.isfinite(image)
+    badmask=np.zeros((nx,ny))+1
+    badmask[edges]=0.0
+    badmask=ndimage.gaussian_filter(badmask,1.5)
+    badmask[np.where(badmask > 0)]=1.0
+
+    #mask sources
+    bkg = sep.Background(image,mask=badmask)    
+    thresh = 1.5 * bkg.globalrms
+    segmap = np.zeros((nx,ny))
+    objects,segmap=sep.extract(image,thresh,segmentation_map=True,
+                               minarea=10,clean=True,mask=badmask)
+    badmask[np.where(segmap > 0)]=1.0
+  
+    tonan = (badmask>0)
+    badmask[tonan] = np.nan
+    badmask[np.logical_not(tonan)] = 1
+  
+    mask3d = np.broadcast_to(badmask,(nz,)+badmask.shape)
+    fsig = data/std*mask3d
+
+    fsig_1d = np.nanstd(fsig, axis=(1,2))
+    
+    okwave = ((wave>4700) & (wave<5800)) | ((wave>6600) & (wave<6800))
+    
+    #Average does not like nans, mask them out
+    global_offset = np.nanmedian(fsig_1d[okwave])
+
+    hdu[2].data *= global_offset**2
+    hdu[2].header['VARSCALE'] = global_offset**2
+    
+    hdu.writeto(outcube, overwrite=True)
+
+    
+
+def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits",cut=10,smooth=1,block=65,disp=0.07,sthre=1.0,bootstrap=None,expmap=None,expmap_range=[0,0],memmap=False,savechecks=None):
     
     """
 
@@ -266,7 +327,7 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     bootstrap -> if set to a bootstrap variance cube perform rescaling using bootstrap resampling
                  rather than imposing rms
     expmap -> image file with number of exposures per pixel
-    expmap_range -> array with min/max values of the exposure map to be used. Range is capped to [1,nmax].		  
+    expmap_range -> array with min/max values of the exposure map to be used. Range is capped to [1,nmax].                
     memmap -> If false read the cube in memory, faster for numerical operations but more memory intensive
 
     savechecks-> if set to a root name, save check plots in files
@@ -488,8 +549,8 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     for ww in range(nw):
         #First thing write scale txt file
         txtout.write("{} {}\n".format(ww+1,filterscale[ww]**2))
-	
-	#get slices - handling AO gap, MFossati, unclear why we do need try statement
+        
+        #get slices - handling AO gap, MFossati, unclear why we do need try statement
         #try:
         slicecube=data[1].data[ww]
         slicevar=data[2].data[ww]
