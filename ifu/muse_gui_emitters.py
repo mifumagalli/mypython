@@ -260,10 +260,10 @@ class Window(Tkinter.Tk):
             newcl=Column(np.zeros(len(self.catdata)))
             self.catdata.add_column(newcl,name='redshift')
         if('type' not in self.catdata.colnames):
-            newcl=Column(np.full(len(self.catdata),'None',dtype="S25"))
+            newcl=Column(np.full(len(self.catdata),'None',dtype="S50"))
             self.catdata.add_column(newcl,name='type')
         if('notes' not in self.catdata.colnames):
-            newcl=Column(np.full(len(self.catdata),'None',dtype="S25"))
+            newcl=Column(np.full(len(self.catdata),'None',dtype="S50"))
             self.catdata.add_column(newcl,name='notes')
         if('relvel' not in self.catdata.colnames):
             newcl=Column(np.zeros(len(self.catdata)))
