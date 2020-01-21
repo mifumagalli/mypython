@@ -35,8 +35,12 @@ class TableEdit(Tkinter.Frame):
             current_row_lab  = []
             current_row_cel  = []
             for column in range(self.columns):
+                if column == self.columns-1:
+                   width=24
+                else:
+                   width=8   
                 label = Tkinter.StringVar()
-                cell  = Tkinter.Entry(self,textvariable=label,width=8)
+                cell  = Tkinter.Entry(self,textvariable=label,width=width)
                 cell.grid(row=row, column=column, sticky="nsew", padx=1, pady=1)
                 cell.bind("<Button-1>",self.lastclicked)
                 label.set("0.0")
@@ -89,7 +93,11 @@ class TableFix(Tkinter.Frame):
         for row in range(rows):
             current_row  = []
             for column in range(columns):
-                cell  = Tkinter.Label(self,text='Text',width=8)
+                if column == columns-1:
+                   width=24
+                else:
+                   width=8   
+                cell  = Tkinter.Label(self,text='Text',width=width)
                 cell.grid(row=row, column=column, sticky="nsew", padx=1, pady=1)
                 current_row.append(cell)
                 
