@@ -466,6 +466,182 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
    os.remove(cmocks_segmap)
 
 
+def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, extended=False, badmask=None, expmap=None, cov_poly=None, FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000):
+
+    from mypython.ifu import muse_emitters as emi
+    from astropy.io import fits, ascii
+    from astropy.table import Table
+    import subprocess
+    import numpy as np
+    import os, shutil
+
+    """
+
+    Run several iterations of the mock injection and detection loop to build up a statistical
+    sample of simulated line emitters.
+
+    cube -> a MUSE cube [filename] to use for emitters injection
+    varcube -> variance image for detection thresholding
+    segmap -> Segmentation map of the input image
+    cubexfile -> file with cubex run parameters
+    iters -> Number of injection/detection iterations to run
+    outdir -> Name of the output directory
+    outfile -> Name of the output filename
+    
+    badmask -> (Optional) injection will not happen on masked pixels (1)
+    expmap -> (Optional) if supplied, the final catalogue will report the value of the expmap at
+              the position of the injected source
+    extended -> use an exponential profile in x,y with scalelength equal to the value. If false, use point sources
+    fluxrange -> mock sources will be drawn in range [min,max] in 1E-20 erg/s/cm2
+    num -> number of mock sources [default=1000, high numbers give better statistics but can lead to shadowing]
+    cov_poly -> covariance array. If 1D assumed to be cov vs aperture size and valid at all waves. 
+                If 2D, the polynomial fit at the closest wave is used.
+    SNRdet -> SNR for detection (default = 5). Covariance is applied on top of this.
+    FWHM_pix -> spatial FWHM for Gaussian model in pixel
+    
+    """
+    
+    mockxc   = []
+    mockyc   = []
+    mockwc   = []
+    mockflux = []
+    mockexp  = []
+    sexdet   = []
+    sexxc    = []
+    sexyc    = []
+    sexwc    = []
+    sexflux1 = []
+    sexflux2 = []
+    
+    folder = '/tmpdir/'
+    
+    if expmap is not None:
+      #Read expmap
+      hduexp = fits.open(expmap)
+      expima = hduexp[0].data
+    
+    if not os.path.isdir(outdir+folder):
+       os.makedirs(outdir+folder)
+
+    for repeat in range(iters):
+        print("####################################")
+        print("Run " + str(repeat+1) + " of " + str(iters))
+        print("####################################")
+
+        mocklines(cube,segmap,fluxrange,badmask=badmask,output=outdir+folder,num=num, spatwidth=FWHM_pix, wavewidth=2, outprefix='lmocks', fill=6., exp=extended)
+        
+	# run on mock cube 
+        cube_mock = outdir+folder+'lmocks_'+os.path.basename(cube)
+        cubexcat = outdir+folder+'lmocks_catalogue.txt'
+        
+        #extract sources
+        print("Running CubEx")
+	subprocess.call(["CubEx",cubexfile,"-Catalogue",cubexcat,"-cube",cube_mock, "-var", varcube,"-SourceMask", segmap, "-NCheckCubes", "0", "-isn", "{}".format(SNRdet)],stdout=open(os.devnull, 'w'))
+
+        #Load extraction catalog
+        f = open(cubexcat, 'r')
+        o = open(cubexcat.replace('.txt', '_cln.txt'), 'w')
+        for line in f:
+           if '**' not in line and 'nan' not in line and 'NaN' not in line:
+              o.write(line)
+        f.close()
+        o.close()
+               
+        extracted = emi.read_cubex_catalog(cubexcat.replace('.txt', '_cln.txt'))
+        
+        # read in catalogue of known mock sources
+        tmpmock = ascii.read(outdir+folder+"{}_catalogue.txt".format(os.path.basename(cube_mock).split('.fits')[0]))
+        
+	for mockob in range(len(tmpmock)):
+	
+   	  thisxc = tmpmock['col1'][mockob]
+   	  thisyc = tmpmock['col2'][mockob]
+   	  thiswc = tmpmock['col3'][mockob]
+   	  
+   	  mockxc.append(thisxc)
+   	  mockyc.append(thisyc)
+	  mockwc.append(thiswc)
+   	  mockflux.append(tmpmock['col4'][mockob])
+	  
+          if expmap is not None:
+	    mockexp.append(expima[int(thisyc), int(thisxc)])
+	  else:
+	    mockexp.append(1)
+
+          sexx = np.array(extracted['x_fluxw'])-0.5
+          sexy = np.array(extracted['y_fluxw'])-0.5
+          sexw = np.array(extracted['z_fluxw'])-0.5
+          sexflux_aper = np.array(extracted['flux_aper'])
+          sexflux_iso  = np.array(extracted['IsoFlux'])
+	  sexerr_iso   = np.array(extracted['IsoErr'])
+	  sexsize      = np.sqrt(extracted['area_isoproj'])*0.2
+	  
+          distarray = np.sqrt((sexx-thisxc)**2+(sexy-thisyc)**2+(sexw-thiswc)**2)
+          	  
+	  if np.nanmin(distarray)<3.0:
+             
+	     indmatch = np.nanargmin(distarray)  
+	     
+	     #Calculate SN including covariance
+             if cov_poly is None:
+                 covariance = 1.0
+             elif cov_poly.ndim == 1 :
+                 size = sexsize[indmatch]
+                 covariance = np.polyval(cov_poly,size)
+             elif cov_poly.ndim == 2 :
+                 size = sexsize[indmatch]
+                 try:
+                    okind = np.where(extracted['lambda_geow'][indmatch]>cov_poly[:,0])[0][-1]
+                 except:
+                    okind = 0 
+                 covariance = np.polyval(cov_poly[okind,2:],size)
+	     
+             
+             sexdet.append((sexflux_iso[indmatch]/sexerr_iso[indmatch])/covariance)
+	     
+	     sexxc.append(sexx[indmatch])
+	     sexyc.append(sexy[indmatch])
+	     sexwc.append(sexw[indmatch])
+	     sexflux1.append(sexflux_iso[indmatch])
+	     sexflux2.append(sexflux_aper[indmatch])
+
+	  else:
+	     sexdet.append(0)
+	     sexxc.append(-1)
+	     sexyc.append(-1)
+             sexwc.append(-1) 
+	     sexflux1.append(-1) 
+	     sexflux2.append(-1) 
+        
+        if (repeat%10 ==0):
+             
+             print('Output mode')
+             
+             data = Table([mockxc, mockyc, mockwc, mockexp, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1, sexflux2])
+  
+	     if not os.path.isfile(outdir+outfile):
+                 with open(outdir+outfile, mode='w') as f:
+                   f.write('#mockxc mockyc mockwc mockexp mockflux sexdet sexxc sexyc sexwc sexfluxiso sexfluxaper \n')
+             
+             with open(outdir+outfile, mode='a') as f:
+                 print('Actually writing')
+                 data.write(f, format='ascii.no_header')
+             
+   	     mockxc   = []
+   	     mockyc   = []
+   	     mockwc   = []
+   	     mockflux = []
+   	     mockexp  = []
+   	     sexdet   = []
+   	     sexxc    = []
+   	     sexyc    = []
+   	     sexwc    = []
+   	     sexflux1 = []
+             sexflux2 = []
+
+    shutil.rmtree(outdir+folder)
+
+
 def analyse_mockcont(infile, exprange=None, nbins=250, complfrac=0.9):
   
   from astropy.io import fits, ascii

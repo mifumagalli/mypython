@@ -132,6 +132,7 @@ def read_cubex_catalog(catname):
         catalog = ascii.read(catname, names=fields)
         
     except:
+        print 'HERE'
         #Open file manually and perge bad rows
         f = open(catname, 'r')
         o = open(catname, 'w')
@@ -441,7 +442,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
                        cov_poly=None,working_dir='./',output_dir='./',fcube_median=None,fcube_odd=None,
                        fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
                        fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
-                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True):
+                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True,startind=0):
     
     """
     
@@ -675,7 +676,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         print("Extracting images for {} sources".format(len(catalog)))
         #loop over detections
         
-        for ii in range(len(catalog)):
+        for ii in range(startind,len(catalog)):
             
             #folder for this object
             objid = catalog['id'][ii]
