@@ -595,7 +595,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         cube_median_var=None
 
     #open source image
-    if(fsource_img):
+    if(fsource_img) and (marzred):
         apermap=fits.open(fsource_img)[0].data
         try:
             contzcat=ascii.read(marzred,format='csv',header_start=2)
