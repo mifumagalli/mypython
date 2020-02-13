@@ -45,99 +45,102 @@ def sigclip_cubex(array, sigma_lower=3, sigma_upper=3, maxiters=1000, minnum=3, 
     else:
       return array
 
-def evaluatenoise(iproc,wstart,wend,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,sigma_lo=3,sigma_up=3,maxiters=5,minnum=4):
+def evaluatenoise(wrun,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,semaphore,sigma_lo=3,sigma_up=3,maxiters=5,minnum=4):
     
     """
     Utility function that evaluates boostrap noise
     
     """
     
-    #now load the exposures
-    dataexp=np.zeros((nexp,wend-wstart+1,nx,ny))
+    if not os.path.isfile("boostrapvar_tmpout_w{}.npz".format(wrun)):
+       
+       #now load the exposures
+       dataexp=np.zeros((nexp,nx,ny))
     
-    for exp in range(nexp):
-        dataexp[exp]=fits.open(allexposures[exp])[1].data[wstart:wend+1,:,:]
-        #If requested apply mask on the fly
-        if(masks):
-          tmpmask=fits.open(allmasks[exp])[0].data[:,:]
-          dataexp[exp,:,(tmpmask==0)] = np.nan
+       for exp in range(nexp):
+           dataexp[exp]=fits.open(allexposures[exp])[1].data[wrun,:,:]
+           #If requested apply mask on the fly
+           if(masks):
+             tmpmask=fits.open(allmasks[exp])[0].data[:,:]
+             dataexp[exp,(tmpmask==0)] = np.nan
 
-    print('Proc {}: All data loaded'.format(iproc))        
-    sys.stdout.flush()
+       print('PROG: Slice {}. All data loaded, now running job...'.format(wrun))        
+       sys.stdout.flush()
     
-    #make space for output
-    newvar=np.zeros((wend-wstart+1,nx,ny))
+       #make space for output
+       newvar=np.zeros((nx,ny))
 
 
-    #select evaluator
-    if(median): 
-        try:
-          from bottleneck import nanmedian as evalcent 
-          if iproc ==0:
-             print("Proc 0: Using bottleneck for statistical functions")
-        except:
-          from numpy import median as evalcent
-          if iproc ==0:
-             print("Proc 0: Using numpy for statistical functions")
+       #select evaluator
+       if(median): 
+           try:
+             from bottleneck import nanmedian as evalcent 
+             if wrun ==0:
+                print("INFO: Using bottleneck for statistical functions")
+           except:
+             from numpy import median as evalcent
+             if wrun ==0:
+                print("INFO: Using numpy for statistical functions")
+       else:
+           try:
+             from bottleneck import nanmean as evalcent
+             if wrun ==0:
+                print("INFO: Using bottleneck for statistical functions")
+           except:
+             from numpy import mean as evalcent
+             if wrun ==0:
+                print("INFO: Using numpy for statistical functions")
+             
+    
+       try:
+         from bottleneck import nanvar as evalvar
+       except:
+         from numpy import var as evalvar
+    
+       if(sigclip):
+           try:
+             from bottleneck import nanstd as clipstd
+           except:
+             from numpy import std as clipstd
+           try:
+             from bottleneck import nanmedian as clipmedian 
+           except:
+             from numpy import median as clipmedian
+        
+           
+       #loop over slices (include tail)
+       sys.stdout.flush()
+    
+       #giant loop on pixels - necessary otherwise the memory goes off the roof
+       for xx in range(nx):
+           for yy in range(ny):
+                   
+               #ingest flux 
+               fluxpix=dataexp[:,xx,yy]
+               fluxpix=fluxpix[np.isfinite(fluxpix)]
+               npix=len(fluxpix)
+               #print(ww,npix)
+               if(sigclip) and (npix>4):
+                  #dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
+                  #fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
+                  fluxpix = sigclip_cubex(fluxpix, sigma_lower=sigma_lo, sigma_upper=sigma_up, maxiters=maxiters, minnum=minnum, cenfunc=clipmedian, stdfunc=clipstd)
+                  npix=len(fluxpix)
+               
+               #bootstrap
+               if(npix > 1):
+                   #run bootstrap
+                   rindex=np.random.randint(npix,size=(nsamp,npix))
+                   newvar[xx,yy]=evalvar(evalcent(fluxpix[rindex], axis=1))
+               else:
+                   newvar[xx,yy]=np.nan
+                       
+       #save output
+       np.savez("boostrapvar_tmpout_w{}.npz".format(wrun),wstart=wrun,wend=wrun,newvar=newvar)
+    
     else:
-        try:
-          from bottleneck import nanmean as evalcent
-          if iproc ==0:
-             print("Proc 0: Using bottleneck for statistical functions")
-        except:
-          from numpy import mean as evalcent
-          if iproc ==0:
-             print("Proc 0: Using numpy for statistical functions")
-          
+       print('PROG: Slice {} already done. Skipping...'.format(wrun))     
     
-    try:
-      from bottleneck import nanvar as evalvar
-    except:
-      from numpy import var as evalvar
-    
-    if(sigclip):
-        try:
-          from bottleneck import nanstd as clipstd
-        except:
-          from numpy import std as clipstd
-        try:
-          from bottleneck import nanmedian as clipmedian 
-        except:
-          from numpy import median as clipmedian
-     
-        
-    #loop over slices (include tail)
-    for ww in range(wstart,wend+1):
-        print('Proc {}: Working on slice {}/{}'.format(iproc,ww,wend))
-        sys.stdout.flush()
-        
-        #giant loop on pixels - necessary otherwise the memory goes off the roof
-        for xx in range(nx):
-            for yy in range(ny):
-                    
-                #ingest flux 
-                fluxpix=dataexp[:,ww-wstart,xx,yy]
-                fluxpix=fluxpix[np.isfinite(fluxpix)]
-                npix=len(fluxpix)
-                #print(ww,npix)
-                if(sigclip) and (npix>4):
-                   #dummy, low, high = stats.sigmaclip(fluxpix, low=sigma_lo, high=sigma_up)
-                   #fluxpix=fluxpix[(fluxpix>low) & (fluxpix<high)]
-                   fluxpix = sigclip_cubex(fluxpix, sigma_lower=sigma_lo, sigma_upper=sigma_up, maxiters=maxiters, minnum=minnum, cenfunc=clipmedian, stdfunc=clipstd)
-                   npix=len(fluxpix)
-                
-                #bootstrap
-                if(npix > 1):
-                    #run bootstrap
-                    rindex=np.random.randint(npix,size=(nsamp,npix))
-                    newvar[ww-wstart,xx,yy]=evalvar(evalcent(fluxpix[rindex], axis=1))
-                else:
-                    newvar[ww-wstart,xx,yy]=np.nan
-                    
-    #save output
-    np.savez("boostrapvar_tmpout_proc{}".format(iproc),wstart=wstart,wend=wend,newvar=newvar)
-    print("Proc {}: Done!".format(iproc))
-
+    semaphore.release()
 
 def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50,median=False,sigclip=False):
 
@@ -148,7 +151,7 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
 
     cubes -> list of input cubes
     masks -> list of associated masks
-    nsamp -> number of samples to draw [ideally 500000]
+    nsamp -> number of samples to draw [ideally 10000]
     outvar -> where to store output
     nproc -> number of proc to run this over 
     median -> if True, switches to median estimator 
@@ -164,61 +167,50 @@ def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits"
     for exp in open(cubes):
         allexposures.append(exp.strip())
         nexp=nexp+1
-    print('Found {} exposures'.format(nexp))
+    print('INFO: Found {} exposures'.format(nexp))
 
     
-
     if(masks):
         for exp in open(masks):
             allmasks.append(exp.strip())
-    print('Found {} masks'.format(nexp))
+    print('INFO: Found {} masks'.format(nexp))
     
     #find format of data and create empty var
     nw,nx,ny=fits.open(allexposures[0])[1].data.shape
-    print('Data format {} {} {}'.format(nw,nx,ny))
+    print('INFO: Data format {} {} {}'.format(nw,nx,ny))
     
     #now prepare batches for parallel run
-    itempbatch=nw/nproc
-    print('Running on {} proc with batches of {}'.format(nproc,itempbatch))
+    print('INFO: Running on {} proc '.format(nproc))
 
     #loop over processors and start parallel function
-    wstart=0
-    wend=np.round(itempbatch)
     processes=[]
-    for iproc in range(nproc):
-        #make sure does not run over index 
-        wend=np.minimum(wend,nw-1)
-        print('Proc {}: Start slice {} End slice {}'.format(iproc,wstart,wend))
-        p=mp.Process(target=evaluatenoise,args=(iproc,wstart,wend,nx,ny,nexp,
-                                                nsamp,allexposures,allmasks,masks,median,sigclip))
+    sema = mp.Semaphore(nproc)
+    for wrun in range(nw):
+        #make sure does not run over index
+        sema.acquire() 
+        p=mp.Process(target=evaluatenoise,args=(wrun,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigclip,sema))
         processes.append(p)
         p.start()
         
-        #update for next loop
-        wstart=wend+1
-        wend=wstart+itempbatch
-        if(iproc == nproc -1):
-            wend=nw-1
-            
     for p in processes:
         p.join()
     
     #reconstruct variance array 
     allvar=np.zeros((nw,nx,ny), dtype=np.float32)
-    for iproc in range(nproc):
-        thisproc=np.load("boostrapvar_tmpout_proc{}.npz".format(iproc))
-        allvar[thisproc['wstart']:thisproc['wend']+1,:,:]=thisproc['newvar']
+    for wrun in range(nw):
+        thisproc=np.load("boostrapvar_tmpout_w{}.npz".format(wrun))
+        allvar[wrun,:,:]=thisproc['newvar']
 
     #save to fits file
     hdu=fits.PrimaryHDU(allvar)
     hdu.writeto(outvar,overwrite=True)    
 
     #clean tmp files
-    alltmp=glob.glob("boostrapvar_tmpout_proc*.npz")
+    alltmp=glob.glob("boostrapvar_tmpout_w*.npz")
     for tmpfile in alltmp:
         os.remove(tmpfile)
 
-    print('All done at {}'.format(datetime.datetime.now()))
+    print('INFO: All done at {}'.format(datetime.datetime.now()))
 
 
 def applybootnoise(cube, bootcube, outcube, varscale=1.):
