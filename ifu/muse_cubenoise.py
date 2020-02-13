@@ -65,11 +65,9 @@ def evaluatenoise(wrun,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigcl
              dataexp[exp,(tmpmask==0)] = np.nan
 
        print('PROG: Slice {}. All data loaded, now running job...'.format(wrun))        
-       sys.stdout.flush()
-    
+           
        #make space for output
        newvar=np.zeros((nx,ny))
-
 
        #select evaluator
        if(median): 
@@ -107,10 +105,6 @@ def evaluatenoise(wrun,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigcl
            except:
              from numpy import median as clipmedian
         
-           
-       #loop over slices (include tail)
-       sys.stdout.flush()
-    
        #giant loop on pixels - necessary otherwise the memory goes off the roof
        for xx in range(nx):
            for yy in range(ny):
@@ -140,6 +134,7 @@ def evaluatenoise(wrun,nx,ny,nexp,nsamp,allexposures,allmasks,masks,median,sigcl
     else:
        print('PROG: Slice {} already done. Skipping...'.format(wrun))     
     
+    sys.stdout.flush()
     semaphore.release()
 
 def bootstrapnoise(cubes,masks=None,nsamp=10000,outvar="bootstrap_variance.fits",nproc=50,median=False,sigclip=False):
