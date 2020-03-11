@@ -132,6 +132,7 @@ def read_cubex_catalog(catname):
         catalog = ascii.read(catname, names=fields)
         
     except:
+        print 'HERE'
         #Open file manually and perge bad rows
         f = open(catname, 'r')
         o = open(catname, 'w')
@@ -441,7 +442,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
                        cov_poly=None,working_dir='./',output_dir='./',fcube_median=None,fcube_odd=None,
                        fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
                        fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
-                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True):
+                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True,mask=None,startind=0):
     
     """
     
@@ -481,7 +482,9 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
     fracnpix -> [optional] if set, cuts object with less than fracnpix in segmap within 5x5x5 region
     derived  -> if true, compute derived quantities (SN etc..)
     checkimg -> if true generate image cut outs 
-
+    mask --> [optional] If a mask is provided (1=bad, 0=ok) the sources with their center on a masked 
+             pixel will be rejected
+    
     """
 
     
@@ -594,7 +597,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         cube_median_var=None
 
     #open source image
-    if(fsource_img):
+    if(fsource_img) and (marzred):
         apermap=fits.open(fsource_img)[0].data
         try:
             contzcat=ascii.read(marzred,format='csv',header_start=2)
@@ -638,7 +641,18 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
     #make simplest cut to catalogue to reject unwanted sources
     select=catalog['SNR']>=np.amin(SNcut)
     catalog=catalog[select]
-    
+ 
+    #If mask is provided apply it
+    if (mask):
+       hdu = fits.open(mask)
+       try:
+         msk = hdu[0].data
+       except:
+         msk = hdu[1].data
+       
+       masked = msk[np.array(catalog['y_geow'], dtype=int),np.array(catalog['x_geow'], dtype=int)]  
+       catalog=catalog[masked==0]
+       
     #loop over classes and assign
     print("Assigning classes")
     for iclass,iSN in enumerate(SNcut):
@@ -675,7 +689,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         print("Extracting images for {} sources".format(len(catalog)))
         #loop over detections
         
-        for ii in range(len(catalog)):
+        for ii in range(startind,len(catalog)):
             
             #folder for this object
             objid = catalog['id'][ii]

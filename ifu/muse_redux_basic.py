@@ -58,7 +58,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     print('xml files loaded')
 
     #now try to pick the best calib files available based on matches of dates etc...
- 
+
     #start by setting the time of the observations
     time_obj=grabtime(xml_info['OBJECT'])
     reference_time=time_obj[0]
@@ -76,7 +76,6 @@ def parse_xml(path='./',nproc=12,pipecal=False):
         if('OBJECT' not in kk):
             #find list
             currentlist=list(xml_info[kk])                                
-                
             #find time offset in seconds
             times=np.array(grabtime(currentlist))
             delta_time=np.abs(times-reference_time)/3600.
@@ -101,13 +100,13 @@ def parse_xml(path='./',nproc=12,pipecal=False):
             #This is when you want only the best one
             else:
 		try:
-                 #pick closest
-                 mintm=np.argmin(delta_time)
-                 xml_info[kk]=[currentlist[mintm]]
-                 print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
+                    #pick closest
+                    mintm=np.argmin(delta_time)
+                    xml_info[kk]=[currentlist[mintm]]
+                    print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
                 except:
-                 print 'No suitable calibration found for {}. Abort.'.format(kk)
-                 exit()
+                    print 'No suitable calibration found for {}. Abort.'.format(kk)
+                    exit()
                 
     #set the calibration path relative and suffix
     xml_info["PATHCAL"]='../../Raw/'
