@@ -421,9 +421,13 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             exit()
     else:
         #for muse, keep eveything the same
-        imgdata=img[0].data
-        vardata=img[1].data
         psimg=psref
+        try:
+            imgdata=img[1].data
+            vardata=img[2].data
+        except:
+            imgdata=img[0].data
+            vardata=img[1].data
 
     #grab flux and var
     dataflx=np.nan_to_num(imgdata.byteswap(True).newbyteorder())
