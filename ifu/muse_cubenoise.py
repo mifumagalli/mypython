@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits 
+from astropy.stats import sigma_clipped_stats as scstat
 import sep
 import datetime
 from scipy import ndimage
@@ -577,4 +578,41 @@ def rescalenoise(cube,rescaleout="rescale_variance.txt",outvar="CUBE_rmsvar.fits
     data.close()
 
 
+def rescalenoise_image(image,outima,segmap=None):
+    
+    """
+    Rescale variance for a single image    
+    """
+ 
+    #open the data
+    data=fits.open(image)
+    
+    ima=data[1].data
+    var=data[2].data
+    nx,ny=ima.shape
+  
+    #mask edges
+    edges=np.isfinite(ima)
+    badmask=np.zeros((nx,ny))+1
+    badmask[edges]=0.0
+    badmask=ndimage.gaussian_filter(badmask,1.5)
+    badmask[np.where(badmask > 0)]=1.0
 
+        
+    #mask sources
+    bkg = sep.Background(ima.byteswap().newbyteorder(),mask=badmask)    
+    thresh = 2.0 * bkg.globalrms
+    segmap = np.zeros((nx,ny))
+    objects,segmap=sep.extract(ima.byteswap().newbyteorder(),thresh,segmentation_map=True,
+                               minarea=10,clean=True,mask=badmask)
+    badmask[np.where(segmap > 0)]=1.0
+    goodpix=np.where(badmask < 1)
+    
+    fsigma = (ima[goodpix])/np.sqrt(var[goodpix])
+    
+    fscale = scstat(fsigma)[2]
+    
+    data[2].data *= fscale**2
+    print('Scaling factor for variance = {:4.3f}'.format(fscale**2))
+    
+    data.writeto(outima, overwrite=True)

@@ -336,7 +336,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
     return
 
 
-def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, num=80, fill=10., minarea=10.,append=False):
+def run_mockcont(iters, outfile, image,  segmap, varima=None, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, ZP=None, num=80, fill=10., minarea=10.,append=False):
    
    """
 
@@ -346,9 +346,9 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
     iters -> Number of injection/detection iterations to run
     outfile -> Name of the output file
     image -> a MUSE image [filename] to use for mock, must have ZPAB keyword in header
-    varima - > variance image for detection thresholding
     segmap -> Segmentation map of the input image
-    
+
+    varima - > (Optional) variance image for detection thresholding     
     badmask -> (Optional) injection will not happen on masked pixels (1)
     expmap -> (Optional) if supplied, the final catalogue will report the value of the expmap at
               the position of the injected source
@@ -372,7 +372,8 @@ def run_mockcont(iters, outfile, image, varima, segmap, badmask=None, expmap=Non
    import os
 
    hduima = fits.open(image)
-   ZP = hduima[0].header['ZPAB']
+   if ZP is None:
+     ZP = hduima[0].header['ZPAB']
    
    #Read expmap
    if expmap:
