@@ -20,6 +20,8 @@ import numpy as np
 import subprocess
 import os
 import signal
+from mypython.ifu import muse_utils as utl
+
 
 class TableEdit(Tkinter.Frame):
     def __init__(self, parent, rows=10, columns=2):
@@ -371,7 +373,7 @@ class Window(Tkinter.Tk):
         currentz=float(self.relvel.get())
         currentl=float(self.rellam.get())
 
-        zline=self.catdata['lambda_fluxw']/currentl-1
+        zline=utl.airtovac(self.catdata['lambda_fluxw'])/currentl-1
         ratio=(1+currentz)/(1+zline)
         self.catdata['relvel']=np.abs(299792.458*(ratio**2-1)/(1+ratio**2))
         
