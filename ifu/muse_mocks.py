@@ -19,7 +19,8 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     wavewidth -> FWHM in spectral direction, in slices
     outprefix -> prefix for output  
     fill -> multiple of sigma to evaluate Gaussian. Larger number is more accurate but slower
-    exp -> use an exponential profile in x,y. If false, use point sources
+    exp -> use an exponential profile in x,y. If false, use point sources. If exp is a list the 
+           values will be drawn randomly
 
     """
     
@@ -46,7 +47,11 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     segima = seghdu[0].data
     seghdu.close()
     
-    segcube = np.repeat(segima[np.newaxis,...], np.shape(newcube)[0], axis=0)
+    if segima.ndim==2:
+       segcube = np.repeat(segima[np.newaxis,...], np.shape(newcube)[0], axis=0)
+    else:
+       segcube = segima
+    
     
     if(badmask):
       #Open badmask image
@@ -65,42 +70,47 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
         minw = wavelimits[0]
         maxw = wavelimits[1]
     
+    nx, ny, nw = cubhdu[0].header['NAXIS1'], cubhdu[0].header['NAXIS2'], cubhdu[0].header['NAXIS3']
+    
     minx=20
-    maxx=cubhdu[0].header['NAXIS1']-20
+    maxx=nx-20
     miny=20
-    maxy=cubhdu[0].header['NAXIS2']-20
+    maxy=ny-20
 
     #open output to store mocks
     fl=open(output+"{}_{}_catalogue.txt".format(outprefix,os.path.basename(cube).split('.fits')[0]),'w')
-    
-    #compute Gaussian parameters 
-    if exp:
-       sigmax=exp
-       sigmay=exp
-    else:
-       sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
-       sigmay=spatwidth/(2*np.sqrt(2*np.log(2)))
-    
-    sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
-    
+        
     #loop on mocks
     print('Injecting mock sources')
     
     mockcube = np.zeros_like(newcube)
     
+    if np.isscalar(exp):
+      exp = [exp]
+        
     ind = 0
     
     while ind<num:
-
+      
       #now draw random distributions
       mflux    = 10**np.random.uniform(np.log10(fluxlimits[0]),np.log10(fluxlimits[1]))
       xc       = np.random.uniform(minx,maxx)
       yc       = np.random.uniform(miny,maxy)
       wc       = np.random.uniform(minw,maxw)
 
-      sizex = int(np.ceil(3*sigmax))
-      sizey = int(np.ceil(3*sigmay))
-      sizew = int(np.ceil(3*sigmaw)) 
+      #compute Gaussian parameters 
+      if exp[0] is not False:
+         sigmax=np.random.choice(exp)
+         sigmay=sigmax
+      else:
+         sigmax=spatwidth/(2*np.sqrt(2*np.log(2)))
+         sigmay=sigmax
+      
+      sigmaw=wavewidth/(2*np.sqrt(2*np.log(2)))
+
+      sizex = int(np.ceil(5*sigmax))
+      sizey = int(np.ceil(5*sigmay))
+      sizew = int(np.ceil(5*sigmaw)) 
 
       #Verify availablity in seg map
       thisseg = np.sum(segcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex])
@@ -110,7 +120,8 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
       if thisseg > 0 or thisbad>0 or np.isnan(thiscub):
          continue
       else:
-        segcube[int(np.ceil(wc))-sizew:int(np.ceil(wc))+sizew,int(np.ceil(yc))-sizey:int(np.ceil(yc))+sizey,int(np.ceil(xc))-sizex:int(np.ceil(xc))+sizex] = 1 
+        #Book space in segcube with some space around to avoid overlapping injections
+        segcube[int(np.ceil(wc))-2*sizew:int(np.ceil(wc))+2*sizew,int(np.ceil(yc))-2*sizey:int(np.ceil(yc))+2*sizey,int(np.ceil(xc))-2*sizex:int(np.ceil(xc))+2*sizex] = 1 
         ind += 1  
 
       norm=mflux/(sigmax*sigmay*sigmaw*(2*np.pi)**(3./2.))
@@ -126,14 +137,12 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
       for xx in allx:
               for yy in ally:
         	  for ww in allw:
-    
-        	      if((xx > minx) & (yy > miny) & (ww > minw) & 
-        		 (xx < maxx) & (yy < maxy) & (ww < maxw)):
-        		  #evaluate 
-    
-        		  if exp:
-        		      pix= norm*np.exp(-1.*(( abs((xx-xc)) /sigmax )+
-        					    ( abs((yy-yc)) /sigmay )+
+                       if (xx>0) & (yy>0) & (ww>0) & (xx<nx-1) & (yy<ny-1) & (ww<nw-1):
+        		  if exp[0] is not False:
+                              #For exponential we need to compute the radius explicitly.
+                              #The code only allows symmetric exponentials in x and y, sorry about that.
+                              rad = np.sqrt((xx-xc)**2+(yy-yc)**2)
+        		      pix= norm*np.exp(-1.*(( rad /sigmax )+
         					    (((ww-wc)**2)/(2.*sigmaw**2))))
         		  
         		  else:
@@ -143,18 +152,14 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
         	       
         		  #store
         		  mockcube[int(ww),int(yy),int(xx)]=mockcube[int(ww),int(yy),int(xx)]+pix
-    
-    if(exp):
+              
+    if(exp[0] is not False):
       #The mock exponential profiles need to be convolved with a gaussian 2D filter to simulate PSF effects.
       #go from FWHM to sigma for the Kernel
-      kern = kern = (0,spatwidth/(2*np.sqrt(2*np.log(2))),spatwidth/(2*np.sqrt(2*np.log(2))))
+      kern = (0,spatwidth/(2*np.sqrt(2*np.log(2))),spatwidth/(2*np.sqrt(2*np.log(2))))
       mockcube =  filters.gaussian_filter(mockcube, kern, order=0)    
     
     newcube += mockcube
-
-    
-    print('Done.. writing!')
-    
 
     #store output
     if(ext==0):
@@ -178,7 +183,7 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,wavelimits
     return
 
 
-def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.,exp=False, expscale=1.5):
+def mockcont(image,segmap,fluxlimits,badmask=None,output='./',num=100,ZP=-1,spatwidth=3.5,outprefix='cmocks',fill=6.,exp=False, expscale=1.5):
 
     """
 
@@ -230,16 +235,18 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
       badhdu.close()      
     else:
       badmask = np.zeros_like(segima)
+
+    nx, ny = imahdu[0].header['NAXIS1'], iahdu[0].header['NAXIS2']
     
     minx=20
-    maxx=imahdu[0].header['NAXIS1']-20
+    maxx=nx-20
     miny=20
-    maxy=imahdu[0].header['NAXIS2']-20
+    maxy=ny-20
     
     #now draw random distributions
 
     #open output to store mocks
-    fl=open("{}_{}_catalogue.txt".format(outprefix,os.path.basename(image).split('.fits')[0]),'w')
+    fl=open(output+"{}_{}_catalogue.txt".format(outprefix,os.path.basename(image).split('.fits')[0]),'w')
     
     if(exp):
       #input is scalelength directly
@@ -290,10 +297,11 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
 
         for xx in allx:
             for yy in ally:
-                    if((xx > minx) & (yy > miny) & (xx < maxx) & (yy < maxy)):
+                     if (xx>0) & (yy>0) & (xx<nx-1) & (yy<ny-1):
                         #evaluate model at pixel
 			if(exp):
-			    pix=norm*np.exp(-1.*(( abs((xx-xc)) /sigmax )+( abs((yy-yc)) /sigmay )))
+                            rad= np.sqrt((xx-xc)**2+(yy-yc)**2)
+			    pix=norm*np.exp(-1.*(( rad /sigmax )))
 			else:
 			    pix=norm*np.exp(-1.*((((xx-xc)**2)/(2.*sigmax**2))+(((yy-yc)**2)/(2.*sigmay**2))))
                               
@@ -325,18 +333,18 @@ def mockcont(image,segmap,fluxlimits,badmask=None,num=100,ZP=-1,spatwidth=3.5,ou
         hdulist[1].header=imahdu[1].header
 
     write='{}_{}'.format(outprefix,os.path.basename(image))
-    hdulist.writeto(write,overwrite=True)
+    hdulist.writeto(output+write,overwrite=True)
     
     hdusegout = fits.ImageHDU(segima)
     write='{}_{}'.format(outprefix,os.path.basename(segmap))
-    hdusegout.writeto(write, overwrite=True)
+    hdusegout.writeto(output+write, overwrite=True)
 
     fl.close()
               
     return
 
 
-def run_mockcont(iters, outfile, image,  segmap, varima=None, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, ZP=None, num=80, fill=10., minarea=10.,append=False):
+def run_mockcont(image,  segmap, iters, outdir, outfile,  varima=None, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, ZP=None, num=80, fill=10., minarea=10.,append=False):
    
    """
 
@@ -394,25 +402,25 @@ def run_mockcont(iters, outfile, image,  segmap, varima=None, badmask=None, expm
    sexmag   = []
    
    if not append:
-      with open(outfile, mode='w') as f:
+      with open(outdir+outfile, mode='w') as f:
         f.write('#mockxc mockyc mockexp mockflux mockmag sexdet sexxc sexyc sexflux sexmag \n')
    
    #Define more filenames
-   cmocks_injcat = 'cmocks_{}_catalogue.txt'.format(os.path.basename(image).split('.fits')[0])
-   cmocks_image  = 'cmocks_{}'.format(os.path.basename(image))
-   cmocks_segmap = 'cmocks_{}'.format(os.path.basename(segmap))
+   cmocks_injcat = outdir+'cmocks_{}_catalogue.txt'.format(os.path.basename(image).split('.fits')[0])
+   cmocks_image  = outdir+'cmocks_{}'.format(os.path.basename(image))
+   cmocks_segmap = outdir+'cmocks_{}'.format(os.path.basename(segmap))
       
    for repeat in range(iters):
    	 
    	 print("Iteration {}".format(repeat))
    	 
    	 #Inject sources and read master catalogue
-   	 mockcont(image, segmap, magrange, badmask=badmask, num=num, ZP=ZP, spatwidth=FWHM_pix, fill=fill, exp=exp, expscale=EXP_scale)
+   	 mockcont(image, segmap, magrange, output=outdir, badmask=badmask, num=num, ZP=ZP, spatwidth=FWHM_pix, fill=fill, exp=exp, expscale=EXP_scale)
    	 tmpmock = ascii.read(cmocks_injcat, names=['Xpos', 'Ypos', 'Flux'])
    	 
    	 #Run sextractor
-   	 source.findsources(cmocks_image, image, nsig=SNRdet, fitsmask=badmask, varima=varima, minarea=minarea)
-   	 sexcat = fits.open('catalogue.fits')[1].data
+   	 source.findsources(cmocks_image, image, nsig=SNRdet, output=outdir, fitsmask=badmask, varima=varima, minarea=minarea)
+   	 sexcat = fits.open(outdir+'catalogue.fits')[1].data
    	 
    	 for mockob in range(len(tmpmock)):
    	   
@@ -443,11 +451,11 @@ def run_mockcont(iters, outfile, image,  segmap, varima=None, badmask=None, expm
    	      sexflux.append(-1)  
 	      sexmag.append(-1) 
    	   
-	 if (repeat%10 ==0) and (repeat>0):
+	 if (repeat%5 ==0) and (repeat>0):
 	      data = Table([mockxc, mockyc, mockexp, mockflux, mockmag, sexdet, sexxc, sexyc, sexflux, sexmag], names=[\
               'mockxc','mockyc','mockexp','mockflux','mockmag','sexdet','sexxc','sexyc','sexflux','sexmag'])
    
-              with open(outfile, mode='a') as f:
+              with open(outdir+outfile, mode='a') as f:
 	           data.write(f, format='ascii.no_header')
 	      
 	      mockxc   = []
@@ -460,14 +468,14 @@ def run_mockcont(iters, outfile, image,  segmap, varima=None, badmask=None, expm
 	      sexyc    = []
 	      sexflux  = []
   	      sexmag   = [] 
- 
-   os.remove('catalogue.fits')
+   
+   os.remove(outdir+'catalogue.fits')
    os.remove(cmocks_image)
    os.remove(cmocks_injcat)
    os.remove(cmocks_segmap)
 
 
-def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, extended=False, badmask=None, expmap=None, cov_poly=None, FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000):
+def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, extended=False, badmask=None, expmap=None, cov_poly=None, tmpdir='tmpdir', FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000):
 
     from mypython.ifu import muse_emitters as emi
     from astropy.io import fits, ascii
@@ -492,7 +500,8 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
     badmask -> (Optional) injection will not happen on masked pixels (1)
     expmap -> (Optional) if supplied, the final catalogue will report the value of the expmap at
               the position of the injected source
-    extended -> use an exponential profile in x,y with scalelength equal to the value. If false, use point sources
+    extended -> use an exponential profile in x,y with scalelength equal to the value. If false, use point sources.
+                If the value is a list of values they will be randomly drawn in the mock run
     fluxrange -> mock sources will be drawn in range [min,max] in 1E-20 erg/s/cm2
     num -> number of mock sources [default=1000, high numbers give better statistics but can lead to shadowing]
     cov_poly -> covariance array. If 1D assumed to be cov vs aperture size and valid at all waves. 
@@ -514,20 +523,19 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
     sexflux1 = []
     sexflux2 = []
     
-    folder = '/tmpdir/'
+    folder = '/'+tmpdir+'/'
     
     if expmap is not None:
       #Read expmap
       hduexp = fits.open(expmap)
       expima = hduexp[0].data
-    
+
     if not os.path.isdir(outdir+folder):
        os.makedirs(outdir+folder)
-
+        
     for repeat in range(iters):
         print("####################################")
         print("Run " + str(repeat+1) + " of " + str(iters))
-        print("####################################")
 
         mocklines(cube,segmap,fluxrange,badmask=badmask,output=outdir+folder,num=num, spatwidth=FWHM_pix, wavewidth=2, outprefix='lmocks', fill=6., exp=extended)
         
@@ -558,11 +566,12 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
    	  thisxc = tmpmock['col1'][mockob]
    	  thisyc = tmpmock['col2'][mockob]
    	  thiswc = tmpmock['col3'][mockob]
+          thisflux = tmpmock['col4'][mockob]
    	  
    	  mockxc.append(thisxc)
    	  mockyc.append(thisyc)
 	  mockwc.append(thiswc)
-   	  mockflux.append(tmpmock['col4'][mockob])
+   	  mockflux.append(thisflux)
 	  
           if expmap is not None:
 	    mockexp.append(expima[int(thisyc), int(thisxc)])
@@ -578,11 +587,21 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
 	  sexsize      = np.sqrt(extracted['area_isoproj'])*0.2
 	  
           distarray = np.sqrt((sexx-thisxc)**2+(sexy-thisyc)**2+(sexw-thiswc)**2)
-          	  
+          
+          tmpindmatch = np.nanargmin(distarray)
+            
 	  if np.nanmin(distarray)<3.0:
-             
-	     indmatch = np.nanargmin(distarray)  
-	     
+	     indmatch = tmpindmatch  
+	  elif np.nanmin(distarray)<5.0:
+             if (sexflux_iso[tmpindmatch] > 0.5*thisflux) and (sexflux_iso[tmpindmatch] < 2.0*thisflux):
+               indmatch = tmpindmatch
+             else:
+               indmatch = -1  
+          else:
+             indmatch = -1
+          
+          if indmatch>=0:
+                 
 	     #Calculate SN including covariance
              if cov_poly is None:
                  covariance = 1.0
@@ -613,19 +632,23 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
              sexwc.append(-1) 
 	     sexflux1.append(-1) 
 	     sexflux2.append(-1) 
-        
-        if (repeat%10 ==0):
+                   
+        if (repeat%5 ==0):
              
              print('Output mode')
              
-             data = Table([mockxc, mockyc, mockwc, mockexp, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1, sexflux2])
-  
+             if expmap is not None:
+               data = Table([mockxc, mockyc, mockwc, mockexp, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1])
+               header = '#mockxc mockyc mockwc mockexp mockflux sexdet sexxc sexyc sexwc sexfluxiso \n'
+             else:
+               data = Table([mockxc, mockyc, mockwc, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1])
+               header = '#mockxc mockyc mockwc mockflux sexdet sexxc sexyc sexwc sexfluxiso \n'
+             
 	     if not os.path.isfile(outdir+outfile):
                  with open(outdir+outfile, mode='w') as f:
-                   f.write('#mockxc mockyc mockwc mockexp mockflux sexdet sexxc sexyc sexwc sexfluxiso sexfluxaper \n')
+                   f.write(header)
              
              with open(outdir+outfile, mode='a') as f:
-                 print('Actually writing')
                  data.write(f, format='ascii.no_header')
              
    	     mockxc   = []
@@ -639,7 +662,7 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, exte
    	     sexwc    = []
    	     sexflux1 = []
              sexflux2 = []
-
+                 
     shutil.rmtree(outdir+folder)
 
 
