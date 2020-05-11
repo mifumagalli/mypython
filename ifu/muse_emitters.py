@@ -173,7 +173,7 @@ def independent_SNR(catalog, covariance, segmap, cube, var, cube_med=None, cube_
     for j in range(len(catalog)):
         
         #find pixels in seg map
-	Id = catalog['id'][j]
+        Id = catalog['id'][j]
         
         x=int(catalog['x_geow'][j])
         y=int(catalog['y_geow'][j])
@@ -209,7 +209,7 @@ def independent_SNR(catalog, covariance, segmap, cube, var, cube_med=None, cube_
 
         if(cube_even is not None):
             try:
-                SNR_even = np.nansum(cube_even[okpix])/np.sqrt(np.nansum(var_even[okpix]))	
+                SNR_even = np.nansum(cube_even[okpix])/np.sqrt(np.nansum(var_even[okpix]))      
                 catalog['SNR_even'][j] = SNR_even/covariance[j]
             except:
                 print('Have you correctly set even cubes/variance?')
@@ -256,7 +256,7 @@ def independent_SNR_fast(catalog, covariance, segmap, cube, var, cube_med=None, 
     for j in range(len(catalog)):
         
         #find pixels in seg map
-	Id = catalog['id'][j]
+        Id = catalog['id'][j]
         
         x=int(catalog['x_geow'][j])
         y=int(catalog['y_geow'][j])
@@ -300,7 +300,7 @@ def independent_SNR_fast(catalog, covariance, segmap, cube, var, cube_med=None, 
 
         if(cube_even is not None):
             try:
-                SNR_even = np.nansum(cube_even[z1:z2,y1:y2,x1:x2][okpix])/np.sqrt(np.nansum(var_even[z1:z2,y1:y2,x1:x2][okpix]))	
+                SNR_even = np.nansum(cube_even[z1:z2,y1:y2,x1:x2][okpix])/np.sqrt(np.nansum(var_even[z1:z2,y1:y2,x1:x2][okpix]))        
                 catalog['SNR_even'][j] = SNR_even/covariance[j]
             except:
                 print('Have you correctly set even cubes/variance?')
@@ -493,7 +493,7 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
 
     
     #create space for bunch of keywords [some may not be used]
-    ksig	   = Column(np.zeros(len(catalog), dtype=float), name='SNR')
+    ksig           = Column(np.zeros(len(catalog), dtype=float), name='SNR')
     ksig_odd    = Column(np.zeros(len(catalog), dtype=float), name='SNR_odd')
     ksig_even   = Column(np.zeros(len(catalog), dtype=float), name='SNR_even')
     ksig_med    = Column(np.zeros(len(catalog), dtype=float), name='SNR_med')
@@ -717,5 +717,93 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
                 utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, twod=True, tovac=True, write=savename, idsource=objid)
 
 
+def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, growthlim=1.025, plots=False):
+    
+    try:
+      cube = fits.open(fcube)[1].data
+    except:
+      cube = fits.open(fcube)[0].data
+    try:
+      cubevar = fits.open(fcube_var)[1].data
+    except:
+      cubevar = fits.open(fcube_var)[0].data
+      
+    
+    segcube = fits.open(fsegcube)[0].data
+    catalog = fits.open(fcatalog)[1].data
+    
+    fluxarr = np.zeros(len(idlist))
+    errarr  = np.zeros(len(idlist))
+    radarr  = np.zeros(len(idlist))
+    
+    for ind, eid in enumerate(idlist):
+    
+      #Find xc, yc, zc in catalog
+      emirec = catalog['id'] == eid
+      
+      if emirec.sum() <1:
+         print('ID {} not found in Cubex catalog. Skipping..'.format(eid))
+         continue
+      
+      xc, yc, zc = catalog['x_fluxw'][emirec][0],  catalog['y_fluxw'][emirec][0],  catalog['z_fluxw'][emirec][0]
+      ny, nx = np.shape(cube)[1:]
 
+      tmpnbima = np.zeros((ny, nx))
+      tmpnbvar = np.zeros((ny, nx))
 
+      for zz in np.arange(np.floor(zc-dz/2.), np.ceil(zc+dz/2.), dtype=int):
+          neigh = (segcube[zz,...] != eid) & (segcube[zz,...] > 0)
+          
+          tmpslice = np.nan_to_num(cube[zz,...])
+          tmpslice[neigh] = 0
+          tmpnbima += tmpslice
+          
+          tmpslice = np.nan_to_num(cubevar[zz,...])
+          tmpslice[neigh] = 0
+          tmpnbvar += tmpslice
+      
+      #Go in flux 
+      tmpnbima *= 1.25
+      tmpnbvar *= 1.25
+      
+      rad = np.arange(1,maxrad+1)
+      phot    = np.zeros_like(rad, dtype=float)
+      photerr = np.zeros_like(rad, dtype=float)
+      growth  = np.zeros_like(rad, dtype=float)
+      
+      skyaper = CircularAnnulus((xc-1, yc-1), r_in=maxrad, r_out = 1.5*maxrad)
+      skymask = skyaper.to_mask(method='center')
+      skydata = skymask.multiply(tmpnbima)[skymask.data>0]
+
+      bkg_avg, bkg_med, _  = scl(skydata)       
+      
+      for ii, r in enumerate(rad):
+        
+        aper = CircularAperture((xc-1, yc-1), r=r)
+        phot[ii]    = (aperture_photometry(tmpnbima, aper))['aperture_sum'][0]-bkg_med*aper.area
+        photerr[ii] = np.sqrt((aperture_photometry(tmpnbvar,aper))['aperture_sum'][0])
+        if ii==0:
+           growth[ii] = 100
+        else:
+           growth[ii] = phot[ii]/phot[ii-1]    
+          
+      rlim = np.argmin(growth>growthlim)-1
+      
+      fluxarr[ind] = phot[rlim]
+      errarr[ind] = photerr[rlim]
+      radarr[ind] = rad[rlim]
+      
+      if plots:
+        fig, ax = mp.subplots(nrows=1, ncols=1, figsize=(5,5))
+        ax.imshow(convolve(tmpnbima, Box2DKernel(5)), vmin=-2, vmax=30, origin='lower')
+        #ax.imshow(tmpnbima, vmin=-2, vmax=30, origin='lower')
+        circ = mp.Circle((xc,yc), rad[rlim], color='r', fill=False, lw=3)
+        ax.add_artist(circ)
+        ax.set_xlim(xc-50,xc+50)
+        ax.set_ylim(yc-50,yc+50)
+        mp.show() 
+      
+        mp.plot(rad, phot)
+        mp.show()
+      
+    return fluxarr, errarr, radarr    
