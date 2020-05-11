@@ -132,7 +132,6 @@ def read_cubex_catalog(catname):
         catalog = ascii.read(catname, names=fields)
         
     except:
-        print 'HERE'
         #Open file manually and perge bad rows
         f = open(catname, 'r')
         o = open(catname, 'w')
