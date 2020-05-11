@@ -5,7 +5,7 @@ These are sets of utilities to handle muse sources
 
 def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
                 minarea=10.,deblend_cont=0.0001,regmask=None,invregmask=False,fitsmask=None,clean=True,
-		outspec='Spectra',marz=False,rphot=False, detphot=False, sname='MUSE'):
+                outspec='Spectra',marz=False,rphot=False, detphot=False, sname='MUSE'):
 
     """      
 
@@ -32,7 +32,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     outspec -> where to store output spectra 
     marz    -> write spectra in also marz format (spectra needs to be true). 
                If set to numerical value, this is used as an r-band magnitude limit.
-    detphot -> perform aperture phtometry on the detection image and add magnitues to the catalogue	       
+    detphot -> perform aperture phtometry on the detection image and add magnitues to the catalogue            
     rphot   -> perform r-band aperture photometry and add r-band magnitudes to the catalogue
     sname   -> prefix for the source names. Default = MUSE
 
@@ -61,7 +61,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     except:
         #white cubex images
         data=img[0].data
-	
+        
     data=data.byteswap(True).newbyteorder()
     #grab effective dimension
     nex,ney=data.shape
@@ -83,20 +83,20 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
       
       if (stdx != nex) or (stdy != ney):
         print("The noise image does not have the same dimensions as the science image")
-	return -1
+        return -1
 
     #create bad pixel mask
     if(fitsmask):
         print("Using FITS image for badmask")
         hdumsk = fits.open(fitsmask)
-	try:
-	  badmask = hdumsk[1].data
-	except:
-	  badmask = hdumsk[0].data
-	badmask=badmask.byteswap(True).newbyteorder()
+        try:
+          badmask = hdumsk[1].data
+        except:
+          badmask = hdumsk[0].data
+        badmask=badmask.byteswap(True).newbyteorder()
     elif(regmask):
         print("Using region file for badmask")
-	Mask=msk.PyMask(ney,nex,regmask,header=img[0].header)
+        Mask=msk.PyMask(ney,nex,regmask,header=img[0].header)
         for ii in range(Mask.nreg):
             Mask.fillmask(ii)
             if(ii == 0):
@@ -124,7 +124,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     print('Residual background rms ', bkg.globalrms)
 
     if(check):
-        print 'Dumping sky...'
+        print('Dumping sky...')
         #dump sky properties
         back = bkg.back() 
         rms = bkg.rms()  
@@ -146,7 +146,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
                                minarea=minarea,clean=clean,mask=badmask,deblend_cont=deblend_cont,deblend_nthresh=32)
     
     
-    print "Extracted {} objects... ".format(len(objects))
+    print("Extracted {} objects... ".format(len(objects)))
     ids  = np.arange(len(objects))+1    
     
     if(spectra):
@@ -160,39 +160,39 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         #loop over detections
         for nbj in ids:
             obj = objects[nbj-1]
-	    #init mask
+            #init mask
             tmpmask=np.zeros((data.shape[0],data.shape[1]),dtype=np.bool)
             #fill this mask
             sep.mask_ellipse(tmpmask,obj['x'],obj['y'],obj['a'],obj['b'],obj['theta'],r=2)
             #add in global mask
-	    srcmask=srcmask+tmpmask*nbj
-	    #verify conflicts, resolve using segmentation map
-	    if np.nanmax(srcmask)>nbj:
-	       blended = (srcmask>nbj)
-	       srcmask[blended] = segmap[blended]
-	    
+            srcmask=srcmask+tmpmask*nbj
+            #verify conflicts, resolve using segmentation map
+            if np.nanmax(srcmask)>nbj:
+               blended = (srcmask>nbj)
+               srcmask[blended] = segmap[blended]
+            
         #Now loop again and extract spectra if required
-	if(spectra):
+        if(spectra):
            #Verify that the source mask has the same number of objects as the object list
-	   if not len(np.unique(srcmask[srcmask>0])) == len(objects):
-	      print("Mismatch between number of objects and number of spectra to extract.")
-	   for nbj in ids:
-	      savename="{}/id{}.fits".format(outspec,nbj)
-	      tmpmask3d=np.zeros((1,data.shape[0],data.shape[1]))
-	      tmpmask3d[0,:,:]=srcmask[:,:]
-	      tmpmask3d[tmpmask3d != nbj] = 0
-	      tmpmask3d[tmpmask3d > 0] = 1
-	      tmpmask3d = np.array(tmpmask3d, dtype=np.bool)
+           if not len(np.unique(srcmask[srcmask>0])) == len(objects):
+              print("Mismatch between number of objects and number of spectra to extract.")
+           for nbj in ids:
+              savename="{}/id{}.fits".format(outspec,nbj)
+              tmpmask3d=np.zeros((1,data.shape[0],data.shape[1]))
+              tmpmask3d[0,:,:]=srcmask[:,:]
+              tmpmask3d[tmpmask3d != nbj] = 0
+              tmpmask3d[tmpmask3d > 0] = 1
+              tmpmask3d = np.array(tmpmask3d, dtype=np.bool)
               utl.cube2spec(cube,None,None,None,write=savename,shape='mask',helio=helio,mask=tmpmask3d,tovac=True)
 
     if(check):
-        print 'Dumping source mask...'
+        print('Dumping source mask...')
         hdumain  = fits.PrimaryHDU(srcmask,header=header)
         hdubk  = fits.ImageHDU(srcmask)
         hdulist = fits.HDUList([hdumain,hdubk])
         hdulist.writeto(output+"/source.fits",overwrite=True)
         
-        print 'Dumping segmentation map'
+        print('Dumping segmentation map')
         hdumain  = fits.PrimaryHDU(segmap,header=header)
         hdubk  = fits.ImageHDU(segmap)
         hdulist = fits.HDUList([hdumain,hdubk])
@@ -211,7 +211,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     use_source = np.ones_like(name, dtype=bool)
     
     #write source catalogue
-    print 'Writing catalogue..'
+    print('Writing catalogue..')
     tab = table.Table(objects)
     tab.add_column(table.Column(dec),0,name='DEC')
     tab.add_column(table.Column(ra),0,name='RA')
@@ -238,22 +238,22 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
 
         tbhdu = fits.open(output+'/catalogue.fits')
         tbhdu.append(fits.BinTableHDU(phot_r))
-	tbhdu[-1].header['PHOTBAND'] = 'SDSS_r'
-        tbhdu.writeto(output+'/catalogue.fits',overwrite=True)	
+        tbhdu[-1].header['PHOTBAND'] = 'SDSS_r'
+        tbhdu.writeto(output+'/catalogue.fits',overwrite=True)  
     
     if((marz) & (spectra)):
         #if marz is True but no magnitude limit set, create marz file for whole catalogue
         if marz>10 and (rphot):
-	    #Requires testing
-	    hdu = fits.open(output+'/catalogue.fits')
-	    hdu[1].data['use_source'][hdu[2].data['MAGAP']>marz] = False
-	    hdu.writeto(output+'/catalogue.fits',overwrite=True)
-	    
+            #Requires testing
+            hdu = fits.open(output+'/catalogue.fits')
+            hdu[1].data['use_source'][hdu[2].data['MAGAP']>marz] = False
+            hdu.writeto(output+'/catalogue.fits',overwrite=True)
+            
             marz_file(output+'/catalogue.fits', outspec, output, r_lim=marz)
         else:
-	    marz_file(output+'/catalogue.fits', outspec, output)
-	
-    print 'All done'
+            marz_file(output+'/catalogue.fits', outspec, output)
+        
+    print('All done')
     return objects
     
 
@@ -284,8 +284,8 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
 
     id         = catalog[1].data['ID']         # Integer array - id of object
     name       = catalog[1].data['name']
-    x          = catalog[1].data['x']	       # Array of object image x-coords
-    y          = catalog[1].data['y']	       # Array of object image y-coords
+    x          = catalog[1].data['x']          # Array of object image x-coords
+    y          = catalog[1].data['y']          # Array of object image y-coords
     ra         = catalog[1].data['RA']         # Array of object R.A.s
     dec        = catalog[1].data['DEC']        # Array of object Dec.s
     use_source = catalog[1].data['use_source']
@@ -299,7 +299,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
     ra   = ra[use_source]
     dec  = dec[use_source]   
     
-    print ("Generating MARZ file for {} spectra".format(nspectra))
+    print("Generating MARZ file for {} spectra".format(nspectra))
         
     # Initialize flux, variance & sky arrays (sky not mandatory)
     intensity = np.zeros((nspectra,naxis3))
@@ -317,7 +317,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
         intensity[ii,:]  = data[0].data
         variance[ii,:]   = data[1].data
         sky[ii,:]        = data[0].data*0.0
-	wavelength[ii,:] = utl.vactoair(data[2].data)
+        wavelength[ii,:] = utl.vactoair(data[2].data)
 
     intensity[np.logical_not(np.isfinite(intensity))] = np.nan
     variance[np.logical_not(np.isfinite(variance))] = np.nan
@@ -387,7 +387,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
 
     #grab root name 
     rname=((image.split('/')[-1]).split('.fits'))[0]
-    print ('Working on {}'.format(rname))
+    print('Working on {}'.format(rname))
 
     #open the catalogue/fits 
     cat=fits.open(catalogue)
@@ -398,7 +398,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     #grab reference wcs from detection image 
     wref=wcs.WCS(det[0].header)
     psref=wref.pixel_scale_matrix[1,1]*3600.
-    print ('Reference pixel size {}'.format(psref))
+    print('Reference pixel size {}'.format(psref))
 
 
     #if not handling MUSE, special cases for format of data
@@ -417,7 +417,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
             if(zpab):
                 img[0].header['ZPAB']=zpab
         else:
-            print 'Instrument not supported!!'
+            print('Instrument not supported!!')
             exit()
     else:
         #for muse, keep eveything the same
@@ -445,7 +445,7 @@ def sourcephot(catalogue,image,segmap,detection,instrument='MUSE',dxp=0.,dyp=0.,
     if('MUSE' not in instrument):
         #allocate space for transformed segmentation map
         segmasktrans=np.zeros(dataflx.shape)
-        print "Remapping segmentation map to new image..."
+        print("Remapping segmentation map to new image...")
 
         #loop over original segmap and map to trasformed one
         #Just use nearest pixel, and keep only 1 when multiple choices 

@@ -228,7 +228,7 @@ class Muse(object):
         ex.individual_skysub(listob, autocalib=autocalib)
         
         if (combine):
-	  #now make space as needed for final products
+          #now make space as needed for final products
           if not os.path.exists('esocombine'):
               os.makedirs('esocombine')
 
@@ -244,7 +244,7 @@ class Muse(object):
           print('Back to top level...')
           os.chdir(currdir)
         
-	print('All done!')
+        print('All done!')
         
 
     def line_process(self,skymode='internal',refpath='./esocombine/',skymask=None,lmin=4900,lmax=9000,
@@ -336,9 +336,9 @@ class Muse(object):
                    
         deepwhite -> the best white image available to mask sources
         
-	skymask -> mask this region in the mpdaf reduction (selfcalibrate and zap) Format: ds9 region in image units
-	
-	extmaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
+        skymask -> mask this region in the mpdaf reduction (selfcalibrate and zap) Format: ds9 region in image units
+        
+        extmaskonly -> if true ose only the skymask supplied externally, if false merge sextractor and skymasks
 
         nproc -> number of processors 
 

@@ -20,7 +20,12 @@ from astropy.io import fits, ascii
 from astropy.table import Column, vstack, Table, join
 import sys    
 import matplotlib.pyplot as plt
+from photutils import CircularAperture, CircularAnnulus
+from photutils import aperture_photometry
 from datetime import datetime as tm
+from astropy.stats import sigma_clipped_stats as scl
+from astropy.convolution import convolve, Box2DKernel
+
 
 def preprocess_cubes(cubeslist,zmin,zmax,xpsf=None,ypsf=None,inpath='./',outpath='./'):
 
@@ -793,16 +798,16 @@ def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, 
       radarr[ind] = rad[rlim]
       
       if plots:
-        fig, ax = mp.subplots(nrows=1, ncols=1, figsize=(5,5))
+        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
         ax.imshow(convolve(tmpnbima, Box2DKernel(5)), vmin=-2, vmax=30, origin='lower')
         #ax.imshow(tmpnbima, vmin=-2, vmax=30, origin='lower')
-        circ = mp.Circle((xc,yc), rad[rlim], color='r', fill=False, lw=3)
+        circ = plt.Circle((xc,yc), rad[rlim], color='r', fill=False, lw=3)
         ax.add_artist(circ)
         ax.set_xlim(xc-50,xc+50)
         ax.set_ylim(yc-50,yc+50)
-        mp.show() 
+        plt.show() 
       
-        mp.plot(rad, phot)
-        mp.show()
+        plt.plot(rad, phot)
+        plt.show()
       
     return fluxarr, errarr, radarr    
