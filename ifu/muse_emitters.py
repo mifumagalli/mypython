@@ -716,13 +716,57 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
                 utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, twod=True, tovac=True, write=savename, idsource=objid)
 
 
-def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, growthlim=1.025, plots=False):
-    
+
+def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, plots=False):
+
     from photutils import CircularAperture, CircularAnnulus
     from photutils import aperture_photometry
     from astropy.stats import sigma_clipped_stats as scl
     from astropy.convolution import convolve, Box2DKernel
 
+    rad = np.arange(1,maxrad+1)
+    phot    = np.zeros_like(rad, dtype=float)
+    photerr = np.zeros_like(rad, dtype=float)
+    growth  = np.zeros_like(rad, dtype=float)
+    
+    skyaper = CircularAnnulus((xc-1, yc-1), r_in=maxrad, r_out = np.max([1.5*maxrad,20]))
+    skymask = skyaper.to_mask(method='center')
+    skydata = skymask.multiply(nbima)[skymask.data>0]
+
+    bkg_avg, bkg_med, _  = scl(skydata)       
+    
+    for ii, r in enumerate(rad):
+      
+      aper = CircularAperture((xc-1, yc-1), r=r)
+      phot[ii]    = (aperture_photometry(nbima, aper))['aperture_sum'][0]-bkg_med*aper.area
+      photerr[ii] = np.sqrt((aperture_photometry(nbvar,aper))['aperture_sum'][0])
+      if ii<3:
+         growth[ii] = 100
+      else:
+         growth[ii] = phot[ii]/phot[ii-1]    
+        
+    rlim = np.argmin(growth>growthlim)-1
+    
+    fluxarr = phot[rlim]
+    errarr = photerr[rlim]
+    radarr = rad[rlim]
+    
+    if plots:
+      fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
+      ax.imshow(convolve(nbima, Box2DKernel(5)), vmin=-2, vmax=30, origin='lower')
+      #ax.imshow(tmpnbima, vmin=-2, vmax=30, origin='lower')
+      circ = plt.Circle((xc-1,yc-1), rad[rlim], color='r', fill=False, lw=3)
+      ax.add_artist(circ)
+      ax.set_xlim(xc-50,xc+50)
+      ax.set_ylim(yc-50,yc+50)
+      plt.show() 
+    
+      plt.plot(rad, phot)
+      plt.show()
+    
+    return fluxarr, errarr, radarr
+
+def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, growthlim=1.025, plots=False):
     
     try:
       cube = fits.open(fcube)[1].data
@@ -743,72 +787,34 @@ def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, 
     
     for ind, eid in enumerate(idlist):
     
-      #Find xc, yc, zc in catalog
-      emirec = catalog['id'] == eid
-      
-      if emirec.sum() <1:
-         print('ID {} not found in Cubex catalog. Skipping..'.format(eid))
-         continue
-      
-      xc, yc, zc = catalog['x_fluxw'][emirec][0],  catalog['y_fluxw'][emirec][0],  catalog['z_fluxw'][emirec][0]
-      ny, nx = np.shape(cube)[1:]
+      #Find xc, yc, zc in catalog                                                                                
+      emirec = catalog['id'] == eid                                                                              
+                                                                                                                 
+      if emirec.sum() <1:                                                                                        
+         print('ID {} not found in Cubex catalog. Skipping..'.format(eid))                                       
+         continue                                                                                                
+                                                                                                                 
+      xc, yc, zc = catalog['x_fluxw'][emirec][0],  catalog['y_fluxw'][emirec][0],  catalog['z_fluxw'][emirec][0] 
+      ny, nx = np.shape(cube)[1:]                                                                                
 
-      tmpnbima = np.zeros((ny, nx))
-      tmpnbvar = np.zeros((ny, nx))
+      tmpnbima = np.zeros((ny, nx))                                                                              
+      tmpnbvar = np.zeros((ny, nx))                                                                              
 
-      for zz in np.arange(np.floor(zc-dz/2.), np.ceil(zc+dz/2.), dtype=int):
-          neigh = (segcube[zz,...] != eid) & (segcube[zz,...] > 0)
-          
-          tmpslice = np.nan_to_num(cube[zz,...])
-          tmpslice[neigh] = 0
-          tmpnbima += tmpslice
-          
-          tmpslice = np.nan_to_num(cubevar[zz,...])
-          tmpslice[neigh] = 0
-          tmpnbvar += tmpslice
+      for zz in np.arange(np.floor(zc-dz/2.), np.ceil(zc+dz/2.), dtype=int):                                     
+          neigh = (segcube[zz,...] != eid) & (segcube[zz,...] > 0)                                               
+                                                                                                                 
+          tmpslice = np.nan_to_num(cube[zz,...])                                                                 
+          tmpslice[neigh] = 0                                                                                    
+          tmpnbima += tmpslice                                                                                   
+                                                                                                                 
+          tmpslice = np.nan_to_num(cubevar[zz,...])                                                              
+          tmpslice[neigh] = 0                                                                                    
+          tmpnbvar += tmpslice                                                                                   
       
-      #Go in flux 
-      tmpnbima *= 1.25
-      tmpnbvar *= 1.25
+      #Go in flux        
+      tmpnbima *= 1.25   
+      tmpnbvar *= 1.25   
       
-      rad = np.arange(1,maxrad+1)
-      phot    = np.zeros_like(rad, dtype=float)
-      photerr = np.zeros_like(rad, dtype=float)
-      growth  = np.zeros_like(rad, dtype=float)
-      
-      skyaper = CircularAnnulus((xc-1, yc-1), r_in=maxrad, r_out = 1.5*maxrad)
-      skymask = skyaper.to_mask(method='center')
-      skydata = skymask.multiply(tmpnbima)[skymask.data>0]
-
-      bkg_avg, bkg_med, _  = scl(skydata)       
-      
-      for ii, r in enumerate(rad):
-        
-        aper = CircularAperture((xc-1, yc-1), r=r)
-        phot[ii]    = (aperture_photometry(tmpnbima, aper))['aperture_sum'][0]-bkg_med*aper.area
-        photerr[ii] = np.sqrt((aperture_photometry(tmpnbvar,aper))['aperture_sum'][0])
-        if ii==0:
-           growth[ii] = 100
-        else:
-           growth[ii] = phot[ii]/phot[ii-1]    
-          
-      rlim = np.argmin(growth>growthlim)-1
-      
-      fluxarr[ind] = phot[rlim]
-      errarr[ind] = photerr[rlim]
-      radarr[ind] = rad[rlim]
-      
-      if plots:
-        fig, ax = plt.subplots(nrows=1, ncols=1, figsize=(5,5))
-        ax.imshow(convolve(tmpnbima, Box2DKernel(5)), vmin=-2, vmax=30, origin='lower')
-        #ax.imshow(tmpnbima, vmin=-2, vmax=30, origin='lower')
-        circ = plt.Circle((xc-1,yc-1), rad[rlim], color='r', fill=False, lw=3)
-        ax.add_artist(circ)
-        ax.set_xlim(xc-50,xc+50)
-        ax.set_ylim(yc-50,yc+50)
-        plt.show() 
-      
-        plt.plot(rad, phot)
-        plt.show()
+      fluxarr[ind], errarr[ind], radarr[ind] = nb_cogphot(tmpnbima, tmpnbvar, xc, yc, maxrad=maxrad, growthlim=growthlim, plots=plots)
       
     return fluxarr, errarr, radarr    
