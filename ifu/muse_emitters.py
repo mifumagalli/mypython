@@ -766,7 +766,7 @@ def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, plots=False):
     
     return fluxarr, errarr, radarr
 
-def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, growthlim=1.025, plots=False):
+def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, offx=0, offy=0, growthlim=1.025, plots=False):
     
     try:
       cube = fits.open(fcube)[1].data
@@ -794,7 +794,7 @@ def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, 
          print('ID {} not found in Cubex catalog. Skipping..'.format(eid))                                       
          continue                                                                                                
                                                                                                                  
-      xc, yc, zc = catalog['x_fluxw'][emirec][0],  catalog['y_fluxw'][emirec][0],  catalog['z_fluxw'][emirec][0] 
+      xc, yc, zc = catalog['x_fluxw'][emirec][0]+offx,  catalog['y_fluxw'][emirec][0]+offy,  catalog['z_fluxw'][emirec][0] 
       ny, nx = np.shape(cube)[1:]                                                                                
 
       tmpnbima = np.zeros((ny, nx))                                                                              
