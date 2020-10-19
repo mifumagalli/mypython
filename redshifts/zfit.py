@@ -4,16 +4,22 @@ Gui to inspect spectra in 1/2D
 
 
 """
+try:
+ import Tkinter as tkinter
+ import tkFont as tkfont
+ from Tkinter import Tk
+ import tkFileDialog as filedialog
+except:
+ import tkinter
+ from tkinter import font as tkfont
+ from tkinter import Tk
+ from tkinter import filedialog 
 
-import Tkinter
-import tkFont
-from Tkinter import Tk
-import tkFileDialog
 
 from astropy.io import fits
 import matplotlib 
 matplotlib.use("TkAgg")
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2TkAgg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 import os
 import numpy as np
@@ -26,7 +32,7 @@ from astropy.io import fits
 from astropy.table import Table
 import sys, getopt
 
-class zfitwin(Tkinter.Tk):
+class zfitwin(tkinter.Tk):
     
     """ The basic class of the widget """
 
@@ -57,7 +63,7 @@ class zfitwin(Tkinter.Tk):
             self.execdir='./'
             
         #Fiddle with font
-        default_font = tkFont.nametofont("TkDefaultFont")
+        default_font = tkfont.nametofont("TkDefaultFont")
         scalefont = int(screen_height/1080.0*14)
         default_font.configure(size=scalefont)
 
@@ -68,19 +74,19 @@ class zfitwin(Tkinter.Tk):
         """ This init the basic gui """ 
         
         #create a menu frame
-        self.menuframe=Tkinter.Frame(self,width=int(self.preferwinwidth*self.menuaspect[0]),
+        self.menuframe=tkinter.Frame(self,width=int(self.preferwinwidth*self.menuaspect[0]),
                                      height=int(self.preferwinheight*self.menuaspect[1]))
         self.menuframe.grid_propagate(0)
         self.menuframe.grid()
 
         #create a data frame
-        self.dataframe=Tkinter.Frame(self,width=int(self.preferwinwidth*self.dataaspect[0]), 
+        self.dataframe=tkinter.Frame(self,width=int(self.preferwinwidth*self.dataaspect[0]), 
                                      height=int(self.preferwinheight*self.dataaspect[1]))
         self.dataframe.grid_propagate(0)
         self.dataframe.grid()
 
         #stick the 2D image in a separate window
-        self.imgframe=Tkinter.Toplevel(width=600,height=600)
+        self.imgframe=tkinter.Toplevel(width=600,height=600)
         
         #update for later use of units 
         self.update()
@@ -101,34 +107,34 @@ class zfitwin(Tkinter.Tk):
         """ This init the menu specific part """ 
         
         #exit button
-        self.menu_exit = Tkinter.Button(self.menuframe,text=u"EXIT",command=self.OnExit)
+        self.menu_exit = tkinter.Button(self.menuframe,text=u"EXIT",command=self.OnExit)
         self.menu_exit.grid(column=0,row=0)
 
       
         #save button
-        self.menu_save = Tkinter.Button(self.menuframe,text=u"Save",command=self.OnSave)
+        self.menu_save = tkinter.Button(self.menuframe,text=u"Save",command=self.OnSave)
         self.menu_save.grid(column=0,row=1)
 
         #choice of spectra
-        self.menu_select = Tkinter.Button(self.menuframe,text=u"Open Spectrum",
+        self.menu_select = tkinter.Button(self.menuframe,text=u"Open Spectrum",
                                           command=self.SelectFile)
         self.menu_select.grid(column=0,row=2)
         
         #current spectrum
-        self.currspec=Tkinter.StringVar()
+        self.currspec=tkinter.StringVar()
         self.currspec.set('Spect: Demo')
-        self.current=Tkinter.Label(self.menuframe,textvariable = self.currspec)
+        self.current=tkinter.Label(self.menuframe,textvariable = self.currspec)
         self.current.grid(column=0,row=3)
 
-        self.mouse_position=Tkinter.StringVar()
+        self.mouse_position=tkinter.StringVar()
         self.mouse_position.set('Mouse:(None,None)')
-        self.mouse_position_w=Tkinter.Label(self.menuframe,textvariable = self.mouse_position)
+        self.mouse_position_w=tkinter.Label(self.menuframe,textvariable = self.mouse_position)
         self.mouse_position_w.grid(column=0,row=4,columnspan=3)
 
         #Message window
-        self.generic_message=Tkinter.StringVar()
+        self.generic_message=tkinter.StringVar()
         self.generic_message.set('zfit-> Ready to go!')
-        self.generic_message_w=Tkinter.Label(self.menuframe,textvariable = self.generic_message)
+        self.generic_message_w=tkinter.Label(self.menuframe,textvariable = self.generic_message)
         self.generic_message_w.grid(column=5,row=3,columnspan=3)
 
         #line control stuff
@@ -200,37 +206,37 @@ class zfitwin(Tkinter.Tk):
         """ This controls operation with emission lines """
 
         #just say what it is 
-        linelabel=Tkinter.Label(self.menuframe,text = "Emission lines")
+        linelabel=tkinter.Label(self.menuframe,text = "Emission lines")
         linelabel.grid(column=1,row=0,columnspan=2)
 
         #drop down menu to select emission lines
-        llab = Tkinter.Label(self.menuframe, text="Select Lines: ")
+        llab = tkinter.Label(self.menuframe, text="Select Lines: ")
         llab.grid(column=1,row=1)
-        self.linelist = Tkinter.StringVar(self.menuframe)
+        self.linelist = tkinter.StringVar(self.menuframe)
         self.linelist.set("gal_vac") # default value
-        self.lineselect = Tkinter.OptionMenu(self.menuframe, self.linelist,"gal_vac","gal_air","lbg","lls","tell")
+        self.lineselect = tkinter.OptionMenu(self.menuframe, self.linelist,"gal_vac","gal_air","lbg","lls","tell")
         self.lineselect.grid(column=2,row=1)
         #set the linelist in trace state
         self.linelist.trace("w",self.displaylines)
 
         #line redshift window 
-        zlab = Tkinter.Label(self.menuframe, text="z = ")
+        zlab = tkinter.Label(self.menuframe, text="z = ")
         zlab.grid(column=1,row=2)
-        self.redshiftline = Tkinter.StringVar()
-        self.redlinecntr = Tkinter.Entry(self.menuframe,textvariable=self.redshiftline)
+        self.redshiftline = tkinter.StringVar()
+        self.redlinecntr = tkinter.Entry(self.menuframe,textvariable=self.redshiftline)
         self.redlinecntr.grid(column=2,row=2)
         self.redshiftline.set("0.0000")
         #set the redshift in a trace state
         self.redshiftline.trace("w",self.displaylines)
 
         #display lines
-        self.shwlinstate=Tkinter.IntVar()
-        self.lineshow = Tkinter.Checkbutton(self.menuframe, text="Show Lines",
+        self.shwlinstate=tkinter.IntVar()
+        self.lineshow = tkinter.Checkbutton(self.menuframe, text="Show Lines",
                                             variable=self.shwlinstate,command=self.displaylines)
         self.lineshow.grid(column=1,row=3)
         
         #fit lines
-        self.line_fit = Tkinter.Button(self.menuframe,text=u"FitLines",command=self.fitlines)
+        self.line_fit = tkinter.Button(self.menuframe,text=u"FitLines",command=self.fitlines)
         self.line_fit.grid(column=2,row=3)
       
     def init_templcontrol(self):
@@ -238,55 +244,55 @@ class zfitwin(Tkinter.Tk):
         """ Control the options for template fitting """
         
         #just say what it is 
-        templabel=Tkinter.Label(self.menuframe,text = "Templates")
+        templabel=tkinter.Label(self.menuframe,text = "Templates")
         templabel.grid(column=3,row=0,columnspan=4)
 
         #drop down menu to select template family 
-        llab = Tkinter.Label(self.menuframe, text="Pick template: ")
+        llab = tkinter.Label(self.menuframe, text="Pick template: ")
         llab.grid(column=3,row=1)
-        self.tempgroup= Tkinter.StringVar(self.menuframe)
+        self.tempgroup= tkinter.StringVar(self.menuframe)
         self.tempgroup.set("Select")
-        self.tempselect = Tkinter.OptionMenu(self.menuframe,self.tempgroup,"kinney","lbgs","sdss")
+        self.tempselect = tkinter.OptionMenu(self.menuframe,self.tempgroup,"kinney","lbgs","sdss")
         self.tempselect.grid(column=4,row=1)
         self.tempgroup.trace("w",self.loadtemplate)
 
         #just say what it is 
-        self.currenttemplate=Tkinter.StringVar(self.menuframe)
+        self.currenttemplate=tkinter.StringVar(self.menuframe)
         self.currenttemplate.set("Current: None")
-        self.tempchoice=Tkinter.Label(self.menuframe,textvariable = self.currenttemplate)
+        self.tempchoice=tkinter.Label(self.menuframe,textvariable = self.currenttemplate)
         self.tempchoice.grid(column=5,row=1,columnspan=2)
 
         #D not use trace for template, as these are expensive to compute 
         #template redshift window 
-        zlab = Tkinter.Label(self.menuframe, text="z = ")
+        zlab = tkinter.Label(self.menuframe, text="z = ")
         zlab.grid(column=3,row=2)
-        self.redshifttemp = Tkinter.StringVar()
-        self.redtempcntr = Tkinter.Entry(self.menuframe,textvariable=self.redshifttemp)
+        self.redshifttemp = tkinter.StringVar()
+        self.redtempcntr = tkinter.Entry(self.menuframe,textvariable=self.redshifttemp)
         self.redtempcntr.grid(column=4,row=2)
         self.redshifttemp.set("0.0000")
          
         #rmag window
-        rmg = Tkinter.Label(self.menuframe, text="flux = ")
+        rmg = tkinter.Label(self.menuframe, text="flux = ")
         rmg.grid(column=3,row=3)
-        self.magtemp = Tkinter.StringVar()
-        self.magtemcntr = Tkinter.Entry(self.menuframe,textvariable=self.magtemp)
+        self.magtemp = tkinter.StringVar()
+        self.magtemcntr = tkinter.Entry(self.menuframe,textvariable=self.magtemp)
         self.magtemcntr.grid(column=4,row=3)
         self.magtemp.set("1.00")
     
         #display template
-        self.shwtempstate=Tkinter.IntVar()
-        self.tempshow = Tkinter.Button(self.menuframe,text="Show Template",command=self.displaytemplate)
+        self.shwtempstate=tkinter.IntVar()
+        self.tempshow = tkinter.Button(self.menuframe,text="Show Template",command=self.displaytemplate)
         self.tempshow.grid(column=3,row=4)
-        self.temphide = Tkinter.Button(self.menuframe,text="Hide Template",command=self.hidetemplate)
+        self.temphide = tkinter.Button(self.menuframe,text="Hide Template",command=self.hidetemplate)
         self.temphide.grid(column=4,row=4)
        
         #fit template
-        self.template_fit = Tkinter.Button(self.menuframe,text=u"FitTemplate",command=self.fittemplate)
+        self.template_fit = tkinter.Button(self.menuframe,text=u"FitTemplate",command=self.fittemplate)
         self.template_fit.grid(column=5,row=2)
 
         #toggle sky      
-        self.shwskystate=Tkinter.IntVar()
-        self.template_sky=Tkinter.Button(self.menuframe,text=u"Sky On/Off",command=self.togglesky)
+        self.shwskystate=tkinter.IntVar()
+        self.template_sky=tkinter.Button(self.menuframe,text=u"Sky On/Off",command=self.togglesky)
         self.template_sky.grid(column=5,row=4)
 
     
@@ -304,7 +310,7 @@ class zfitwin(Tkinter.Tk):
     def SelectFile(self):
         """ Select and open file as one wishes """
         #select file 
-        self.filename=tkFileDialog.askopenfilename(initialdir='./')
+        self.filename=filedialog.askopenfilename(initialdir='./')
         #update name
         self.currspec.set("Spec: "+self.filename.split("/")[-1])
         
@@ -370,7 +376,11 @@ class zfitwin(Tkinter.Tk):
      
         #send it to canvas - connect event 
         self.twodimagePlot = FigureCanvasTkAgg(self.twodimagePlot_prop["figure"],master=self.imgframe)
-        self.twodimagePlot.show()
+        #Draw is required in matplotlib > 2.2, show is kept for legacy only
+        try:  
+           self.twodimagePlot.draw()
+        except:
+           self.twodimagePlot.show()
         #need to set tight layout after showing 
         self.twodimagePlot_prop["figure"].tight_layout()
         #enable event on click
@@ -412,7 +422,10 @@ class zfitwin(Tkinter.Tk):
         self.update_spectrum()
         #send it to canvas
         self.spectrumPlot = FigureCanvasTkAgg(self.spectrumPlot_prop["figure"],master=self.dataframe)
-        self.spectrumPlot.show()
+        try:
+           self.spectrumPlot.draw()
+        except:
+           self.spectrumPlot.show()
         #enable event on click
         self.spectrumPlot_prop["figure"].tight_layout()
         self.spectrumPlot.mpl_connect("button_press_event", self.pressbutton)
@@ -492,7 +505,10 @@ class zfitwin(Tkinter.Tk):
     
         #send it to canvas
         self.twodspcPlot = FigureCanvasTkAgg(self.twodspcPlot_prop["figure"],master=self.dataframe)
-        self.twodspcPlot.show()
+        try:
+           self.twodspcPlot.draw()
+        except:
+          self.twodspcPlot.show()  
         #enable event on click
         self.twodspcPlot_prop["figure"].tight_layout()
         self.twodspcPlot.mpl_connect("button_press_event", self.pressbutton)
@@ -580,7 +596,10 @@ class zfitwin(Tkinter.Tk):
     
         #send it to canvas
         self.twoderrPlot = FigureCanvasTkAgg(self.twoderrPlot_prop['figure'],master=self.dataframe)
-        self.twoderrPlot.show()
+        try:
+           self.twoderrPlot.draw()
+        except:
+           self.twoderrPlot.show()
         #enable event on click
         self.twoderrPlot_prop['figure'].tight_layout()
         self.twoderrPlot.mpl_connect("button_press_event", self.pressbutton)
@@ -652,7 +671,7 @@ class zfitwin(Tkinter.Tk):
         """
 
         #if so, start dialogue to pick the desired template
-        self.picktemplate=tkFileDialog.askopenfilename(initialdir='{}/templates/{}'.format(self.execdir,self.tempgroup.get()))
+        self.picktemplate=filedialog.askopenfilename(initialdir='{}/templates/{}'.format(self.execdir,self.tempgroup.get()))
         #set current template 
         self.currenttemplate.set("Current: "+self.picktemplate.split("/")[-1])
         
@@ -735,7 +754,7 @@ class zfitwin(Tkinter.Tk):
 
         #loop over lines inside spectrum 
         #lounch a new window
-        self.lnfit=Tkinter.Toplevel(self.tk)
+        self.lnfit=tkinter.Toplevel(self.tk)
         
         #add a display
         fig=Figure(figsize=(self.preferwinwidth/self.dpi,self.preferwinheight/self.dpi),dpi=self.dpi)
@@ -820,7 +839,10 @@ class zfitwin(Tkinter.Tk):
 
         #send figure to canvas
         self.linefitplot = FigureCanvasTkAgg(fig,master=self.lnfit)
-        self.linefitplot.show()
+        try:
+           self.linefitplot.draw()
+        except:
+           self.linefitplot.show()
         #fig.tight_layout()
         self.linefitplot.get_tk_widget().grid()
  
@@ -890,7 +912,7 @@ class zfitwin(Tkinter.Tk):
 
         #trigger display options 
         #lounch a new window
-        self.tmlfit=Tkinter.Toplevel(self.tk)
+        self.tmlfit=tkinter.Toplevel(self.tk)
         
         #add xcorr to display
         #create properties for this plot
@@ -1184,7 +1206,7 @@ class zfitwin(Tkinter.Tk):
         self.displaylines()
 
         #lounch a new window
-        self.lnsel=Tkinter.Toplevel(self.tk)
+        self.lnsel=tkinter.Toplevel(self.tk)
      
         #pick z
         try:
@@ -1193,12 +1215,12 @@ class zfitwin(Tkinter.Tk):
             redsh=0.0
             
         #create line buttons for those visibles
-        self.wlineselect = Tkinter.DoubleVar()
+        self.wlineselect = tkinter.DoubleVar()
         self.wlinepos = event.xdata
         i=0
         for lw,lnam in self.infoline:
             lwplot=lw*(1+redsh)
-            Tkinter.Radiobutton(self.lnsel, text=lnam+"{}".format(int(lw)), 
+            tkinter.Radiobutton(self.lnsel, text=lnam+"{}".format(int(lw)), 
                                 variable=self.wlineselect, value=lw,
                                 command=self.pickedline).grid(row = i%30, column = i/30, sticky = "NWSE")
             i=i+1
