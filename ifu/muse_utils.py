@@ -761,10 +761,17 @@ def smoothcube(cube, smoothcube, spatsig, lamsig,  smethod='median'):
     
        kern = (lamsig,spatsig,spatsig)
        
-       qb[dataext].data =  filters.uniform_filter(qb[dataext].data, kern, order=0)
+       qb[dataext].data =  filters.uniform_filter(qb[dataext].data, kern, origin=0)
        if varext is not None:
-         qb[varext].data = filters.uniform_filter(qb[varext].data, kern, order=0)#/(nsm**2)
-   
+         qb[varext].data = filters.uniform_filter(qb[varext].data, kern, origin=0)#/(nsm**2)   
+    
+    if smethod == 'median':
+    
+       kern = (lamsig,spatsig,spatsig)
+       
+       qb[dataext].data =  filters.median_filter(qb[dataext].data, kern, origin=0)
+       if varext is not None:
+         qb[varext].data = filters.median_filter(qb[varext].data, kern, origin=0)#/(nsm**2)   
     
     qb.writeto(smoothcube, overwrite=True)
         

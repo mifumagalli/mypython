@@ -257,7 +257,7 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
     return objects
     
 
-def marz_file(catalogue, specdir, outdir, r_lim=False):
+def marz_file(catalogue, specdir, outdir, specfmt='id', r_lim=False):
     
     import glob
     from astropy.io import fits
@@ -267,7 +267,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
 
     
     #Makes a list of spectra files ** MUST include the spectra from catalogue**
-    filelist = glob.glob(specdir+'/*')
+    filelist = glob.glob(specdir+'/{}*'.format(specfmt))
     
     #Need catalogue of spectra objects            
     catalog = fits.open(catalogue)   
@@ -277,8 +277,8 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
         marzfile = outdir+'/spectra_marz_r' + str(r_lim) + '.fits'    
     else:
         marzfile = outdir+'/spectra_marz.fits'                                  
-
-
+    
+        
     s0 = fits.open(filelist[0])
     naxis3=len(s0[0].data)
 
@@ -312,7 +312,7 @@ def marz_file(catalogue, specdir, outdir, r_lim=False):
     type = []
 
     for ii in range(nspectra):
-        data = fits.open(specdir+'/id{}.fits'.format(id[ii]))
+        data = fits.open(specdir+'/{}{}.fits'.format(specfmt,id[ii]))
         type.append('P')
         intensity[ii,:]  = data[0].data
         variance[ii,:]   = data[1].data
