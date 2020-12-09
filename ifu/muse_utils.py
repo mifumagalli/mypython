@@ -756,7 +756,6 @@ def smoothcube(cube, smoothcube, spatsig, lamsig,  smethod='median'):
        if varext is not None:
          qb[varext].data = filters.gaussian_filter(qb[varext].data, kern, order=0)#/(nsm**2)
        
-      
     if smethod == 'boxcar':
     
        kern = (lamsig,spatsig,spatsig)
