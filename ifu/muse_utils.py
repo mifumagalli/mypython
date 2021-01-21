@@ -690,7 +690,7 @@ def check_flux_scaling(reference,listexp,maskedges=None,verbose=True,flxlim=150.
         if(verbose):
             plt.scatter(ref_phot[use],chk_phot[use]/ref_phot[use])
             plt.show()
-        print ("Scaling for {} is {}".format(ff,np.median(chk_phot[use]/ref_phot[use])))
+        print("Scaling for {} is {}".format(ff,np.median(chk_phot[use]/ref_phot[use])))
         
     fl.close()
 
