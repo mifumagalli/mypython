@@ -477,7 +477,8 @@ class Window(Tkinter.Tk):
                 
         #sort table
         if('optimal' in self.sortlist.get()):
-            self.catdata.sort(['confidence','SNR'])
+            self.catdata.sort(['OverContinuum','SNR'])
+            self.catdata.reverse()
         else:
             self.catdata.sort(self.sortlist.get())
         

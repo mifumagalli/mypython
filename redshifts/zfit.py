@@ -286,6 +286,7 @@ class zfitwin(Tkinter.Tk):
 
         #toggle sky      
         self.shwskystate=Tkinter.IntVar()
+        #self.shwskystate.set(1)
         self.template_sky=Tkinter.Button(self.menuframe,text=u"Sky On/Off",command=self.togglesky)
         self.template_sky.grid(column=5,row=4)
 
