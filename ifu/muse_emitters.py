@@ -273,8 +273,11 @@ def independent_SNR_fast(catalog, covariance, segmap, cube, var, cube_med=None, 
         #compute fraction of pixels in 5x5x5 region
         cutcutsegmap=cutsegmap[z-2-z1:z+3-z1,y-2-y1:y+3-y1,x-2-x1:x+3-x1]
         cutokpix = (cutcutsegmap == Id)
-        catalog['BoxFraction'][j]=1.*np.sum(cutokpix)/np.sum(okpix)
-        
+        try:
+          catalog['BoxFraction'][j]=1.*np.sum(cutokpix)/np.sum(okpix)
+        except:
+          catalog['BoxFraction'][j]=0
+          
         #compute corrected SN
         cutcube = cube[z1:z2,y1:y2,x1:x2]
         SNR      = np.nansum(cube[z1:z2,y1:y2,x1:x2][okpix])/np.sqrt(np.nansum(var[z1:z2,y1:y2,x1:x2][okpix]))
@@ -766,7 +769,7 @@ def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, plots=False):
     
     return fluxarr, errarr, radarr
 
-def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, offx=0, offy=0, growthlim=1.025, plots=False):
+def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, offx=0, offy=0, growthlim=1.025, writeNB=False, plots=False):
     
     try:
       cube = fits.open(fcube)[1].data
@@ -814,6 +817,10 @@ def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, 
       #Go in flux        
       tmpnbima *= 1.25   
       tmpnbvar *= 1.25   
+      
+      if writeNB:
+        hdu = fits.PrimaryHDU(tmpnbima)
+        hdu.writeto(os.path.dirname(fcatalog)+'/objs/id{}/NBima_24.fits'.format(eid), overwrite=True)
       
       fluxarr[ind], errarr[ind], radarr[ind] = nb_cogphot(tmpnbima, tmpnbvar, xc, yc, maxrad=maxrad, growthlim=growthlim, plots=plots)
       

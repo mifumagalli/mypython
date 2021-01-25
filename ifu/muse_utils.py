@@ -690,7 +690,7 @@ def check_flux_scaling(reference,listexp,maskedges=None,verbose=True,flxlim=150.
         if(verbose):
             plt.scatter(ref_phot[use],chk_phot[use]/ref_phot[use])
             plt.show()
-        print ("Scaling for {} is {}".format(ff,np.median(chk_phot[use]/ref_phot[use])))
+        print("Scaling for {} is {}".format(ff,np.median(chk_phot[use]/ref_phot[use])))
         
     fl.close()
 
@@ -756,15 +756,21 @@ def smoothcube(cube, smoothcube, spatsig, lamsig,  smethod='median'):
        if varext is not None:
          qb[varext].data = filters.gaussian_filter(qb[varext].data, kern, order=0)#/(nsm**2)
        
-      
     if smethod == 'boxcar':
     
        kern = (lamsig,spatsig,spatsig)
        
-       qb[dataext].data =  filters.uniform_filter(qb[dataext].data, kern, order=0)
+       qb[dataext].data =  filters.uniform_filter(qb[dataext].data, kern, origin=0)
        if varext is not None:
-         qb[varext].data = filters.uniform_filter(qb[varext].data, kern, order=0)#/(nsm**2)
-   
+         qb[varext].data = filters.uniform_filter(qb[varext].data, kern, origin=0)#/(nsm**2)   
+    
+    if smethod == 'median':
+    
+       kern = (lamsig,spatsig,spatsig)
+       
+       qb[dataext].data =  filters.median_filter(qb[dataext].data, kern, origin=0)
+       if varext is not None:
+         qb[varext].data = filters.median_filter(qb[varext].data, kern, origin=0)#/(nsm**2)   
     
     qb.writeto(smoothcube, overwrite=True)
         

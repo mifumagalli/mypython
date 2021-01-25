@@ -18,6 +18,7 @@ from astropy.io import fits
 from astropy.io import ascii
 import string as str
 from scipy import asarray as ar, exp
+from scipy import ndimage
 import glob
 
 
@@ -46,10 +47,10 @@ def make_expmap(RAG, DEG, NAXIS_x, NAXIS_y, imgfv, mosaicpos, outname):
   1         350       175.80264 20.006542      MYMOSAIC1
   2         350       175.73517 19.97025       MYMOSAIC2
   3         350       175.7857  20.0145        MYMOSAIC3
-  4    	    350       175.76889 20.024283      MYMOSAIC4
-  5    	    350       175.75305 20.036153      MYMOSAIC5
-  6    	    350       175.73672 20.040716      MYMOSAIC6
-  7    	    490       175.73437 19.984127      MYMOSAIC7
+  4         350       175.76889 20.024283      MYMOSAIC4
+  5         350       175.75305 20.036153      MYMOSAIC5
+  6         350       175.73672 20.040716      MYMOSAIC6
+  7         490       175.73437 19.984127      MYMOSAIC7
   8         490       175.73583 20.00156       MYMOSAIC8
   
   """
@@ -57,7 +58,7 @@ def make_expmap(RAG, DEG, NAXIS_x, NAXIS_y, imgfv, mosaicpos, outname):
   #Set the MOSAIC central coords and axis dimensions, 
   #start from an existent header of an IMAGEFOV and update the WCS
   
-  print 'Reading header of the file: '+imgfv
+  print('Reading header of the file: '+imgfv)
   cubo=fits.open(imgfv)
 
   header_data = cubo[1].header
@@ -72,8 +73,8 @@ def make_expmap(RAG, DEG, NAXIS_x, NAXIS_y, imgfv, mosaicpos, outname):
 
   empty_cube = np.zeros([NAXIS_y, NAXIS_x], dtype=np.float32)
   hdu_prim = fits.PrimaryHDU(header=cubo[0].header)  
-  hdu_img  = fits.ImageHDU(empty_cube, header=header_data)  	     
-  hdu_list = fits.HDUList([hdu_prim,hdu_img])	     
+  hdu_img  = fits.ImageHDU(empty_cube, header=header_data)           
+  hdu_list = fits.HDUList([hdu_prim,hdu_img])        
 
   ###READ the FILE WITH OB number AND OB coords
   filecoord = np.array(ascii.read(mosaicpos, format='commented_header'))
@@ -95,7 +96,7 @@ def make_expmap(RAG, DEG, NAXIS_x, NAXIS_y, imgfv, mosaicpos, outname):
    
   hdu_list.writeto(outname, overwrite=True)
   
-  print 'Exposure map saved into file: '+outname
+  print('Exposure map saved into file: '+outname)
 
 
 
@@ -111,7 +112,7 @@ def read_expmap(mosaicID, mosaic_file, nz=3680):
     which can be fed into make_empty_cube from muse_redux_gc
     """
     
-    print "Reading the bit map {0} ".format(mosaic_file)
+    print("Reading the bit map {0} ".format(mosaic_file))
     
     mastermap = fits.open(mosaic_file)
     
@@ -129,7 +130,7 @@ def read_expmap(mosaicID, mosaic_file, nz=3680):
     rag = deg_coo[0,0]
     deg = deg_coo[0,1]
     
-    print "Mosaic ID {0:d} is mapped on a square area centered on RAG: {1:f} DEG: {2:f}".format(mosaicID, rag, deg)
+    print("Mosaic ID {0:d} is mapped on a square area centered on RAG: {1:f} DEG: {2:f}".format(mosaicID, rag, deg))
             
     square = [rag,deg,nx,ny,nz] 
     
@@ -170,7 +171,7 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
     lambdamin = pix_coords[4]
     lambdamax = pix_coords[5]
     
-    print "Reading the Exposure mosaic map: {0} ".format(expmapfile)
+    print("Reading the Exposure mosaic map: {0} ".format(expmapfile))
     
     expmaphdu     = fits.open(expmapfile)
     expmaphdu_wcs = wcs.WCS(expmaphdu[1].header)
@@ -187,63 +188,63 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
     
     infos_mos = [crvalx,crvaly,crpixx,crpixy,nx,ny] 
     
-    print 'Preparing an empty QB for selected area.... '
+    print('Preparing an empty cube for selected area.... ')
     
     QBexpmap                       = make_empty_ima(infos_mos, inname.format(1,1))
     QBmosaic,     lamind1, lamind2 = make_empty_cube(infos_mos, lambdamin, lambdamax, inname.format(1,1))
     QBmosaic_var, lamind1, lamind2 = make_empty_cube(infos_mos, lambdamin, lambdamax, inname.format(1,1))
     
     
-    print 'Now read the bit map and fill the empty QB with data '
-    	  
+    print('Now read the bit map and fill the empty cube with data ')
+          
     uniqbits = np.unique(expmaphdu[1].data[yi:yf,xi:xf]).astype(int)
     uniqbits = uniqbits[np.where(uniqbits >0)]
     
-    print 'The wavelength range {0} - {1} is extracted at pixels = {2} - {3} in the individual cubes'.format(lambdamin,lambdamax, lamind1, lamind2)
-    print 'The region defined by x_i={0}, x_f={1}, y_i={2}, y_f={3} is composed of {4} different regions of overlap'.format(xi,xf,yi,yf,np.size(uniqbits))
-    print 'It has CRPIX1= {0} and CRPIX2 = {1} corresponding to CRVAL1={2:7.4f} and CRVAL2={3:7.4f}'.format(crpixx, crpixy, crvalx, crvaly)
-    print ' --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---'
+    print('The wavelength range {0} - {1} is extracted at pixels = {2} - {3} in the individual cubes'.format(lambdamin,lambdamax, lamind1, lamind2))
+    print('The region defined by x_i={0}, x_f={1}, y_i={2}, y_f={3} is composed of {4} different regions of overlap'.format(xi,xf,yi,yf,np.size(uniqbits)))
+    print('It has CRPIX1= {0} and CRPIX2 = {1} corresponding to CRVAL1={2:7.4f} and CRVAL2={3:7.4f}'.format(crpixx, crpixy, crvalx, crvaly))
+    print(' --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- --- ---')
     
-    for i in range(len(uniqbits)):  				    
-    	
-    	yreg, xreg= np.where(expmaphdu[1].data[yi:yf,xi:xf] == uniqbits[i])
-    	
-	contrib_exp =  powers_of2_finder(uniqbits[i])	
-    	
-    	if len(contrib_exp) > 1: 
-    	     print 'Region number {0}, coded as {1}, is the combination of the Mosaic QBs:'.format(i+1, uniqbits[i]), contrib_exp
-    	else: 
-    	     print 'Region number {0}, coded as {1}, is covered only by the Mosaic QB number '.format(i+1, uniqbits[i]), contrib_exp
-    	
-	#Now find relevant datacubes
-	explist = []
-	obslist = []
-	for k in range(len(contrib_exp)):
-	  files = glob.glob(inname.format(contrib_exp[k], '*'))
-	  for j in range(len(files)):
-	    explist.append(files[j])
-	    obslist.append(contrib_exp[k])
-	
-	if ctype=='mean' or ctype=='wmean':
-	   QBmosaic, QBmosaic_var, QBexpmap  = feedQB(QBmosaic, QBmosaic_var, QBexpmap, explist, obslist, yreg, xreg, pix_coords, lamind1, lamind2,  expmaphdu, uniqbits[i], ctype=ctype, memmap=memmap)
- 	else:
-	   'Combine type not understood'
-	   return   
-	
+    for i in range(len(uniqbits)):                                  
+        
+        yreg, xreg= np.where(expmaphdu[1].data[yi:yf,xi:xf] == uniqbits[i])
+        
+        contrib_exp =  powers_of2_finder(uniqbits[i])   
+        
+        if len(contrib_exp) > 1: 
+             print('Region number {0}, coded as {1}, is the combination of the Mosaic QBs:'.format(i+1, uniqbits[i]), contrib_exp)
+        else: 
+             print('Region number {0}, coded as {1}, is covered only by the Mosaic QB number '.format(i+1, uniqbits[i]), contrib_exp)
+        
+        #Now find relevant datacubes
+        explist = []
+        obslist = []
+        for k in range(len(contrib_exp)):
+          files = glob.glob(inname.format(contrib_exp[k], '*'))
+          for j in range(len(files)):
+            explist.append(files[j])
+            obslist.append(contrib_exp[k])
+        
+        if ctype=='mean' or ctype=='wmean':
+           QBmosaic, QBmosaic_var, QBexpmap  = feedQB(QBmosaic, QBmosaic_var, QBexpmap, explist, obslist, yreg, xreg, pix_coords, lamind1, lamind2,  expmaphdu, uniqbits[i], ctype=ctype, memmap=memmap)
+        else:
+           'Combine type not understood'
+           return   
+        
     for wave in range(len(QBmosaic[1].data[:,0,0])):
       nans = (QBmosaic[1].data[wave,:,:] == 0) | (np.isinf(QBmosaic[1].data[wave,:,:]))
       QBmosaic[1].data[wave,nans] = np.nan
       nans = (QBmosaic_var[1].data[wave,:,:] == 0) | (np.isinf(QBmosaic_var[1].data[wave,:,:]))
       QBmosaic_var[1].data[wave,nans] = np.nan
     
-    QBexpmap.writeto(outname.replace('.fits', '_expmap.fits') ,clobber=True)
+    QBexpmap.writeto(outname.replace('.fits', '_expmap.fits') ,overwrite=True)
     
     if mode == 'separate':
         
-       #write output 	   
-       outvar= outname.replace('.fits', '_var.fits')	   
-       QBmosaic.writeto(outname,clobber=True)
-       QBmosaic_var.writeto(outvar,clobber=True)   
+       #write output       
+       outvar= outname.replace('.fits', '_var.fits')       
+       QBmosaic.writeto(outname,overwrite=True)
+       QBmosaic_var.writeto(outvar,overwrite=True)   
     
     elif mode == 'all':
                
@@ -268,9 +269,34 @@ def reconstruct_mosaic(inname, outname, expmapfile, pix_coords, mode='all', ctyp
      
     else:
      
-        print 'Mode not understood'
+        print('Mode not understood')
 
+def mosaic_clean(QBinput, QBout, size=1.0):
+    
+    #open the data
+    data=fits.open(QBinput, memmap=False)
 
+    #compress into image
+    image=np.nanmedian(data[1].data,axis=0)
+    nz,ny,nx=(data[1].data).shape
+
+    #mask edges
+    badmask=np.ones((ny,nx))
+    badmask[np.isfinite(image)]=0
+    badmask=ndimage.gaussian_filter(badmask,size)
+    badmask[np.where(badmask > 0)]=1
+    okmask = np.copy(badmask)
+    okmask[badmask==0] = 1
+    okmask[badmask==1] = np.nan
+    
+    
+    for ii in range(nz):
+       data[1].data[ii,...] *= okmask
+       data[2].data[ii,...] *= okmask
+    
+    data.writeto(QBout, overwrite=True)
+    
+    
 def mosaic_extract(QBinput, QBout, limits):
 
     '''
@@ -302,7 +328,7 @@ def mosaic_extract(QBinput, QBout, limits):
     crvalx = deg_coo[0,0]
     crvaly = deg_coo[0,1]
        
-    print 'Extracting a sub-QB of {0}x{1} pixels'.format(xdim, ydim)
+    print('Extracting a sub-cube of {0}x{1} pixels'.format(xdim, ydim))
     
     nlam = header_new['NAXIS3']
     header_new['CRPIX1'] = xdim/2
@@ -352,22 +378,22 @@ def mosaic_insert(mastercube, childcubes, outputcube):
     for i in range(np.size(childcubes)):
            
            child = fits.open(childcubes[i])
-	   
-	   try:
-	     xi = child[0].header['XI'] 
-	     xf = child[0].header['XF'] 
-	     yi = child[0].header['YI'] 
-	     yf = child[0].header['YF'] 
-	  
-             print 'Pasting {0} at coordinates {1} {2} {3} {4} of master cube'.format(childcubes[i], xi, xf, yi, yf)
+           
+           try:
+             xi = child[0].header['XI'] 
+             xf = child[0].header['XF'] 
+             yi = child[0].header['YI'] 
+             yf = child[0].header['YF'] 
+          
+             print('Pasting {0} at coordinates {1} {2} {3} {4} of master cube'.format(childcubes[i], xi, xf, yi, yf))
            
              mother[1].data[:,yi:yf,xi:xf] = child[1].data
-	     mother[2].data[:,yi:yf,xi:xf] = child[2].data
+             mother[2].data[:,yi:yf,xi:xf] = child[2].data
            
-	   except:
-	     
-	     print 'Coordinate Error. Skipping {0} '.format(childcubes[i])
-	   
+           except:
+             
+             print('Coordinate Error. Skipping {0} '.format(childcubes[i]))
+           
     mother.writeto(outputcube,clobber=True)
 
 
@@ -385,19 +411,19 @@ def get_qbposition(mosaicID, expmaphdu):
     contributing = np.zeros_like(uniqbits)
     
     for i in range(len(uniqbits)):
-    	  
-         contrib_exp =  powers_of2_finder(uniqbits[i])	
-	 if mosaicID in contrib_exp:
-	     contributing[i] += 1
-	       	    
+          
+         contrib_exp =  powers_of2_finder(uniqbits[i])  
+         if mosaicID in contrib_exp:
+             contributing[i] += 1
+                    
     selectedbits = uniqbits[(contributing == 1)]
 
     for kk in range(len(selectedbits)):
-    	    
-    	if kk == 0: 
-    	  target = (expmaphdu[1].data == selectedbits[kk]) 
-    	else: 
-    	  target = target | (expmaphdu[1].data == selectedbits[kk])
+            
+        if kk == 0: 
+          target = (expmaphdu[1].data == selectedbits[kk]) 
+        else: 
+          target = target | (expmaphdu[1].data == selectedbits[kk])
 
     yy, xx =np.where(target==True)
 
@@ -430,8 +456,8 @@ def make_empty_cube(infos, lambdamin, lambdamax, musefile):
     
     npix_lam = lamind2-lamind1+1
 
-    header_data['CRPIX1'] = infos[2]/2
-    header_data['CRPIX2'] = infos[3]/2
+    header_data['CRPIX1'] = infos[2]
+    header_data['CRPIX2'] = infos[3]
     header_data['CRVAL1'] = RAG
     prim_head['RA'] = RAG
     header_data['CRVAL2'] = DEG
@@ -443,7 +469,7 @@ def make_empty_cube(infos, lambdamin, lambdamax, musefile):
     #header_data['NAXIS3']= npix_lam
     header_data['EXTNAME']='MOSAIC'
 
-    empty_cube = np.zeros([npix_lam, infos[3], infos[2]], dtype=np.float32)
+    empty_cube = np.zeros([int(npix_lam), int(infos[5]), int(infos[4])], dtype=np.float32)
 
     hdu_pri = fits.PrimaryHDU(header=prim_head)
     hdu_im  = fits.ImageHDU(empty_cube, header=header_data)
@@ -459,9 +485,9 @@ def make_empty_ima(infos, musefile):
     
     RAG=infos[0]
     DEG=infos[1]
-
-    header_data['CRPIX1'] = infos[2]/2
-    header_data['CRPIX2'] = infos[3]/2
+    
+    header_data['CRPIX1'] = infos[2]
+    header_data['CRPIX2'] = infos[3]
     header_data['CRVAL1'] = RAG
     prim_head['RA'] = RAG
     header_data['CRVAL2'] = DEG
@@ -475,7 +501,7 @@ def make_empty_ima(infos, musefile):
     header_data.remove('CRPIX3')
     header_data.remove('CD3_3')
 
-    empty_cube = np.zeros([infos[3], infos[2]], dtype=np.float32)
+    empty_cube = np.zeros([int(infos[5]), int(infos[4])], dtype=np.float32)
 
     hdu_pri = fits.PrimaryHDU(header=prim_head)
     hdu_im  = fits.ImageHDU(empty_cube, header=header_data)
@@ -517,12 +543,12 @@ def get_bounds(xiqb, yiqb, xfqb, yfqb, ps, min_x, max_x, min_y, max_y):
 def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, lamind1, lamind2, expmaphdu, magicnum, ctype='mean', memmap=True):
     
     npix_lam = lamind2-lamind1+1
-    
+        
     expformean = mosdata[1].data[0:npix_lam,yreg,xreg]*0
     
     for kk in range(np.size(obslist)):
       
-      #print 'Adding file to the mosaic: {0}'.format(filelist[kk]) 
+      #print('Adding file to the mosaic: {0}'.format(filelist[kk]))
          
       qb = fits.open(filelist[kk], memmap=memmap)
       
@@ -541,7 +567,7 @@ def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, l
       good = (expmaphdu[1].data[yiqb:yfqb,xiqb:xfqb] == magicnum) & msk
       
       goody, goodx =  np.where(good == True)
-                 
+
       this_expmap = qb[1].data[lamind1:lamind2+1, goody, goodx]
       nans = np.isnan(this_expmap)
       this_expmap[np.logical_not(nans)] = 1
@@ -553,12 +579,12 @@ def feedQB(mosdata, mosvar, mosexp, filelist, obslist, yreg, xreg, pix_coords, l
       
       if ctype=='mean':
         
-	mosdata[1].data[0:npix_lam, yreg, xreg] = np.nansum([mosdata[1].data[0:npix_lam, yreg, xreg], qb[1].data[lamind1:lamind2+1, goody, goodx]], axis=0)
+        mosdata[1].data[0:npix_lam, yreg, xreg] = np.nansum([mosdata[1].data[0:npix_lam, yreg, xreg], qb[1].data[lamind1:lamind2+1, goody, goodx]], axis=0)
         mosvar[1].data[0:npix_lam, yreg, xreg]  = np.nansum([mosvar[1].data[0:npix_lam, yreg, xreg], qb[2].data[lamind1:lamind2+1, goody, goodx]], axis=0)
       
       elif ctype=='wmean':
         
-	data = qb[1].data[lamind1:lamind2+1, goody, goodx]
+        data = qb[1].data[lamind1:lamind2+1, goody, goodx]
         weight = 1./(qb[2].data[lamind1:lamind2+1, goody, goodx]) #1/variance
             
         mosdata[1].data[0:npix_lam, yreg, xreg] = np.nansum( [mosdata[1].data[0:npix_lam, yreg, xreg],data*weight], axis=0)
