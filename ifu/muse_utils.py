@@ -329,21 +329,21 @@ def cube2spec(cube,x,y,s,write=None,shape='box',helio=0,mask=None,twod=True,tova
     for ii,ww in enumerate(wavec):
         #get the total spec in the aperture, 
         #summing over all the pixels 
-        spec_flx[ii]=np.sum(cubdata[ii,xpix,ypix])
-        spec_var[ii]=np.sum(vardata[ii,xpix,ypix])
-        spec_med[ii]=np.median(cubdata[ii,xpix,ypix])
+        spec_flx[ii]=np.nansum(cubdata[ii,xpix,ypix])
+        spec_var[ii]=np.nansum(vardata[ii,xpix,ypix])
+        spec_med[ii]=np.nanmedian(cubdata[ii,xpix,ypix])
         
         #fill in 2D spectrum in a box 
         if(twod):
             #sum only on the full x-extent
             for jj in range(npix):
                 #add all the pixels in y
-                twodspec[ii,jj]=np.sum(cubdata[ii,uxpix[jj],uypix])
-                twoderr[ii,jj]=np.sum(vardata[ii,uxpix[jj],uypix])
+                twodspec[ii,jj]=np.nansum(cubdata[ii,uxpix[jj],uypix])
+                twoderr[ii,jj]=np.nansum(vardata[ii,uxpix[jj],uypix])
    
     #extract the 2D image with a small buffer around
     if(twod):
-        twodimg=np.median(cubdata[:,uxpix[0]-5:uxpix[-1]+6,uypix[0]-5:uypix[-1]+6],axis=0)
+        twodimg=np.nanmedian(cubdata[:,uxpix[0]-5:uxpix[-1]+6,uypix[0]-5:uypix[-1]+6],axis=0)
         #from variance to error
         twoderr=np.sqrt(twoderr)
 
