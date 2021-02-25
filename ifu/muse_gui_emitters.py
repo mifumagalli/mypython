@@ -127,12 +127,12 @@ class Window(Tkinter.Tk):
         self.tk=Tk()
         
         #set min and preferred size of main gui
-        self.minwinwidth=300
+        self.minwinwidth=400
         self.minwinheight=300
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
-        self.preferwinwidth=int(screen_width*0.6)
-        self.preferwinheight=int(screen_height*0.6)
+        self.preferwinwidth=int(screen_width*0.7)
+        self.preferwinheight=int(screen_height*0.5)
         self.minsize(width=self.minwinwidth, height=self.minwinheight)
         self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
 
@@ -212,8 +212,8 @@ class Window(Tkinter.Tk):
 
 
         #set header table properties
-        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','relvel','confidence','redshift','type','notes']
-        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','relvel','confid','redshift','type','notes']
+        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','relvel','confidence','redshift','CogFlux','CogErr','CogRad','type','notes']
+        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','relvel','confid','redshift','CogFlux','CogErr','CogRad','type','notes']
         self.tabncol=len(self.keycol)
 
         #create sort by option
@@ -269,6 +269,15 @@ class Window(Tkinter.Tk):
         if('redshift' not in self.catdata.colnames):
             newcl=Column(np.zeros(len(self.catdata)))
             self.catdata.add_column(newcl,name='redshift')
+        if('CogFlux' not in self.catdata.colnames):
+            newcl=Column(np.zeros(len(self.catdata)))
+            self.catdata.add_column(newcl,name='CogFlux')
+        if('CogErr' not in self.catdata.colnames):
+            newcl=Column(np.zeros(len(self.catdata)))
+            self.catdata.add_column(newcl,name='CogErr')
+        if('CogRad' not in self.catdata.colnames):
+            newcl=Column(np.zeros(len(self.catdata)))
+            self.catdata.add_column(newcl,name='CogRad')
         if('type' not in self.catdata.colnames):
             newcl=Column(np.full(len(self.catdata),'None',dtype="S50"))
             self.catdata.add_column(newcl,name='type')
@@ -312,6 +321,9 @@ class Window(Tkinter.Tk):
         idid=self.keycol.index('id')
         idconf=self.keycol.index('confidence')
         idnote=self.keycol.index('notes')
+        idflux=self.keycol.index('CogFlux')
+        idferr=self.keycol.index('CogErr')
+        idfrad=self.keycol.index('CogRad')
 
         #scan them 
         for r in range(self.rowppage):
@@ -320,6 +332,9 @@ class Window(Tkinter.Tk):
             mytype=self.table_data.get(r,idtype)
             myconf=self.table_data.get(r,idconf)
             mynote=self.table_data.get(r,idnote)
+            myflux=self.table_data.get(r,idflux)
+            myferr=self.table_data.get(r,idferr)
+            myfrad=self.table_data.get(r,idfrad)
             #store in table by searching for id (allow for blanks)
             try:
                 cidx=np.where(self.catdata['id'] == int(myid))
@@ -327,7 +342,9 @@ class Window(Tkinter.Tk):
                 self.catdata['type'][cidx]=mytype
                 self.catdata['confidence'][cidx]=myconf
                 self.catdata['notes'][cidx]=mynote
-
+                self.catdata['CogFlux'][cidx]=myflux
+                self.catdata['CogErr'][cidx]=myferr
+                self.catdata['CogRad'][cidx]=myfrad
             except:
                 pass
 
@@ -360,6 +377,12 @@ class Window(Tkinter.Tk):
                 elif('type' in self.keycol[c]):
                     self.table_data.unlock(r,c)
                 elif('confidence' in self.keycol[c]):
+                    self.table_data.unlock(r,c)
+                elif('CogFlux' in self.keycol[c]):
+                    self.table_data.unlock(r,c)
+                elif('CogErr' in self.keycol[c]):
+                    self.table_data.unlock(r,c)
+                elif('CogRad' in self.keycol[c]):
                     self.table_data.unlock(r,c)
                 elif('notes' in self.keycol[c]):
                     self.table_data.unlock(r,c)
