@@ -20,7 +20,6 @@ class Filter:
 
         #get the start/end of the filter
         fields=fil_info[self.id-1].split()
-        
         #read the actual filter file 
         data_start=int(fields[1].replace(":",""))
         data_end=int(fields[2])
@@ -35,7 +34,7 @@ class Filter:
             wv.append(float(data[i].split()[1]))
             tr.append(float(data[i].split()[2]))
             
-        filter={'wave':np.array(wv),'tran':np.array(tr)}
+        filter={'wave':np.array(wv),'tran':np.array(tr),'plambda':np.float64(fields[6])}
         self.filter=filter    
 
 
