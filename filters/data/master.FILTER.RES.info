@@ -136,9 +136,9 @@
 136  74358: 3961 WFC3_f438w.UVIS2   (with_system) lambda_c= 4329.89      AB-Vega= 0.00 
 137  78320:  753 LBCB_Uspec         (blueCCD+atm) lambda_c= 3609.95      AB-Vega= 0.00
 138  79074:  229 LBCB_Bbessel       (blueCCD+atm) lambda_c= 4262.55      AB-Vega= 0.00
-139  79304:  439 LBCR_Vbessel       (blueCCD+atm) lambda_c= 5396.16      AB-Vega= 0.00
-140  79744:  865 LBCR_Rbessel       (blueCCD+atm) lambda_c= 6448.86      AB-Vega= 0.00
-141  80610:  574 LBCR_Ibessel       (blueCCD+atm) lambda_c= 7924.85      AB-Vega= 0.00
+139  79304:  439 LBCR_Vbessel       (redCCD+atm) lambda_c= 5396.16      AB-Vega= 0.00
+140  79744:  865 LBCR_Rbessel       (redCCD+atm) lambda_c= 6448.86      AB-Vega= 0.00
+141  80610:  574 LBCR_Ibessel       (redCCD+atm) lambda_c= 7924.85      AB-Vega= 0.00
 142  81185:  471 LRIS_U             (CCDB+atm)    lambda_c= 3494.91      AB-Vega= 0.00
 143  81657:  108 LRIS_B           (CCDB+atm+D460) lambda_c= 4386.90      AB-Vega= 0.00
 144  81766: 2048 LRIS_V        (oldCDDR+atm+D460) lambda_c= 5494.59      AB-Vega= 0.00
@@ -152,4 +152,10 @@
 152  92597: 1274 IMACS_f4_B         (CCD+atm)     lambda_c= 4382.91      AB-Vega= 0.00
 153  93872:  815 IMACS_f4_V         (CCD+atm)     lambda_c= 5445.62      AB-Vega= 0.00
 154  94688: 1490 IMACS_f4_R         (CCD+atm)     lambda_c= 6600.81      AB-Vega= 0.00
-155  96178:  743 WFC3_F140W         (CCD+atm)     lambda_c= 13923.0      AB-Vega= 0.00 
+155  96179:  743 WFC3_F140W         (CCD+atm)     lambda_c= 13923.0      AB-Vega= 0.00 
+156  96923:  109 LUCI2_z            (CCD+atm)     lambda_c= 9650.00      AB-Vega= 0.00
+157  97033:  121 LUCI2_J            (CCD+atm)     lambda_c= 12500.00     AB-Vega= 0.00
+158  97155:   91 LUCI2_H            (CCD+atm)     lambda_c= 16510.00     AB-Vega= 0.00
+159  97247:   74 LUCI2_K            (CCD+atm)     lambda_c= 21990.00     AB-Vega= 0.00
+160  97322:   87 LUCI2_Ks           (CCD+atm)     lambda_c= 21610.00     AB-Vega= 0.00
+
