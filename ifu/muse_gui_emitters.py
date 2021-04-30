@@ -212,8 +212,8 @@ class Window(Tkinter.Tk):
 
 
         #set header table properties
-        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','relvel','confidence','redshift','CogFlux','CogErr','CogRad','type','notes']
-        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','relvel','confid','redshift','CogFlux','CogErr','CogRad','type','notes']
+        self.keycol=['id','x_geow','y_geow','lambda_fluxw','SNR','SNR_odd','SNR_even','SNR_med','EODeltaSN','BoxFraction','OverContinuum','relvel','inspect','confidence','redshift','CogFlux','CogErr','CogRad','type','notes']
+        self.shortkey=['ID','X','Y','Lambda','SNR','SNRodd','SNReven','SNRmed','EODSN','BoxFrac','Continu','relvel','inspect','confid','redshift','CogFlux','CogErr','CogRad','type','notes']
         self.tabncol=len(self.keycol)
 
         #create sort by option
@@ -221,7 +221,7 @@ class Window(Tkinter.Tk):
         llab.grid(column=3,row=1)
         self.sortlist = Tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw','notes','relvel')
+        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw','notes','relvel','inspect')
         self.sortlist_w.grid(column=4,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
@@ -500,7 +500,7 @@ class Window(Tkinter.Tk):
                 
         #sort table
         if('optimal' in self.sortlist.get()):
-            self.catdata.sort(['OverContinuum','SNR'])
+            self.catdata.sort(['inspect','OverContinuum','SNR'])
             self.catdata.reverse()
         else:
             self.catdata.sort(self.sortlist.get())
