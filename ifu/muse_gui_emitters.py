@@ -278,6 +278,9 @@ class Window(Tkinter.Tk):
         if('CogRad' not in self.catdata.colnames):
             newcl=Column(np.zeros(len(self.catdata)))
             self.catdata.add_column(newcl,name='CogRad')
+        if('inspect' not in self.catdata.colnames):
+            newcl=Column(np.zeros(len(self.catdata)))
+            self.catdata.add_column(newcl,name='inspect')
         if('type' not in self.catdata.colnames):
             newcl=Column(np.full(len(self.catdata),'None',dtype="S50"))
             self.catdata.add_column(newcl,name='type')
