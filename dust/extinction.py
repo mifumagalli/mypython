@@ -21,7 +21,7 @@ class Extinction:
         #SFD   = Schlegel et al. 1998 (ApJ 500, 525) [ext SFD mean,ext SFD std]
 
         if (self.coord == -1):
-            print "Error: coordinates must be set"
+            print("Error: coordinates must be set")
             exit()
 
 
@@ -56,8 +56,8 @@ class Extinction:
             self.getebv()
             
         #get the V band for AV
-        import mypython as mp
-        myfil=mp.filters.filter.Filter()
+        from mypython.filters import filter
+        myfil=filter.Filter()
         myfil.id=95
         myfil.loadtrans()
         
@@ -95,7 +95,7 @@ class Extinction:
         #http://irsa.ipac.caltech.edu/applications/DUST/
         
         if (self.coord == -1):
-            print "Error: coordinates must be set"
+            print("Error: coordinates must be set")
             exit()
 
         from astroquery.irsa_dust import IrsaDust
@@ -107,9 +107,9 @@ class Extinction:
         
         """ Print a bunch of info """
 
-        print "Position: ", self.coord.ra, self.coord.dec
-        print "EBV SDF: ", self.ebv['ext SFD mean'][0], self.ebv['ext SFD std'][0]
-        print "EBV S&F: ", self.ebv['ext SandF mean'][0], self.ebv['ext SandF std'][0]
+        print("Position: ", self.coord.ra, self.coord.dec)
+        print("EBV SDF: ", self.ebv['ext SFD mean'][0], self.ebv['ext SFD std'][0])
+        print("EBV S&F: ", self.ebv['ext SandF mean'][0], self.ebv['ext SandF std'][0])
 
 def example():
 
