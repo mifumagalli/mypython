@@ -121,7 +121,7 @@ def example():
     ext=Extinction()
    
     #assign coordinates
-    coord=SkyCoord('00h58m20s','+45d12m00s','icrs')
+    coord=SkyCoord('00h58m20s','+45d12m00s')
     ext.coord=coord
 
     #query for ebv 
