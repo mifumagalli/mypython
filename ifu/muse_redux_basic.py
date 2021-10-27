@@ -83,29 +83,29 @@ def parse_xml(path='./',nproc=12,pipecal=False):
             #now handle by keyword according to calibration plan
             if((kk == 'ARC') or (kk == 'BIAS') or (kk == 'FLAT')):
                 #grab daily calibrations, avoid attached calibrations for standard reduction
-		offtime = 14
+                offtime = 14
                 recent=np.where((delta_time <= offtime) & (delta_time >1.))
-		#If nothing found it might be a glitch in the ESO calibration plan, extend 
-		#allowed time for search
-		if len(recent[0]) == 0:
-		  offtime = 24
-		  recent = np.where((delta_time <= offtime))
+                #If nothing found it might be a glitch in the ESO calibration plan, extend 
+                #allowed time for search
+                if len(recent[0]) == 0:
+                  offtime = 24
+                  recent = np.where((delta_time <= offtime))
                 xml_info[kk]=currentlist[recent[0]]
-                print 'Found {0} {1} taken within {2} hours'.format(len(recent[0]),kk, offtime)
+                print('Found {0} {1} taken within {2} hours'.format(len(recent[0]),kk, offtime))
             elif((kk == 'SKYFLAT') or (kk == 'DARK')):
                 #grab within 30 days
                 recent=np.where(delta_time <= 30*12.)
                 xml_info[kk]=currentlist[recent[0]]
-                print 'Found {0} {1} taken within 30 days'.format(len(recent[0]),kk)
+                print('Found {0} {1} taken within 30 days'.format(len(recent[0]),kk))
             #This is when you want only the best one
             else:
-		try:
+                try:
                     #pick closest
                     mintm=np.argmin(delta_time)
                     xml_info[kk]=[currentlist[mintm]]
-                    print 'Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.)
+                    print('Best {0} taken within {1} days'.format(kk,delta_time[mintm]/24.))
                 except:
-                    print 'No suitable calibration found for {}. Abort.'.format(kk)
+                    print('No suitable calibration found for {}. Abort.'.format(kk))
                     exit()
                 
     #set the calibration path relative and suffix
@@ -476,7 +476,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
     #create suffixes as needed
     suffix = ''
     if(refcube):
-        print 'Using external WCS structure for cube output'
+        print('Using external WCS structure for cube output')
         suffix += '_pos'
     if(wcsoff):
         suffix += '_off'  
@@ -491,7 +491,7 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
         
         if not os.path.isfile(cname):
 
-            print "Processing exposure {0:d}".format(exp+1)
+            print("Processing exposure {0:d}".format(exp+1))
             
             #Write the sof file 
             sof=open("../../Script/scipost_{0:d}.sof".format(scilist[exp]),"w")
@@ -506,10 +506,10 @@ def make_cubes(xml_info,nproc=12,wcsoff=None,refcube=None,scilist=None):
                 sof.write("{0} OUTPUT_WCS\n".format(refcube)) 
 
             if(wcsoff):
-	        sof.write("OFFSET_LIST.fits OFFSET_LIST\n") 
-	    
-	    for ifu in range(24):
-		ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
+                sof.write("OFFSET_LIST.fits OFFSET_LIST\n") 
+            
+            for ifu in range(24):
+                ifupixtab="PIXTABLE_OBJECT_{0:04d}-{1:02d}.fits".format(scilist[exp],ifu+1)
                 #now write the pix tab in sof
                 sof.write("{} PIXTABLE_OBJECT\n".format(ifupixtab)) 
                 

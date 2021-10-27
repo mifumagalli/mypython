@@ -164,7 +164,7 @@ def old_individual_resample(listob,refpath='./',nproc=24):
                 
                 #copy the offsets 
                 alig=fits.open('OFFSET_LIST.fits')
-                alig.writeto('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1),clobber=True)
+                alig.writeto('OFFSET_LIST_EXP{0:d}.fits'.format(exp+1),overwrite=True)
                 
 
 
@@ -198,7 +198,7 @@ def old_individual_resample(listob,refpath='./',nproc=24):
                         pxt[0].header['RA']=pxt[0].header['RA']-offsets[2]
                         pxt[0].header['DEC']=pxt[0].header['DEC']-offsets[3]
                         
-                        pxt.writeto("WCS_"+pixtab,clobber=True)
+                        pxt.writeto("WCS_"+pixtab,overwrite=True)
                         pixtablist.append("WCS_"+pixtab)
                         sofedit.write("WCS_"+pixtab+" PIXTABLE_OBJECT\n")
                     elif('STD_' in ll):
@@ -291,7 +291,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None,version='1.6'):
         #write mask
         hdu = fits.PrimaryHDU(sharpmask)
         hdulist = fits.HDUList([hdu])
-        hdulist.writeto(sharpmsk,clobber=True)
+        hdulist.writeto(sharpmsk,overwrite=True)
         cb.close()
 
         #run cubefix
@@ -319,7 +319,7 @@ def fixandsky_firstpass(cube,pixtab,noclobber,skymask=None,version='1.6'):
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
 
-def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,version='1.6'):
+def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,exthsnmask=None,version='1.6'):
         
     """ 
  
@@ -361,16 +361,19 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,version=
     if ((os.path.isfile(fixed)) & (noclobber)):
         print("Cube {0} already fixed".format(cube))
     else:
-
         print('Create source mask...')
-        #if high cube provide, overwrite white image 
         if(highsn):
-            print('Using high SN cube...')
-            #create source mask from deep exposure 
+            #The final mask will always have the same name and will overwrite existing file
             mask_source=cube.split('.fits')[0]+"_whitedeep.Objects_Id.fits"
-            white_source=cube.split('.fits')[0]+"_whitedeep.fits"
-            subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
-            subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-ApplyFilter','.true.','-ApplyFilterVar','.true.','-FilterXYRad','1','-SN_Threshold','7','-MinNSpax','5'])
+            if exthsnmask:
+              print('Using external HSN mask...')
+              subprocess.call(["cp", exthsnmask, mask_source])
+            else:
+              print('Using high SN cube...')
+              #create source mask from deep exposure 
+              white_source=cube.split('.fits')[0]+"_whitedeep.fits"
+              subprocess.call(["Cube2Im","-cube",highsn,"-out",white_source])
+              subprocess.call(["CubEx",white_source,'-MultiExt','.false.','-ApplyFilter','.true.','-ApplyFilterVar','.true.','-FilterXYRad','1','-SN_Threshold','7','-MinNSpax','5'])
         else:
             print('Using white image from previous loop')
             #create source mask from previous step
@@ -409,7 +412,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,version=
         #write mask
         hdu = fits.PrimaryHDU(sharpmask)
         hdulist = fits.HDUList([hdu])
-        hdulist.writeto(sharpmsk,clobber=True)
+        hdulist.writeto(sharpmsk,overwrite=True)
 
     #now run cube skysub
     if ((os.path.isfile(skysub)) & (noclobber)):
@@ -429,7 +432,7 @@ def fixandsky_secondpass(cube,pixtab,noclobber,highsn=None,skymask=None,version=
         print('Create white image for ', skysub)
         subprocess.call(["Cube2Im","-cube",skysub,"-out",white])
                 
-def cubex_driver(listob,last=False,highsn=None,skymask=None,version='1.6'):
+def cubex_driver(listob,last=False,highsn=None,skymask=None,exthsnmask=None,version='1.6'):
     
     """
     Procedures that drives the loops of cubex within each OB folder
@@ -438,6 +441,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None,version='1.6'):
     last  -> set to True for final pass with high-sn cube 
     highsn -> name of the highsn cube used for masking 
     skymask -> mask this region in source mask before running cubesharp
+    exthsnmask -> name of external hsn mask file that overrides the internally computed one
     version -> the version of cubex 
     
 
@@ -475,7 +479,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None,version='1.6'):
                 pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask,version))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,highsn,skymask,exthsnmask,version))
                 workers.append(p)
                 p.start()
    
@@ -516,7 +520,7 @@ def cubex_driver(listob,last=False,highsn=None,skymask=None,version='1.6'):
                 pixtab="PIXTABLE_REDUCED_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 cube="DATACUBE_FINAL_RESAMPLED_EXP{0:d}.fits".format(dd+1)
                 #now launch the task
-                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask,version))
+                p = multiprocessing.Process(target=fixandsky_secondpass,args=(cube,pixtab,True,None,skymask,None,version))
                 workers.append(p)
                 p.start()
    
@@ -805,7 +809,7 @@ def combine_cubes(cubes,masks,regions=True,final=False,halfset=False,halfsetfina
                     #update the mask
                     cfits[0].data=cfits[0].data*1*np.logical_not(totmask)   
                     savename=cmask.split(".fits")[0]+'_wreg.fits'
-                    cfits.writeto(savename,clobber=True)
+                    cfits.writeto(savename,overwrite=True)
                     llms.write(savename+'\n')
                 
                 

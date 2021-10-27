@@ -37,7 +37,7 @@ class Muse(object):
  
         """
         
-        import muse_redux_basic as rdx
+        from . import muse_redux_basic as rdx
         import os
 
         print('Starting reduction...')
@@ -142,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='esocombine/',skymask=None,version='1.8'):
+    def cubex_process(self,refpath='esocombine/',skymask=None,exthsnmask=None,version='1.8'):
 
         """
   
@@ -162,9 +162,10 @@ class Muse(object):
         import os
         import glob
         import subprocess
-        import muse_redux_cubex as cx 
         import multiprocessing
         import numpy as np
+        
+        from . import muse_redux_cubex as cx 
 
         #first, list how many OBs are there
         listob=glob.glob('OB*')
@@ -187,7 +188,7 @@ class Muse(object):
 
         #exit()
         #now do the final pass of cubex using the tmp combined cube for better masking
-        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,version=version)
+        cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,exthsnmask=exthsnmask,version=version)
 
         #make the final combined cube
         cx.drive_combine('HIGHSN',listob)
@@ -215,7 +216,7 @@ class Muse(object):
         import os
         import glob
         import subprocess
-        import muse_redux_eso as ex 
+        from . import muse_redux_eso as ex 
         
         #first, list how many OBs are there
         listob=glob.glob('OB*')
@@ -271,7 +272,7 @@ class Muse(object):
         import os
         import glob
         import subprocess
-        import muse_redux_line as ex 
+        from . import muse_redux_line as ex 
 
         #first, list how many OBs are there
         listob=glob.glob('OB*')
@@ -348,7 +349,7 @@ class Muse(object):
         import os
         import glob
         import subprocess
-        import muse_redux_mpdaf as ex 
+        from . import muse_redux_mpdaf as ex 
 
         #first, list how many OBs are there
         listob=glob.glob('OB*')
