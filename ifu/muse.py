@@ -142,7 +142,7 @@ class Muse(object):
         
         return xml_info
 
-    def cubex_process(self,refpath='esocombine/',skymask=None,exthsnmask=None,version='1.8'):
+    def cubex_process(self,refpath='esocombine/',skymask=None,exthsnmask=None,hsnonly=False,version='1.8'):
 
         """
   
@@ -179,14 +179,14 @@ class Muse(object):
 
         #rerun pipeline enabling resampling on final ESO cube using modules coded for line_process
         cx.individual_resample(listob,refpath=refpath)
-    
-        #now do the first two passes of cubex on each OB to prepare a temporary cube
-        cx.cubex_driver(listob,skymask=skymask,version=version)
         
-        #prepare for intermediate combine 
-        cx.drive_combine('INTERMEDIATE',listob)
+        if not hsnonly:
+          #now do the first two passes of cubex on each OB to prepare a temporary cube
+          cx.cubex_driver(listob,skymask=skymask,version=version)
+        
+          #prepare for intermediate combine 
+          cx.drive_combine('INTERMEDIATE',listob)
 
-        #exit()
         #now do the final pass of cubex using the tmp combined cube for better masking
         cx.cubex_driver(listob,last=True,highsn='../../../cubexcombine/COMBINED_CUBE.fits',skymask=skymask,exthsnmask=exthsnmask,version=version)
 
