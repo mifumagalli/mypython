@@ -17,7 +17,7 @@ def individual_resample(listob,refpath='./',nproc=24):
     import subprocess
     import shutil
     from astropy.io import fits
-    import muse_utils as mut 
+    from . import muse_utils as mut 
     import numpy as np
 
     #grab top dir
@@ -66,13 +66,13 @@ def individual_resample(listob,refpath='./',nproc=24):
                         sofedit.write("../Basic/"+fil+" "+tag)
                     else:
                         sofedit.write(ll)
-		
-		#Check existence of ABSOLUTE offset list otherwise fall back onto the relative one
-		if os.path.isfile('../../../{}/OFFSET_LIST_ABS.fits'.format(refpath)):
-		   sofedit.write('../../../{}/OFFSET_LIST_ABS.fits OFFSET_LIST\n'.format(refpath))
-		else:
-		   sofedit.write('../../../{}/OFFSET_LIST.fits OFFSET_LIST\n'.format(refpath))   
-		
+                
+                #Check existence of ABSOLUTE offset list otherwise fall back onto the relative one
+                if os.path.isfile('../../../{}/OFFSET_LIST_ABS.fits'.format(refpath)):
+                   sofedit.write('../../../{}/OFFSET_LIST_ABS.fits OFFSET_LIST\n'.format(refpath))
+                else:
+                   sofedit.write('../../../{}/OFFSET_LIST.fits OFFSET_LIST\n'.format(refpath))   
+                
                 #append reference frame to sof file 
                 sofedit.write('../../../{}/DATACUBE_FINAL.fits OUTPUT_WCS\n'.format(refpath))
                 sofedit.close()
@@ -119,7 +119,7 @@ def old_individual_resample(listob,refpath='./',nproc=24):
     import subprocess
     import shutil
     from astropy.io import fits
-    import muse_utils as mut 
+    from . import muse_utils as mut 
     import numpy as np
 
     #grab top dir
@@ -850,8 +850,8 @@ def dataquality(cubeslist,maskslist):
     import numpy as np
     from astropy.io import fits
     from mypython.fits import pyregmask as msk
-    from mypython.ifu import muse_utils as mutil
-    from mypython.ifu import muse_source as msrc
+    from . import muse_utils as mutil
+    from . import muse_source as msrc
     import matplotlib
     from matplotlib.backends.backend_pdf import PdfPages
     import matplotlib.pyplot as plt
