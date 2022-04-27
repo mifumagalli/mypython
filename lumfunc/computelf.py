@@ -33,7 +33,10 @@ class LumFun:
             self.param=self.Herenz2019()
         elif('Drake2017' in self.whichlf):
             self.param=self.Drake2017()
+        elif('Galbiati2022' in self.whichlf):
+            self.param=self.Galbiati2022()
         else:
+            
             raise TypeError('LF {} not known'.format(self.whichlf))
             
     def Bouwens15(self):
@@ -121,17 +124,31 @@ class LumFun:
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
 
 
-    def Drake2017(self):
+    def Grove09(self):
 
         """
-        This evaluates the Lya luminosity function from Drake et al. 2017,
-        Astronomy & Astrophysics, Volume 608, id.A6, 15 pp.
-        Assumes Schecter fit between z~3-4
+        This evaluates the Lya luminosity function from Grove et al. 2009, AA 497, 689-702
+        Generally valid around z~3 
         
         """
-        alpha=-2.03
-        phistar=0.0007943
-        Mstar=42.72
+        alpha=-1.74
+        phistar=3.2e-4
+        Mstar=43.3
+        ltype='SchLum'
+
+        return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
+
+
+    def Galbiati2022(self):
+
+        """
+        This evaluates the Lya field luminosity function from Galbiati  et al. 2022,
+        Assumes Schecter fit around z~3
+        
+        """
+        alpha=-1.365
+        phistar=10**(-2.426)
+        Mstar=42.450
         ltype='SchLum'
 
         return {'alpha':alpha,'type':ltype,'phi':phistar,'Mstar':Mstar}
