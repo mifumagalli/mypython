@@ -152,10 +152,15 @@
 152  92597: 1274 IMACS_f4_B         (CCD+atm)     lambda_c= 4382.91      AB-Vega= 0.00
 153  93872:  815 IMACS_f4_V         (CCD+atm)     lambda_c= 5445.62      AB-Vega= 0.00
 154  94688: 1490 IMACS_f4_R         (CCD+atm)     lambda_c= 6600.81      AB-Vega= 0.00
-155  96179:  743 WFC3_F140W         (CCD+atm)     lambda_c= 13923.0      AB-Vega= 0.00 
+155  96179:  743 WFC3_F140W.NIR     (CCD+atm)     lambda_c= 13923.0      AB-Vega= 0.00 
 156  96923:  109 LUCI2_z            (CCD+atm)     lambda_c= 9650.00      AB-Vega= 0.00
 157  97033:  121 LUCI2_J            (CCD+atm)     lambda_c= 12500.00     AB-Vega= 0.00
 158  97155:   91 LUCI2_H            (CCD+atm)     lambda_c= 16510.00     AB-Vega= 0.00
 159  97247:   74 LUCI2_K            (CCD+atm)     lambda_c= 21990.00     AB-Vega= 0.00
-160  97322:   87 LUCI2_Ks           (CCD+atm)     lambda_c= 21610.00     AB-Vega= 0.00
+160  97322:   86 LUCI2_Ks           (CCD+atm)     lambda_c= 21610.00     AB-Vega= 0.00
+161  97409:  555 WFC3_F160W.NIR     (CCD+atm)     lambda_c= 15369.00     AB-Vega= 0.00 
+162  97965:   49 TOBicocca_Ha       (CCD+atm)     lambda_c= 6570.00      AB-Vega= 0.00                             
+163  98015:   57 TOBicocca_SII      (CCD+atm)     lambda_c= 6730.00      AB-Vega= 0.00                             
+164  98073:   54 TOBicocca_OIII     (CCD+atm)     lambda_c= 5007.00      AB-Vega= 0.00                             
 
+  
