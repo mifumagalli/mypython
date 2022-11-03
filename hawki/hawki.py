@@ -91,10 +91,10 @@ class Hawki(object):
         
         for ob in range(1,nobs+1):
           
-          if not os.path.exists("./OBnosky{}".format(ob)):
-              os.makedirs("./OBnosky{}".format(ob))
-          os.chdir("./OBnosky{}".format(ob))
-          print('Changing dir to OBnosky{}...'.format(ob))
+          if not os.path.exists("./OBmin{}".format(ob)):
+              os.makedirs("./OBmin{}".format(ob))
+          os.chdir("./OBmin{}".format(ob))
+          print('Changing dir to OBmin{}...'.format(ob))
          
           #Next calibrate objects
           if not os.path.isfile("exp_1.fits"):
@@ -106,8 +106,8 @@ class Hawki(object):
             print('Objects already processed')
           
           #This will always be run, since it internally checks for file existence
-          #print('Second order sky subtraction...')
-          #rdx.make_skysub(xml_info)
+          print('Second order sky subtraction...')
+          rdx.make_skysub(xml_info)
           
           
           os.chdir('../')  

@@ -166,7 +166,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     else:
        if np.any(np.diff(dit)>0) or np.any(np.diff(ndit)>0):
          print('Not all flat exposures have been obtained with the same DIT NDIT combination.')
-         print('Dealing with this situation will be made available in a future release')
+         print('Dealing with this will be made available in a future release')
          exit()
        else:
          flt_dit = dit[0]
@@ -177,6 +177,7 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     offtime = 1000
     
     recent= (delta_time <= offtime) & (delta_time >0.5)
+    reference_flttime = np.mean((flttime[recent]))
     
     xml_info['TWILIGHT_FLAT'] = fltlist[recent]
     
@@ -199,13 +200,13 @@ def parse_xml(path='./',nproc=12,pipecal=False):
     xml_info['DARK_OBJ'] = darklist_obj[recent]
     print('Found {0} {1} taken within {2} hours'.format(len(darklist_obj[recent]),'DARKS FOR OBJS', offtime))
     
-    offtime = 1e3
+    offtime = 100
     flt_ditndit = (dit==flt_dit) & (ndit==flt_ndit)
     
     darklist_flt = darklist[flt_ditndit]
     darktime_flt = darktime[flt_ditndit]
-    delta_time=np.abs(darktime_flt-darktime_flt[0])/3600.
-    
+    delta_time=np.abs(darktime_flt-reference_flttime)/3600.
+        
     recent= (delta_time <= offtime) 
     
     xml_info['DARK_FLT'] = darklist_flt[recent]
@@ -370,7 +371,7 @@ def make_objects(xml_info, ob, skyalgo='pawsky_mask', astrocat='wise', nproc=12)
     #Write the command file 
     scr=open("../../Script/make_stack{}.sh".format(ob),"w")
     scr.write("OMP_NUM_THREADS={0:d}\n".format(nproc)) 
-    scr.write("esorex --log-file=object.log hawki_science_process --skyalgo=none --cdssearch_astrom={1} --cdssearch_photom=2mass --savemstd=true --savecat=true --magerrcut=0.12 ../../Script/object{2}.sof".format(skyalgo,astrocds,ob))
+    scr.write("esorex --log-file=object.log hawki_science_process --skyalgo={0} --cdssearch_astrom={1} --cdssearch_photom=2mass --savemstd=true --savecat=true --magerrcut=0.12 ../../Script/object{2}.sof".format(skyalgo,astrocds,ob))
     scr.close()
     
     #Run pipeline 
@@ -384,6 +385,7 @@ def make_fluxcal(xml_info):
     objlist2 = glob.glob('exp_??.fits')
     
     objlist = [*objlist, *objlist2]
+    objlist.sort()
     
     for obj in objlist:
         
@@ -417,6 +419,7 @@ def make_skysub(xml_info):
     objlist2 = glob.glob('exp_??.fits')
     
     objlist = [*objlist, *objlist2]
+    objlist.sort()
     
     fitter = fitting.LinearLSQFitter()
     
@@ -435,6 +438,8 @@ def make_skysub(xml_info):
         for ext in range(1,5):
                         
             data = hdu[ext].data
+            
+            '''
             swdata = data.byteswap().newbyteorder()
             bkg1 = sep.Background(swdata, bw=128, bh=128)
             obj, segmap = sep.extract(swdata-bkg1, 1.5*bkg1.globalrms, minarea=14, segmentation_map=True, deblend_cont=1.0)
@@ -454,14 +459,14 @@ def make_skysub(xml_info):
             filtered  = stats.sigma_clip(data, sigma=2.5, maxiters=10)
             yy,xx = np.mgrid[:hdu[ext].header['NAXIS2'],:hdu[ext].header['NAXIS1']]
             
-            p_init = models.Polynomial2D(degree=7)
+            p_init = models.Polynomial2D(degree=3)
             p_fit = fitter(p_init, xx, yy, filtered)
             
             hdu[ext].data -= p_fit(xx,yy)
             
             cclip = 5 
             
-            
+            '''
             from astropy.convolution import convolve_fft, Box2DKernel
             smdata = convolve_fft(filtered-np.average(p_fit(xx,yy)), Box2DKernel(20))
             smout = convolve_fft(data, Box2DKernel(20))
