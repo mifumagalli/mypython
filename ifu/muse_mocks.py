@@ -279,7 +279,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,output='./',num=100,ZP=-1,spat
     else:
       badmask = np.zeros_like(segima)
 
-    nx, ny = imahdu[0].header['NAXIS1'], iahdu[0].header['NAXIS2']
+    nx, ny = imahdu[0].header['NAXIS1'], imahdu[0].header['NAXIS2']
     
     minx=20
     maxx=nx-20
@@ -387,7 +387,7 @@ def mockcont(image,segmap,fluxlimits,badmask=None,output='./',num=100,ZP=-1,spat
     return
 
 
-def run_mockcont(image,  segmap, iters, outdir, outfile,  varima=None, badmask=None, expmap=None, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, ZP=None, num=80, fill=10., minarea=10.,append=False):
+def run_mockcont(image,  segmap, iters, outdir, outfile,  varima=None, badmask=None, expmap=None, bkgsub=False, magrange=[23,29], SNRdet=3., FWHM_pix=3., EXP_scale=1.3, exp=False, ZP=None, num=80, fill=10., minarea=10.,append=False):
    
    """
 
@@ -462,7 +462,7 @@ def run_mockcont(image,  segmap, iters, outdir, outfile,  varima=None, badmask=N
          tmpmock = ascii.read(cmocks_injcat, names=['Xpos', 'Ypos', 'Flux'])
          
          #Run sextractor
-         source.findsources(cmocks_image, image, nsig=SNRdet, output=outdir, fitsmask=badmask, varima=varima, minarea=minarea)
+         source.findsources(cmocks_image, image, nsig=SNRdet, output=outdir, fitsmask=badmask, varima=varima, minarea=minarea, bkgsub=bkgsub)
          sexcat = fits.open(outdir+'catalogue.fits')[1].data
          
          for mockob in range(len(tmpmock)):

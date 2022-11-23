@@ -5,7 +5,7 @@ These are sets of utilities to handle muse sources
 
 def findsources(image,cube,varima=None,check=False,output='./',spectra=False,helio=0,nsig=2.,
                 minarea=10.,deblend_cont=0.0001,regmask=None,invregmask=False,fitsmask=None,clean=True,
-                outspec='Spectra',marz=False,rphot=False, detphot=False, sname='MUSE'):
+                outspec='Spectra',marz=False,rphot=False, detphot=False, bkgsub=False, sname='MUSE'):
 
     """      
 
@@ -117,12 +117,15 @@ def findsources(image,cube,varima=None,check=False,output='./',spectra=False,hel
         hdulist.writeto(output+"/badmask.fits",overwrite=True)
     
 
-    #check background level, but do not subtract it
+    #check background level, but do not subtract it unless requested
     print('Checking background levels')
     bkg = sep.Background(data,mask=badmask)    
     print('Residual background level ', bkg.globalback)
     print('Residual background rms ', bkg.globalrms)
-
+    
+    if (bkgsub):
+        data -= bkg
+    
     if(check):
         print('Dumping sky...')
         #dump sky properties
