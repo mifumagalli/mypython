@@ -386,24 +386,29 @@ def make_images_fast(cubelist, segcube, header, catentry, Id, outdir, outnamelis
     cubpadhdr['CRPIX2'] -= ypad1
     cubpadhdr['CRPIX3'] -= zpad1
     
+    #open fits
+    hdu_zero=fits.PrimaryHDU([])
+
     #Make segmentation image 
     segima = np.nansum(pixmask, axis=0)
     outima1 = outdir+'Image_id{}_det'.format(Id)+".fits"
-    hdu = fits.PrimaryHDU(segima, header=imahdr)
-    hdu.writeto(outima1, overwrite=True)
+    hdu_img_det = fits.ImageHDU(segima, header=imahdr)
+    #hdu.writeto(outima1, overwrite=True)
     
     if padding>0: 
        outima2 = outdir+'Pstamp_id{}_det'.format(Id)+".fits"
-       hdu = fits.PrimaryHDU(segima[ypad1:ypad2,xpad1:xpad2], header=imapadhdr)
-       hdu.writeto(outima2, overwrite=True)
+       hdu_pad_det = fits.ImageHDU(segima[ypad1:ypad2,xpad1:xpad2], header=imapadhdr)
+       #hdu.writeto(outima2, overwrite=True)
     
     #trim segcube and save it in 3D
     segmapshort=pixmask[zpad1:zpad2,ypad1:ypad2,xpad1:xpad2]
     savename = outdir+"/segcube.fits"
-    hdu=fits.PrimaryHDU(segmapshort, header=cubpadhdr)
-    hdu.writeto(savename,overwrite=True)
+    hdu_segcube=fits.ImageHDU(segmapshort, header=cubpadhdr)
+    #hdu.writeto(savename,overwrite=True)
 
-    
+    hdu_img_list=[]
+    hdu_pad_list=[]
+
     for ii in range(len(cubelist)):
         
         thisima = np.nansum(cubelist[ii]*pixmask, axis=0)
@@ -411,14 +416,26 @@ def make_images_fast(cubelist, segcube, header, catentry, Id, outdir, outnamelis
         thisima[empty] = cubelist[ii][zgeo,empty]
         
         outima1 = outdir+'Image_id{}'.format(Id)+outnamelist[ii]+".fits"
-        hdu = fits.PrimaryHDU(thisima, header=imahdr)
-        hdu.writeto(outima1, overwrite=True)
+        hdu = fits.ImageHDU(thisima, header=imahdr)
+        hdu_img_list.append(hdu)
+        #hdu.writeto(outima1, overwrite=True)
         
         if padding>0: 
            outima2 = outdir+'Pstamp_id{}'.format(Id)+outnamelist[ii]+".fits"
-           hdu = fits.PrimaryHDU(thisima[ypad1:ypad2,xpad1:xpad2], header=imapadhdr)
-           hdu.writeto(outima2, overwrite=True)
+           hdu = fits.ImageHDU(thisima[ypad1:ypad2,xpad1:xpad2], header=imapadhdr)
+           hdu_pad_list.append(hdu)
+           #hdu.writeto(outima2, overwrite=True)
            
+
+    #build list and write 
+    list_hdu_all=[hdu_zero,hdu_segcube,hdu_img_det]+hdu_img_list
+    if padding>0:
+        list_hdu_all=list_hdu_all+[hdu_pad_det]+hdu_pad_list
+        
+    hdulist=fits.HDUList(list_hdu_all)
+    hdulist.writeto(outdir+'/{}'.format(Id)+'_img.fits',overwrite=True)
+            
+
 def velocityoffset(wave_air, ztarg, rest_line):
     
     """
@@ -441,10 +458,11 @@ def velocityoffset(wave_air, ztarg, rest_line):
 
 
 def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=None,
-                       cov_poly=None,working_dir='./',output_dir='./',fcube_median=None,fcube_odd=None,
-                       fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
-                       fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
-                       DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True,mask=None,startind=0):
+                   cov_poly=None,working_dir='./',output_dir='./',fcube_median=None,fcube_odd=None,
+                   fcube_even=None,fcube_median_var=None,fcube_odd_var=None,
+                   fcube_even_var=None,fcube_orig=None,fsource_img=None,marzred=None,SNcut=[7,5],
+                   DeltaEOSNcut=[0.5,0.5],SNEOcut=[3,3],fracnpix=None,derived=True,checkimg=True,
+                   mask=None,startind=0,onefits=True):
     
     """
     
@@ -489,44 +507,51 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
     
     """
 
-    
-    #Load cubex catalog
-    catalog = read_cubex_catalog(working_dir+catname)
+    import os.path
 
+    #make restart safe for check image generation 
+    cat_name=output_dir+catname.split(".cat")[0]+"_select_SNR.fits"
     
-    #create space for bunch of keywords [some may not be used]
-    ksig           = Column(np.zeros(len(catalog), dtype=float), name='SNR')
-    ksig_odd    = Column(np.zeros(len(catalog), dtype=float), name='SNR_odd')
-    ksig_even   = Column(np.zeros(len(catalog), dtype=float), name='SNR_even')
-    ksig_med    = Column(np.zeros(len(catalog), dtype=float), name='SNR_med')
-    kcov_fac    = Column(np.zeros(len(catalog), dtype=float), name='covfac')
-    kconfidence = Column(np.zeros(len(catalog), dtype=float), name='confidence')
-    kveloffset  = Column(np.zeros(len(catalog), dtype=float), name='veloffset')
-    kdeltasn    = Column(np.zeros(len(catalog), dtype=float), name='EODeltaSN')
-    kfraction   = Column(np.zeros(len(catalog), dtype=float), name='BoxFraction')
-    kcontinuum  = Column(np.zeros(len(catalog), dtype=bool), name='OverContinuum')
+    if os.path.isfile(cat_name):
+        catalog=fits.open(cat_name)[1].data
+    else:
+        #Load cubex catalog
+        catalog = read_cubex_catalog(working_dir+catname)
+        
     
-    catalog.add_columns([ksig, ksig_odd, ksig_even, ksig_med, kcov_fac, kconfidence, kveloffset,
-                         kdeltasn,kfraction,kcontinuum])
+        #create space for bunch of keywords [some may not be used]
+        ksig           = Column(np.zeros(len(catalog), dtype=float), name='SNR')
+        ksig_odd    = Column(np.zeros(len(catalog), dtype=float), name='SNR_odd')
+        ksig_even   = Column(np.zeros(len(catalog), dtype=float), name='SNR_even')
+        ksig_med    = Column(np.zeros(len(catalog), dtype=float), name='SNR_med')
+        kcov_fac    = Column(np.zeros(len(catalog), dtype=float), name='covfac')
+        kconfidence = Column(np.zeros(len(catalog), dtype=float), name='confidence')
+        kveloffset  = Column(np.zeros(len(catalog), dtype=float), name='veloffset')
+        kdeltasn    = Column(np.zeros(len(catalog), dtype=float), name='EODeltaSN')
+        kfraction   = Column(np.zeros(len(catalog), dtype=float), name='BoxFraction')
+        kcontinuum  = Column(np.zeros(len(catalog), dtype=bool), name='OverContinuum')
     
-    #catalog=catalog[0:100]
+        catalog.add_columns([ksig, ksig_odd, ksig_even, ksig_med, kcov_fac, kconfidence, kveloffset,
+                             kdeltasn,kfraction,kcontinuum])
     
-    #Calculate covariance
-    if cov_poly is None:
-        covariance = np.zeros(len(catalog), dtype=float)+1.0
-    elif cov_poly.ndim == 1 :
-        size = np.sqrt(catalog['area_isoproj'])*0.2
-        covariance = np.polyval(cov_poly,size)
-    elif cov_poly.ndim == 2 :
-        size = np.sqrt(catalog['area_isoproj'])*0.2
-        covariance = np.zeros(len(catalog), dtype=float)
-        for ii in range(len(catalog)):
-            try:
-             okind = np.where(catalog['lambda_geow'][ii]>cov_poly[:,0])[0][-1]
-            except:
-             okind = 0 
-            covariance[ii] = np.polyval(cov_poly[okind,2:],size[ii])
-       
+        #catalog=catalog[0:100]
+    
+        #Calculate covariance
+        if cov_poly is None:
+            covariance = np.zeros(len(catalog), dtype=float)+1.0
+        elif cov_poly.ndim == 1 :
+            size = np.sqrt(catalog['area_isoproj'])*0.2
+            covariance = np.polyval(cov_poly,size)
+        elif cov_poly.ndim == 2 :
+            size = np.sqrt(catalog['area_isoproj'])*0.2
+            covariance = np.zeros(len(catalog), dtype=float)
+            for ii in range(len(catalog)):
+                try:
+                 okind = np.where(catalog['lambda_geow'][ii]>cov_poly[:,0])[0][-1]
+                except:
+                 okind = 0 
+                covariance[ii] = np.polyval(cov_poly[okind,2:],size[ii])
+
     #Open cubes, take header from data extension of average cube
     #We assume all the other products share the same WCS!!!
     print("Reading cubes")
@@ -610,78 +635,83 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         apermap=None
         contzcat=None
 
-    #Computing and adding velocity offset
-    if(target_z is not None):
-        veloff = velocityoffset(catalog['lambda_fluxw'], target_z, rest_line)
-        catalog['veloffset'] = veloff
+
+    if not os.path.isfile(cat_name):
+        #Computing and adding velocity offset
+        if(target_z is not None):
+            veloff = velocityoffset(catalog['lambda_fluxw'], target_z, rest_line)
+            catalog['veloffset'] = veloff
         
-        #Trim in velocity if requested
-        if(vel_cut is not None):
-           select=np.abs(catalog['veloffset'])<=vel_cut
-           catalog=catalog[select]
-           
-    #now loop over sources and update the catalogue info 
-    if(derived):
-        print("Calculating independent SNR and additional metrics for {} sources".format(len(catalog)))
-        catalog = independent_SNR_fast(catalog, covariance, segmap, cube, cube_var, cube_med=cube_median,cube_odd=cube_odd, cube_even=cube_even, var_med=cube_median_var,var_odd=cube_odd_var, var_even=cube_even_var,apermap=apermap,contzcat=contzcat)
-        
-    #Compute EOSN 
-    if(fcube_even is not None):
-        rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
-        catalog['EODeltaSN'] = rel_diff_halves
+            #Trim in velocity if requested
+            if(vel_cut is not None):
+                select=np.abs(catalog['veloffset'])<=vel_cut
+                catalog=catalog[select]
+
+        #now loop over sources and update the catalogue info 
+        if(derived):
+            print("Calculating independent SNR and additional metrics for {} sources".format(len(catalog)))
+            catalog = independent_SNR_fast(catalog, covariance, segmap, cube, cube_var,\
+                                           cube_med=cube_median,cube_odd=cube_odd, cube_even=cube_even,\
+                                           var_med=cube_median_var,var_odd=cube_odd_var, var_even=cube_even_var,\
+                                           apermap=apermap,contzcat=contzcat)
+        #Compute EOSN 
+        if(fcube_even is not None):
+            rel_diff_halves = np.abs(catalog['SNR_even']-catalog['SNR_odd'])/np.minimum(catalog['SNR_even'],catalog['SNR_odd'])
+            catalog['EODeltaSN'] = rel_diff_halves
 
     
-    #make space for checks
-    if not os.path.isdir(output_dir):
-        os.mkdir(output_dir)
-        
-    #Write full catalogue with SNR and derived quantities
-    print("Writing full catalog to disk")
-    catalog.write(output_dir+catname.split(".cat")[0]+"_all_SNR.fits", format="fits", overwrite=True)
+        #make space for checks
+        if not os.path.isdir(output_dir):
+            os.mkdir(output_dir)
 
-    
-    #make simplest cut to catalogue to reject unwanted sources
-    select=catalog['SNR']>=np.amin(SNcut)
-    catalog=catalog[select]
- 
-    #If mask is provided apply it
-    if (mask):
-       hdu = fits.open(mask)
-       try:
-         msk = hdu[0].data
-       except:
-         msk = hdu[1].data
-       
-       masked = msk[np.array(catalog['y_geow'], dtype=int),np.array(catalog['x_geow'], dtype=int)]  
-       catalog=catalog[masked==0]
-       
-    #loop over classes and assign
-    print("Assigning classes")
-    for iclass,iSN in enumerate(SNcut):
+        #Write full catalogue with SNR and derived quantities
+        print("Writing full catalog to disk")
+        catalog.write(output_dir+catname.split(".cat")[0]+"_all_SNR.fits", format="fits", overwrite=True)
 
-        #case of SN,DeltaSN,fractpix,continnum
-        if((fcube_even is not None) & (fracnpix is not None) & (fsource_img is not None)):
-            thisclass=((catalog['SNR'] >= iSN) & (catalog['SNR_odd'] >= SNEOcut[iclass]) & (catalog['SNR_even'] >= SNEOcut[iclass]) & (catalog['EODeltaSN'] <= DeltaEOSNcut[iclass]) & (catalog['OverContinuum'] == False) & (catalog['BoxFraction'] >= fracnpix) & (catalog['confidence'] == 0))
-            catalog['confidence'][thisclass] = iclass+1
 
-        #case of SN,DeltaSN,fractpix
-        elif ((fcube_even is not None) & (fracnpix is not None)):
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog[BoxFraction] > fracnpix) & (catalog['confidence'] == 0))
-            catalog['confidence'][thisclass] = iclass+1
-        
-        #case of SN,DeltaSN
-        elif(fcube_even is not None):
-            thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog['confidence'] == 0))
-            catalog['confidence'][thisclass] = iclass+1
-        
-        #remaining cases
-        else:
-            thisclass=((catalog['SNR'] > iSN) & (catalog['confidence'] == 0)) 
-            catalog['confidence'][thisclass] = iclass+1
-        
-        
-    #Write full catalogue with SNR and derived quantities
-    catalog.write(output_dir+catname.split(".cat")[0]+"_select_SNR.fits", format="fits", overwrite=True)
+        #make simplest cut to catalogue to reject unwanted sources
+        select=catalog['SNR']>=np.amin(SNcut)
+        catalog=catalog[select]
+
+        #If mask is provided apply it
+        if (mask):
+           hdu = fits.open(mask)
+           try:
+             msk = hdu[0].data
+           except:
+             msk = hdu[1].data
+
+           masked = msk[np.array(catalog['y_geow'], dtype=int),np.array(catalog['x_geow'], dtype=int)]  
+           catalog=catalog[masked==0]
+
+        #loop over classes and assign
+        print("Assigning classes")
+        for iclass,iSN in enumerate(SNcut):
+
+            #case of SN,DeltaSN,fractpix,continnum
+            if((fcube_even is not None) & (fracnpix is not None) & (fsource_img is not None)):
+                thisclass=((catalog['SNR'] >= iSN) & (catalog['SNR_odd'] >= SNEOcut[iclass]) & (catalog['SNR_even'] >= SNEOcut[iclass]) & (catalog['EODeltaSN'] <= DeltaEOSNcut[iclass]) & (catalog['OverContinuum'] == False) & (catalog['BoxFraction'] >= fracnpix) & (catalog['confidence'] == 0))
+                catalog['confidence'][thisclass] = iclass+1
+
+            #case of SN,DeltaSN,fractpix
+            elif ((fcube_even is not None) & (fracnpix is not None)):
+                thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog[BoxFraction] > fracnpix) & (catalog['confidence'] == 0))
+                catalog['confidence'][thisclass] = iclass+1
+
+            #case of SN,DeltaSN
+            elif(fcube_even is not None):
+                thisclass=((catalog['SNR'] > iSN) & (catalog['SNR_odd'] > SNEOcut[iclass]) & (catalog['SNR_even'] > SNEOcut[iclass]) & (catalog['EODeltaSN']<DeltaEOSNcut[iclass]) & (catalog['confidence'] == 0))
+                catalog['confidence'][thisclass] = iclass+1
+
+            #remaining cases
+            else:
+                thisclass=((catalog['SNR'] > iSN) & (catalog['confidence'] == 0)) 
+                catalog['confidence'][thisclass] = iclass+1
+
+
+        #Write full catalogue with SNR and derived quantities
+        catalog.write(output_dir+catname.split(".cat")[0]+"_select_SNR.fits", format="fits", overwrite=True)
+
 
     #make space for checks
     if not os.path.isdir(output_dir+"/objs"):
@@ -692,31 +722,34 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
         #loop over detections
         
         for ii in range(startind,len(catalog)):
-            
+
             #folder for this object
             objid = catalog['id'][ii]
-            
+
             objdir = output_dir+"/objs/id{}/".format(objid)
-            if not os.path.isdir(objdir):
+            if os.path.isdir(objdir):
+                print('Output for id{} exists... do not overwrite!'.format(objid))
+            else:
                 os.mkdir(objdir)
 
-            #make images
-            hdulist=[cube, cube_median, cube_odd, cube_even]
-            outnamelist=['_mean', '_median', '_half1', '_half2']
-            make_images_fast(hdulist, segmap, cubehdr, catalog[ii], objid, objdir, outnamelist, padding=50)
-            
-            #Uncomment if you want to use cubex to make the images, (SLOW!)
-            #hcubelist=[fsegmap,fcube,fcube_median,fcube_odd,fcube_even]
-            #namelist=[working_dir+thc for thc in hcubelist]
-            #taglist=['Image_id{}_det','Image_id{}_mean', 'Image_id{}_median', 'Image_id{}_half1', 'Image_id{}_half2']
-            #make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=-1)
-            #taglist=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'Pstamp_id{}_half1', 'Pstamp_id{}_half2']
-            #make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=50)
+                #make images
+                hdulist=[cube, cube_median, cube_odd, cube_even]
+                outnamelist=['_mean', '_median', '_half1', '_half2']
+                make_images_fast(hdulist, segmap, cubehdr, catalog[ii], objid, objdir, outnamelist, padding=50)
 
-            #Extract spectrum
-            if(fcube_orig is not None):
-                savename = objdir+"/spectrum.fits".format(objid)
-                utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, twod=True, tovac=True, write=savename, idsource=objid)
+                    #Uncomment if you want to use cubex to make the images, (SLOW!)
+                    #hcubelist=[fsegmap,fcube,fcube_median,fcube_odd,fcube_even]
+                    #namelist=[working_dir+thc for thc in hcubelist]
+                    #taglist=['Image_id{}_det','Image_id{}_mean', 'Image_id{}_median', 'Image_id{}_half1', 'Image_id{}_half2']
+                    #make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=-1)
+                    #taglist=['Pstamp_id{}_det','Pstamp_id{}_mean', 'Pstamp_id{}_median', 'Pstamp_id{}_half1', 'Pstamp_id{}_half2']
+                    #make_cubex_images(namelist, namelist[0], objid, objdir,taglist, padding=50)
+
+                    #Extract spectrum
+                if(fcube_orig is not None):
+                    savename = objdir+"/spectrum.fits".format(objid)
+                    utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, \
+                                  twod=True, tovac=True, write=savename, idsource=objid)
 
 
 
@@ -825,3 +858,64 @@ def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, 
       fluxarr[ind], errarr[ind], radarr[ind] = nb_cogphot(tmpnbima, tmpnbvar, xc, yc, maxrad=maxrad, growthlim=growthlim, plots=plots)
       
     return fluxarr, errarr, radarr    
+
+
+    def onefitscompressor(folderlist):
+
+        """
+
+        Utility function that compresses the legacy output of finalcatalogue from multiple fits to one multiextension fits file 
+
+        folderlist -> list of objid folders to operate on
+
+
+        """
+
+
+        import numpy as np
+        from astropy.io import fits
+        import re 
+        import os
+        
+        for dd in folders:
+            
+            print('Process ',dd)
+            #get obj id
+            objid=re.findall('r\D+|\d+',dd)[0]
+
+            imglist=['segcube.fits','Image_id{}_det.fits'.format(objid),\
+                     'Image_id{}_mean.fits'.format(objid),'Image_id{}_median.fits'.format(objid),\
+                     'Image_id{}_half1.fits'.format(objid),'Image_id{}_half2.fits'.format(objid),\
+                     'Pstamp_id{}_det.fits'.format(objid),'Pstamp_id{}_mean.fits'.format(objid),\
+                     'Pstamp_id{}_median.fits'.format(objid),'Pstamp_id{}_half1.fits'.format(objid),\
+                     'Pstamp_id{}_half2.fits'.format(objid)]
+            hdulist=[]
+    
+
+            #create fits file
+            hdulist.append(fits.PrimaryHDU([]))
+            
+            for thisfile in imglist:
+                #read and append
+                thisfits=fits.open(dd+'/'+thisfile)
+                hdulist.append(fits.ImageHDU(thisfits[0].data,header=thisfits[0].header))
+                thisfits.close()
+    
+            #write
+            hdulist=fits.HDUList(hdulist)
+            hdulist.writeto(dd+'/'+dd+'_img.fits',overwrite=True)
+                
+            #now purge 
+            for thisfile in imglist:
+                os.remove(dd+'/'+thisfile)
+        
+
+
+
+
+
+        
+
+        
+
+
