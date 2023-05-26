@@ -433,7 +433,7 @@ def make_images_fast(cubelist, segcube, header, catentry, Id, outdir, outnamelis
         list_hdu_all=list_hdu_all+[hdu_pad_det]+hdu_pad_list
         
     hdulist=fits.HDUList(list_hdu_all)
-    hdulist.writeto(outdir+'/{}'.format(Id)+'_img.fits',overwrite=True)
+    hdulist.writeto(outdir+'/id{}'.format(Id)+'_img.fits',overwrite=True)
             
 
 def velocityoffset(wave_air, ztarg, rest_line):

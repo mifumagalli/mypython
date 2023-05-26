@@ -411,7 +411,7 @@ class Window(Tkinter.Tk):
             self.update_tabdisplay()
 
 
-    def inspect_current(self):
+    def inspect_current(self,oldformat=False):
         
         #kill open processes
         for pp in self.processes:
@@ -428,11 +428,21 @@ class Window(Tkinter.Tk):
         #launch displays
         try:
             #control ds9
-            rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
-            if(self.white is not None):
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+            if(oldformat):
+                rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
             else:
-                ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+                rtname='objs/id{}/id{}_img.fits'.format(focusid,focusid)
+
+            if(self.white is not None):
+                if(oldformat):
+                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+                else:
+                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+            else:
+                if(oldformat):
+                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+                else:
+                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
             #collect processes
             self.processes.append(ds9)
             
@@ -450,7 +460,10 @@ class Window(Tkinter.Tk):
           
   
             #view cube
-            ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
+            if(oldformat):
+                ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid),'-3d','vp','90','0','-cmap','color'])
+            else:
+                ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/id{}_img.fits[1]'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
             self.processes.append(ds93d)
 
         except:
