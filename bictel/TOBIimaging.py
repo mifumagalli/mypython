@@ -1,16 +1,19 @@
 import glob
 import astropy
-from astropy.io import fits
+from astropy.io import fits,ascii
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import signal as signal 
 import os
+
+from mypython.filters import filter as flt
 
 from photutils.centroids import centroid_com
 from photutils.aperture import CircularAperture,CircularAnnulus
 from photutils.aperture import aperture_photometry
 from photutils.aperture import ApertureStats
 
+from astropy.stats import sigma_clipped_stats
 
 class TOBI_img_redux:
 
@@ -18,7 +21,10 @@ class TOBI_img_redux:
         
         #some default imaging numbers
         self.gain=0.6
-        self.nfilters=7
+        self.flatdict=['Ha','Hb','OIII','SII','g','r','i']
+        self.mypython_filters=[162,168,164,163,165,166,167]
+        self.nfilters=len(self.flatdict)
+        self.pixsize=0.44
         
         #path and alike
         self.rawpath=rawpath
@@ -30,12 +36,18 @@ class TOBI_img_redux:
         
         if not os.path.exists(self.output):
             os.makedirs(self.output)
-
-            
-            
+                 
     
     def makebias(self):
 
+
+        """
+
+        Routine that generate master bias
+        
+        """
+
+        
         print("*********************")
         print("Processing bias now")
         print("*********************")
@@ -68,15 +80,22 @@ class TOBI_img_redux:
 
     def makeflats(self):
 
+        """
+
+        Routine that generates coadded flats in each filter
+        
+        """
+
+        
         print("*********************")
         print("Processing flats now")
         print("*********************")
 
         savename=self.mflatname
 
+        flatdict=self.flatdict
+        
         #loop over 7 filter positions
-        flatdict=['Ha','Hb','OIII','SII','g','r','i']
-
         flatindex=np.where(self.datatype == "F")[0]
         self.masterflat={}
         hdulist=[]
@@ -119,6 +138,12 @@ class TOBI_img_redux:
 
     def makescience(self):
 
+        """
+        
+        Routine that turns the raw science frame in reduced frames (e/s)
+
+        """
+        
 
         print("*********************")
         print("Processing science now")
@@ -129,7 +154,7 @@ class TOBI_img_redux:
         for ii,kk in enumerate(self.alldata[sciindex]):
 
             savename=(kk.split("/")[-1]).split('.fit')[0]+"_redux.fit"
-
+            
             if not (os.path.isfile(self.output+"/"+savename)):
                         
                 
@@ -142,12 +167,16 @@ class TOBI_img_redux:
                 
                 
                 #write output
-                hdu = fits.PrimaryHDU(img)
+                hdu = fits.PrimaryHDU(img,header=science[0].header)
                 hdul = fits.HDUList([hdu])
                 hdul.writeto(self.output+'/'+savename)
 
                 print('Done with ', savename)
+
+
+        self.allredux=glob.glob(self.output+"/*redux.fit")
                 
+        print("All done with science")
         return
     
     def redux(self,verbose=True):
@@ -208,3 +237,111 @@ class TOBI_img_redux:
 
         #now handle the science
         self.makescience()
+
+
+
+    def zeropoint(self,stdname,listfile=None,guess_x=None,guess_y=None,check=False):
+
+
+        """
+        
+        Procedure that computes the zeropoint
+
+
+        """
+
+        #if list not given, use all redux files
+
+
+        #load standard
+        #col1 wave in A
+        #col2 f_lambda 1e-16 erg/s/cm2/A
+        std=ascii.read(os.getenv("MYPYTHON")+"/bictel/data/"+stdname)
+
+
+        allzp=[]
+        allfilt=[]
+        allsky=[]
+        
+        if(listfile is None):
+            listfile=self.allredux
+
+
+        if((guess_x is None) | (guess_y is None)):
+            guess_x=int(self.nx/2)
+            guess_y=int(self.ny/2)
+
+        for ffile in listfile:
+            
+            print("Processing zeropoint from image ", ffile)
+
+            #data 
+            fdata=fits.open(ffile)
+            skymean, skymedian, skystd = sigma_clipped_stats(fdata[0].data, sigma=3.0)
+            
+            #select star
+            trimdata=fdata[0].data[guess_x-100:guess_x+100,guess_y-100:guess_y+100]-skymedian
+            x1, y1 = centroid_com(trimdata)
+            
+            #recenter
+            trimdata=fdata[0].data[int(y1+guess_x-100)-100:int(y1+guess_x-100)+100,int(x1+guess_y-100)-100:int(x1+guess_y-100)+100]-skymedian
+            x1, y1 = centroid_com(trimdata)
+
+
+            if(check):
+                #display
+                plt.imshow(trimdata)
+                plt.scatter([x1],[y1])
+                plt.show()
+        
+
+            #now get phot profile
+            
+            #find bkg in annulus
+            annulus_aperture = CircularAnnulus((y1,x1), r_in=70, r_out=90)
+            aperstats = ApertureStats(trimdata, annulus_aperture)
+            
+            radii=[2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,40,50,60]
+            phot=[]
+            for r in radii:
+                aperture = CircularAperture((y1,x1), r=r)
+                phot_table = aperture_photometry(trimdata, aperture)
+                phot.append(phot_table['aperture_sum']-aperstats.mean*aperture.area)
+                
+
+            phot=np.array(phot)
+            phot_std=phot[-2][0]
+
+
+            if(check):
+                plt.plot(radii,phot)
+                plt.show()
+                
+            
+            #grab filter
+            findex=int((fdata[0].header['FILTER']).split(' ')[-1])
+            fdata.close()
+
+            #find standrad flux in filter
+            filT=flt.Filter(self.mypython_filters[findex-1])
+            filT.loadtrans()
+            std_fl=filT.convolve(std['col2']*1e-16,std['col1'])
+            
+            zp=np.log10(phot_std/std_fl)
+
+
+            print("STD flux [e/s]",phot_std)
+            print("STD flux [erg/s/cm2/A]",std_fl)
+            print("{} ZP log([e/s]/[erg/s/cm2/A])".format(self.flatdict[findex-1]),zp)
+
+
+            #go to SB (erg/s/cm2/A/arcsec2)
+            skySB=np.log10(skymedian)-zp-2*self.pixsize
+            print("Sky SB log([erg/s/cm2/A/arcsec2])",skySB)
+            
+
+            allfilt.append(findex)
+            allsky.append(skySB)
+            allzp.append(zp)
+            
+        return np.array(allzp),np.array(allsky),np.array(allfilt)
