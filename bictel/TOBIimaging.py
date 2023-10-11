@@ -5,6 +5,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from scipy import signal as signal 
 import os
+from scipy.ndimage import median_filter as medfilt 
 
 from mypython.filters import filter as flt
 
@@ -33,6 +34,8 @@ class TOBI_img_redux:
         #self
         self.mbiasname=mbiasname
         self.mflatname=mflatname
+
+        
         
         if not os.path.exists(self.output):
             os.makedirs(self.output)
@@ -136,7 +139,7 @@ class TOBI_img_redux:
         return
 
 
-    def makescience(self):
+    def makescience(self,localbk=False):
 
         """
         
@@ -165,6 +168,21 @@ class TOBI_img_redux:
                 
                 img=((science[0].data-self.masterbias)/self.masterflat[findex]*self.gain)/texp
                 
+
+                #correct local background if so desired
+                if(localbk):
+                    slicex=medfilt(np.median(np.hstack((img[:,10:400],img[:,-400:-10])),axis=1),size=15)
+                    
+                    imgslicex = np.repeat(slicex[:,None],img.shape[1],axis=1)
+                    img=img-imgslicex
+                    
+                    #slicex=np.hstack((img[:,10:400],img[:,-400:-10]))
+
+                    #plt.imshow(img-imgslicex)
+                    #plt.plot(slicex)
+                    #plt.show()
+                               
+                #exit()
                 
                 #write output
                 hdu = fits.PrimaryHDU(img,header=science[0].header)
@@ -179,7 +197,7 @@ class TOBI_img_redux:
         print("All done with science")
         return
     
-    def redux(self,verbose=True):
+    def redux(self,verbose=True,localbk=True):
 
         """
 
@@ -223,7 +241,13 @@ class TOBI_img_redux:
             self.makebias()
             
         #now process the dark
-        print("TDB... dark will be added in the future")
+        #if (os.path.isfile(self.output+"/"+self.mbiasname)):
+        #    print("Dark model exists, do not overwrite!")
+        #    self.masterbias=fits.open(self.output+"/"+self.mbiasname)[0].data
+        #else:
+        #    self.makebias()
+        print("Dark under construction!")
+        
 
         #now handle the flats
         if (os.path.isfile(self.output+"/"+self.mflatname)):
@@ -236,7 +260,7 @@ class TOBI_img_redux:
             self.makeflats()
 
         #now handle the science
-        self.makescience()
+        self.makescience(localbk=localbk)
 
 
 
