@@ -36,6 +36,8 @@ class Cosmocal:
             from astropy.cosmology import WMAP7 as apcosmo
         elif('WMAP9' in basic):
             from astropy.cosmology import WMAP9 as apcosmo
+        elif('Planck18' in basic):
+            from astropy.cosmology import Planck18 as apcosmo
         else:
             raise ValueError('Cosmology flavor not recognised')
 
