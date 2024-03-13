@@ -52,6 +52,8 @@ class Filter:
             where listin overlaps with filter (if smaller interval)
 
             Precision of integration is set to 1e-4.
+            Use with care for spectra with singularities, works best 
+            for smooth functions.
 
         """      
       
@@ -93,7 +95,7 @@ class Filter:
 
             The intergal is done with the simpson rule on a 
             number of samples that depends on the filter width,
-            unless a different value is specified by the user
+            unless a different value is specified by the user.
 
         """      
       
