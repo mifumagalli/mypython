@@ -43,7 +43,7 @@ class Filter:
         #plt.show()
 
 
-    def convolve(self,listin,wavein):
+    def convolve(self,listin,wavein, verbose=True):
 
         """ Given an input listin,wavein, perform the intergal: 
             (int listin*filter*dl)/(int filter*dl) 
@@ -71,10 +71,10 @@ class Filter:
         minint=np.max([minwl,minwf])
         maxint=np.min([maxwl,maxwf])
 
-        
-        print("Filter wave range {} {}".format(minwf, maxwf))
-        print("Data   wave range {} {}".format(minwl, maxwl))
-        print("Actual integration {} {}".format(minint, maxint))
+        if verbose:
+          print("Filter wave range {} {}".format(minwf, maxwf))
+          print("Data   wave range {} {}".format(minwl, maxwl))
+          print("Actual integration {} {}".format(minint, maxint))
 
         #create interpolation function 
         listint = interp1d(wavein,listin)
@@ -83,5 +83,51 @@ class Filter:
         numer = integrate.quad(lambda x: listint(x)*filtint(x), minint, maxint, limit=100, epsabs=1e-4, epsrel=1e-4)
         denom = integrate.quad(lambda x: filtint(x), minint, maxint, limit=100,epsabs=1e-4, epsrel=1e-4)
         integ=numer[0]/denom[0]
+        
+        return integ
+
+    def convolve_simpson(self,listin,wavein,nsamples=0,verbose=True):
+
+        """ Given an input listin,wavein, perform the intergal: 
+            (int listin*filter*dl)/(int filter*dl) 
+
+            The intergal is done with the simpson rule on a 
+            number of samples that depends on the filter width,
+            unless a different value is specified by the user
+
+        """      
+      
+        if (self.filter==None): 
+            self.loadtrans()
+
+        import numpy as np
+        from scipy.interpolate import interp1d
+        from scipy import integrate 
+     
+        #find absolute min/max for integration
+        minwf=np.min(self.filter['wave'])
+        maxwf=np.max(self.filter['wave'])
+        minwl=np.min(wavein)
+        maxwl=np.max(wavein)
+        minint=np.max([minwl,minwf])
+        maxint=np.min([maxwl,maxwf])
+        
+        if nsamples==0:
+           nsamples = int(maxint-minint)*4
+        
+        if verbose:
+          print("Filter wave range {} {}".format(minwf, maxwf))
+          print("Data   wave range {} {}".format(minwl, maxwl))
+          print("Actual integration {} {}".format(minint, maxint))
+
+        #create interpolation function 
+        listint = interp1d(wavein,listin)
+        filtint = interp1d(self.filter['wave'],self.filter['tran'])
+        
+        xarr = np.linspace(minint, maxint, nsamples)
+        
+        numer = integrate.simpson(filtint(xarr)*listint(xarr),xarr)
+        denom = integrate.simpson(filtint(xarr),xarr)
+        integ=numer/denom
         
         return integ
