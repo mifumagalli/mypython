@@ -5,10 +5,17 @@ Assumes file written with the muse_emitters.py procedures
 
 """
 
-from tkinter import *
-import Tkinter
-import tkFont
-from Tkinter import Tk
+try:
+ import Tkinter as tkinter
+ import tkFont as tkfont
+ from Tkinter import Tk
+ import tkFileDialog as filedialog
+except:
+ import tkinter
+ from tkinter import font as tkfont
+ from tkinter import Tk
+ from tkinter import filedialog 
+ 
 import tkMessageBox
 import tkFileDialog
 import argparse
@@ -23,11 +30,11 @@ import signal
 from mypython.ifu import muse_utils as utl
 
 
-class TableEdit(Tkinter.Frame):
+class TableEdit(tkinter.Frame):
     def __init__(self, parent, rows=10, columns=2):
         # use black background so it "peeks through" to 
         # form grid lines
-        Tkinter.Frame.__init__(self, parent)
+        tkinter.Frame.__init__(self, parent)
         self._table_labels = []
         self._table_cells = []
         self.clicked=None
@@ -41,8 +48,8 @@ class TableEdit(Tkinter.Frame):
                    width=24
                 else:
                    width=8   
-                label = Tkinter.StringVar()
-                cell  = Tkinter.Entry(self,textvariable=label,width=width)
+                label = tkinter.StringVar()
+                cell  = tkinter.Entry(self,textvariable=label,width=width)
                 cell.grid(row=row, column=column, sticky="nsew", padx=1, pady=1)
                 cell.bind("<Button-1>",self.lastclicked)
                 label.set("0.0")
@@ -70,7 +77,7 @@ class TableEdit(Tkinter.Frame):
 
     def unlock(self, row, column):
         widget = self._table_cells[row][column]
-        widget.configure(state=NORMAL)
+        widget.configure(state='normal')
     
     def hasfocus(self):
         for row in range(self.rows):
@@ -85,11 +92,11 @@ class TableEdit(Tkinter.Frame):
 
 
 
-class TableFix(Tkinter.Frame):
+class TableFix(tkinter.Frame):
     def __init__(self, parent, rows=10, columns=2):
         # use black background so it "peeks through" to 
         # form grid lines
-        self.frame = Tkinter.Frame.__init__(self, parent)
+        self.frame = tkinter.Frame.__init__(self, parent)
         self._table_labels = []
         self._table_cells = []
         for row in range(rows):
@@ -99,7 +106,7 @@ class TableFix(Tkinter.Frame):
                    width=24
                 else:
                    width=8   
-                cell  = Tkinter.Label(self,text='Text',width=width)
+                cell  = tkinter.Label(self,text='Text',width=width)
                 cell.grid(row=row, column=column, sticky="nsew", padx=1, pady=1)
                 current_row.append(cell)
                 
@@ -115,7 +122,7 @@ class TableFix(Tkinter.Frame):
 
 
 
-class Window(Tkinter.Tk):
+class Window(tkinter.Tk):
 
     def __init__(self,parent,startfile=None,white=None):
         
@@ -156,13 +163,13 @@ class Window(Tkinter.Tk):
         """ This init the basic gui """ 
         
         #create a menu frame
-        self.menuframe=Tkinter.Frame(self,width=int(self.preferwinwidth*self.menuaspect[0]),
+        self.menuframe=tkinter.Frame(self,width=int(self.preferwinwidth*self.menuaspect[0]),
                                      height=int(self.preferwinheight*self.menuaspect[1]))
         self.menuframe.grid_propagate(0)
         self.menuframe.grid()
 
         #create a data frame
-        self.dataframe=Tkinter.Frame(self,width=int(self.preferwinwidth*self.dataaspect[0]), 
+        self.dataframe=tkinter.Frame(self,width=int(self.preferwinwidth*self.dataaspect[0]), 
                                      height=int(self.preferwinheight*self.dataaspect[1]))
         self.dataframe.grid_propagate(0)
         self.dataframe.grid()
@@ -180,35 +187,35 @@ class Window(Tkinter.Tk):
        
 
         # creating a quite command
-        self.quitButton_w = Tkinter.Button(self.menuframe, text="Quit",command=self.client_exit).grid(row=0,column=0)
+        self.quitButton_w = tkinter.Button(self.menuframe, text="Quit",command=self.client_exit).grid(row=0,column=0)
         
         # creating an abort command
-        self.abortButton_w = Tkinter.Button(self.menuframe, text="Abort",command=self.client_abort).grid(row=1,column=0)
+        self.abortButton_w = tkinter.Button(self.menuframe, text="Abort",command=self.client_abort).grid(row=1,column=0)
 
 
         # creating a save command
-        self.saveButton_w = Tkinter.Button(self.menuframe, text="Save",command=self.write_current).grid(row=0,column=1)
+        self.saveButton_w = tkinter.Button(self.menuframe, text="Save",command=self.write_current).grid(row=0,column=1)
 
         #create the control page
-        self.nextButton_w = Tkinter.Button(self.menuframe, text=">>",command=self.next_page).grid(row=0,column=4)
-        self.previousButton_w = Tkinter.Button(self.menuframe, text="<<",command=self.previous_page).grid(row=0,column=2)
+        self.nextButton_w = tkinter.Button(self.menuframe, text=">>",command=self.next_page).grid(row=0,column=4)
+        self.previousButton_w = tkinter.Button(self.menuframe, text="<<",command=self.previous_page).grid(row=0,column=2)
 
-        self.currentpage=Tkinter.StringVar()
+        self.currentpage=tkinter.StringVar()
         self.currentpage.set(1)
-        self.allpages=Tkinter.StringVar()
+        self.allpages=tkinter.StringVar()
         self.allpages.set(1)
-        self.statuspage=Tkinter.StringVar()
+        self.statuspage=tkinter.StringVar()
         self.statuspage.set("Page {}/{}".format(self.currentpage.get(),self.allpages.get()))
-        self.currentpage_w=Tkinter.Label(self.menuframe,textvariable = self.statuspage)
+        self.currentpage_w=tkinter.Label(self.menuframe,textvariable = self.statuspage)
         self.currentpage_w.grid(column=3,row=0)
 
         # creating a save command
-        self.firstButton_w = Tkinter.Button(self.menuframe, text="First",command=self.gotofirst).grid(row=0,column=5)
-        self.lastButton_w = Tkinter.Button(self.menuframe, text="Last",command=self.gotolast).grid(row=0,column=6)
+        self.firstButton_w = tkinter.Button(self.menuframe, text="First",command=self.gotofirst).grid(row=0,column=5)
+        self.lastButton_w = tkinter.Button(self.menuframe, text="Last",command=self.gotolast).grid(row=0,column=6)
 
 
         #create inspect option
-        self.inspectButton_w = Tkinter.Button(self.menuframe, text="Inspect Current",command=self.inspect_current).grid(row=1,column=1,columnspan=2)
+        self.inspectButton_w = tkinter.Button(self.menuframe, text="Inspect Current",command=self.inspect_current).grid(row=1,column=1,columnspan=2)
 
 
         #set header table properties
@@ -217,24 +224,24 @@ class Window(Tkinter.Tk):
         self.tabncol=len(self.keycol)
 
         #create sort by option
-        llab = Tkinter.Label(self.menuframe, text="Sort by:")
+        llab = tkinter.Label(self.menuframe, text="Sort by:")
         llab.grid(column=3,row=1)
-        self.sortlist = Tkinter.StringVar(self.menuframe)
+        self.sortlist = tkinter.StringVar(self.menuframe)
         self.sortlist.set("id") # default value
-        self.sortlist_w = Tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw','notes','relvel','inspect')
+        self.sortlist_w = tkinter.OptionMenu(self.menuframe, self.sortlist,'id','optimal','SNR','confidence','redshift','type','x_geow','y_geow','lambda_fluxw','notes','relvel','inspect')
         self.sortlist_w.grid(column=4,row=1)
         #set the linelist in trace state
         self.sortlist.trace("w",self.sorttab)
 
         #create reverse option
-        self.reverselist_w = Tkinter.Button(self.menuframe,text="Reverse",command=self.reversetab)
+        self.reverselist_w = tkinter.Button(self.menuframe,text="Reverse",command=self.reversetab)
         self.reverselist_w.grid(column=5,row=1)
     
         #redshift reference
-        zlab = Tkinter.Label(self.menuframe, text="z_ref = ")
+        zlab = tkinter.Label(self.menuframe, text="z_ref = ")
         zlab.grid(column=7,row=0)
-        self.relvel = Tkinter.StringVar()
-        self.relvelcntr = Tkinter.Entry(self.menuframe,textvariable=self.relvel)
+        self.relvel = tkinter.StringVar()
+        self.relvelcntr = tkinter.Entry(self.menuframe,textvariable=self.relvel)
         self.relvelcntr.grid(column=8,row=0)
         self.relvel.set("0.0000")
         #set the redshift in a trace state
@@ -242,10 +249,10 @@ class Window(Tkinter.Tk):
 
         
         #reference lambda
-        llab = Tkinter.Label(self.menuframe, text="lam_ref = ")
+        llab = tkinter.Label(self.menuframe, text="lam_ref = ")
         llab.grid(column=7,row=1)
-        self.rellam = Tkinter.StringVar()
-        self.rellamcntr = Tkinter.Entry(self.menuframe,textvariable=self.rellam)
+        self.rellam = tkinter.StringVar()
+        self.rellamcntr = tkinter.Entry(self.menuframe,textvariable=self.rellam)
         self.rellamcntr.grid(column=8,row=1)
         self.rellam.set("1215.6701")
         #set the redshift in a trace state
@@ -426,6 +433,7 @@ class Window(Tkinter.Tk):
         idlambda=self.keycol.index('lambda_fluxw')
         focusid=self.table_data.get(row,idid)        
         #launch displays
+        print('Triggering inspect')
         try:
             #control ds9
             if(oldformat):
