@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+from astropy.io.ascii import masked
 from torch.utils.data import Dataset, DataLoader
 import glob
 import argparse
@@ -166,15 +167,26 @@ def dataloader(pathtodata,batch_size=0):
     y = []
 
     for file in data_files:
+        #read the file
         data = fits.open(file)[0].data
+
+        #need to regularize the data (nan) and make mask
+        exit()
+        data[np.isnan(data)] = 0
+
+        #put data between 0 and 1
+        data = (data - np.min(data)) / (np.max(data) - np.min(data))
+
+
+        # Extract label from filename
         table = Table.read(file, hdu=1)
         X.append(data)
 
         # Extract label from filename
         if(('LAE' in table['type']) | ('lae' in table['type'])):
-            label=True
+            label=1
         else:
-            label=False
+            label=0
         y.append(label)
 
     #reformat nsample,1,3d_cube_shape
@@ -221,11 +233,12 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
 
-    exit()
 
     # Initialize model
+    input_shape=X_train.shape[2:]
     model = ThreeDClassificationNet(input_shape).to(device)
-    
+
+
     # Define loss and optimizer
     criterion = nn.BCELoss()  # Binary Cross Entropy for binary classification
     optimizer = optim.Adam(model.parameters(), lr=0.001)
