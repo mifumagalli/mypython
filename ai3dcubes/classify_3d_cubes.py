@@ -3,6 +3,10 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
+import glob
+import argparse
+from astropy.table import Table
+from astropy.io import fits
 
 # Custom 3D Dataset
 class ThreeDDataset(Dataset):
@@ -138,23 +142,71 @@ def evaluate_model(model, test_loader, device):
     
     return correct / total
 
+def dataloader(pathtodata,batch_size=0):
+
+    """
+    Load 3D data and labels from files contained in a directory
+
+    pathtodata: path to directory containing 3D data files
+
+    returns:
+        X, y: numpy arrays of 3D data and labels
+
+    """
+
+    # Load data files
+    data_files = np.array(glob.glob(pathtodata + '/*.fits'))
+    num_samples = len(data_files)
+
+    if(batch_size > 0):
+        random_index = np.random.choice(np.arange(num_samples), size=batch_size, replace=False)
+        data_files = data_files[random_index]
+
+    X = []
+    y = []
+
+    for file in data_files:
+        data = fits.open(file)[0].data
+        table = Table.read(file, hdu=1)
+        X.append(data)
+
+        # Extract label from filename
+        if(('LAE' in table['type']) | ('lae' in table['type'])):
+            label=True
+        else:
+            label=False
+        y.append(label)
+
+    #reformat nsample,1,3d_cube_shape
+    X = np.array(X)[:,np.newaxis,:,:,:]
+    y = np.array(y)
+
+    return np.array(X), np.array(y)
+
+
+
+
 def main():
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(description='Input arguments')
+    parser.add_argument('input_path', type=str, help='Path to the data files')
+    parser.add_argument('--batch_size', type=int, help='Number of files to select', default=0)
+    parser.add_argument('--random_state', type=int, help='Random state for reproducibility', default=42)
+
+    args = parser.parse_args()
+
     # Set random seed for reproducibility
-    torch.manual_seed(42)
-    np.random.seed(42)
+    torch.manual_seed(args.random_state)
+    np.random.seed(args.random_state)
     
     # Determine device
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f'Using device: {device}')
-    
-    # Generate sample 3D data (replace with your actual data)
-    num_samples = 1000
-    input_shape = (16, 32, 32)  # depth, height, width
-    
-    # Simulate 3D data with random noise and labels
-    X = np.random.randn(num_samples, 1, *input_shape)
-    y = np.random.randint(2, size=num_samples).astype(float)
-    
+
+    #load data
+    X, y = dataloader(args.input_path, batch_size=args.batch_size)
+    num_samples = len(y)
+
     # Split data into training and testing
     train_ratio = 0.8
     split_idx = int(num_samples * train_ratio)
@@ -165,10 +217,12 @@ def main():
     # Create datasets and dataloaders
     train_dataset = ThreeDDataset(X_train, y_train)
     test_dataset = ThreeDDataset(X_test, y_test)
-    
+
     train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False)
-    
+
+    exit()
+
     # Initialize model
     model = ThreeDClassificationNet(input_shape).to(device)
     
