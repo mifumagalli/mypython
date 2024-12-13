@@ -1,3 +1,11 @@
+"""
+*Use of AI disclaimer*
+
+This code has been developed starting from a template generated with Claude using a prompt asking for a binary classifier of 3D datacubes with masks
+
+"""
+
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
