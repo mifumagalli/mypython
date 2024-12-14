@@ -114,11 +114,13 @@ def masked_loss(outputs, labels, masks):
     Returns:
     - Masked loss value
     """
+
+    print(outputs.shape, labels.shape, masks.shape)
     # Compute binary cross-entropy loss
     bce_loss = nn.functional.binary_cross_entropy(outputs, labels.unsqueeze(1), reduction='none')
 
     # Normalize the mask and apply to loss
-    mask_sum = masks.sum(dim=[1, 2, 3])
+    mask_sum = masks.sum(dim=[1, 2, 3], keepdim=True)
     masked_loss = (bce_loss * masks.squeeze(1)).sum(dim=[1, 2, 3]) / mask_sum
 
     return masked_loss.mean()
@@ -297,7 +299,7 @@ def main():
     model = MaskedThreeDClassificationNet(input_shape).to(device)
 
     # Define loss and optimizer
-    criterion = nn.BCELoss()  # Binary Cross Entropy for binary classification
+    criterion = masked_loss
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # Train the model

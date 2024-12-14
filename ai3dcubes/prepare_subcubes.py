@@ -43,14 +43,14 @@ pathcube = config['Paths']['pathcube']
 cube = config['Paths']['cube']
 minw = int(config['Wavelength']['minw'])
 maxw = int(config['Wavelength']['maxw'])
+augment = bool(config['Data']['augment'])
 
-
-pathcat = '../emitter_sources_358/extracted_SN7/'
-catalogue='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub_select_SNR.fits'
-pathcube= '../emitter_sources_358/'
-cube='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub.fits'
-minw=4850
-maxw=9500
+#pathcat = '../emitter_sources_358/extracted_SN7/'
+#catalogue='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub_select_SNR.fits'
+#pathcube= '../emitter_sources_358/'
+#cube='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub.fits'
+#minw=4850
+#maxw=9500
 
 #open fits
 datacube=fits.open(pathcube+cube)[0].data
@@ -109,7 +109,19 @@ for lae in laetab:
         hdu = fits.HDUList([hduc, hdut])
         hdu.writeto(outfile, overwrite=True)
         
-        
+
+        #augment by rotating if needed
+        if((augment) & (('LAE' in lae['type']) | ('lae' in lae['type']))):
+            for i in range(1,4):
+                #rotate
+                finalcut=np.rot90(finalcut,axes=(1,2))
+                outfile = 'data/subcube_{}_{}.fits'.format(lae['id'],i)
+                hduc = fits.PrimaryHDU(data=finalcut)
+                hdut = fits.BinTableHDU(data=Table(lae))
+                hdu = fits.HDUList([hduc, hdut])
+                hdu.writeto(outfile, overwrite=True)
+
+
         #except:
         #    #drop sources close to edges that give size problem
         #    pass
