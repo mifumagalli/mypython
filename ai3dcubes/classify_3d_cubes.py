@@ -250,8 +250,8 @@ def main():
     train_dataset = ThreeDDataset(X_train, y_train)
     test_dataset = ThreeDDataset(X_test, y_test)
 
-    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=8, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
+    test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
 
     # Initialize model

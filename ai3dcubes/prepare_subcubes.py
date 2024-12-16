@@ -44,6 +44,7 @@ cube = config['Paths']['cube']
 minw = int(config['Wavelength']['minw'])
 maxw = int(config['Wavelength']['maxw'])
 augment = bool(config['Data']['augment'])
+lineonly = bool(config['Data']['lineonly'])
 
 #pathcat = '../emitter_sources_358/extracted_SN7/'
 #catalogue='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub_select_SNR.fits'
@@ -89,7 +90,10 @@ for lae in laetab:
 
         #find a 41 channel centered on emitter and copy as head part of the data
         zoomcube=subcube[zc-20:zc+21,:,:]
-        finalcut=np.concatenate((zoomcube,subcube[indexw[0],:,:]))
+        if lineonly:
+            finalcut=zoomcube
+        else:
+            finalcut=np.concatenate((zoomcube,subcube[indexw[0],:,:]))
 
         #print(zoomcube.shape)
         #print(subcube[indexw].shape)
