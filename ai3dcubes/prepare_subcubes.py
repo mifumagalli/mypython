@@ -25,7 +25,6 @@ import matplotlib.pyplot as plt
 import configparser
 import argparse
 
-
 parser = argparse.ArgumentParser(description='Process a parameter file.')
 parser.add_argument('param_file', type=str, help='Path to the parameter file')
 args = parser.parse_args()
@@ -40,11 +39,14 @@ config.read(args.param_file)
 pathcat = config['Paths']['pathcat']
 catalogue = config['Paths']['catalogue']
 pathcube = config['Paths']['pathcube']
+pathout = config['Paths']['pathout']
 cube = config['Paths']['cube']
+suffix = config['Paths']['suffix']
 minw = int(config['Wavelength']['minw'])
 maxw = int(config['Wavelength']['maxw'])
 augment = bool(config['Data']['augment'])
 lineonly = bool(config['Data']['lineonly'])
+
 
 #pathcat = '../emitter_sources_358/extracted_SN7/'
 #catalogue='COMBINED_CUBE_FINAL_bootvar_psfsub_bkgsub_select_SNR.fits'
@@ -107,7 +109,7 @@ for lae in laetab:
         #img=np.nansum(subcube,axis=0)
         #plt.imshow(img)
         #plt.show()
-        outfile = 'data/subcube_{}.fits'.format(lae['id'])
+        outfile = '{}/{}_subcube_{}.fits'.format(pathout,suffix, lae['id'])
         hduc = fits.PrimaryHDU(data=finalcut)
         hdut = fits.BinTableHDU(data=Table(lae))
         hdu = fits.HDUList([hduc, hdut])
@@ -115,16 +117,16 @@ for lae in laetab:
         
 
         #augment by rotating if needed
-        if((augment) & (('LAE' in lae['type']) | ('lae' in lae['type']))):
+        #if((augment) & (('LAE' in lae['type']) | ('lae' in lae['type']))):
+        if ((augment) & (lae['redshift'] > 0)):
             for i in range(1,4):
                 #rotate
                 finalcut=np.rot90(finalcut,axes=(1,2))
-                outfile = 'data/subcube_{}_{}.fits'.format(lae['id'],i)
+                outfile = '{}/{}_subcube_{}_{}.fits'.format(pathout,suffix,lae['id'],i)
                 hduc = fits.PrimaryHDU(data=finalcut)
                 hdut = fits.BinTableHDU(data=Table(lae))
                 hdu = fits.HDUList([hduc, hdut])
                 hdu.writeto(outfile, overwrite=True)
-
 
         #except:
         #    #drop sources close to edges that give size problem
