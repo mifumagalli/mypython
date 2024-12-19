@@ -9,6 +9,8 @@ This code has been developed starting from a template generated with Claude usin
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torchmetrics
+
 import numpy as np
 from astropy.io.ascii import masked
 from torch.utils.data import Dataset, DataLoader
@@ -22,6 +24,10 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from torch.utils.data import Dataset, DataLoader
+import random
+
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 # Custom 3D Dataset
@@ -146,8 +152,8 @@ def evaluate_model(model, test_loader, device):
     - Accuracy of the model
     """
     model.eval()
-    correct = 0
-    total = 0
+    metric = torchmetrics.ConfusionMatrix(task='binary',num_classes=2)
+    metric = metric.to(device)
 
     with torch.no_grad():
         for batch_data, batch_labels in test_loader:
@@ -157,10 +163,10 @@ def evaluate_model(model, test_loader, device):
             outputs = model(batch_data)
             predicted = (outputs > 0.5).float()
 
-            total += batch_labels.size(0)
-            correct += (predicted == batch_labels.unsqueeze(1)).sum().item()
+            metric.update(predicted, batch_labels.unsqueeze(1))
 
-    return correct / total
+    confusion_matrix = metric.compute()
+    return confusion_matrix
 
 def cubeloader(pathtodata,batch_size=0):
 
@@ -176,6 +182,7 @@ def cubeloader(pathtodata,batch_size=0):
 
     # Load data files
     data_files = np.array(glob.glob(pathtodata + '/*.fits'))
+    random.shuffle(data_files)
     num_samples = len(data_files)
 
     # Select a subset of files if batch_size > 0
@@ -238,6 +245,7 @@ def main():
     #load data
     X, y, masks= cubeloader(args.input_path, batch_size=args.batch_size)
     num_samples = len(y)
+    print(f'Loaded {num_samples} samples')
 
     # Split data into training and testing
     train_ratio = 0.8
@@ -271,9 +279,16 @@ def main():
     train_model(model, train_loader, criterion, optimizer, device)
     
     # Evaluate the model
-    accuracy = evaluate_model(model, test_loader, device)
-    print(f'Test Accuracy: {accuracy * 100:.2f}%')
-    
+    confusion_matrix = evaluate_model(model, test_loader, device)
+    print(f'Confusion Matrix:\n{confusion_matrix.cpu().numpy()}')
+
+    plt.figure(figsize=(10, 7))
+    sns.heatmap(confusion_matrix.cpu().numpy(), annot=True, fmt='d', cmap='Blues')
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix')
+    plt.show()
+
     # Example prediction
     #sample_data = torch.FloatTensor(np.random.randn(1, 1, *input_shape)).to(device)
     #with torch.no_grad():
