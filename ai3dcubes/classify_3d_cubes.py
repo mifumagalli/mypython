@@ -74,16 +74,22 @@ class ThreeDClassificationNet(nn.Module):
 
             nn.Conv3d(64, 128, kernel_size=3, padding=1),
             nn.ReLU(),
-            nn.MaxPool3d(2)
+            nn.MaxPool3d(2),
+
+            #nn.Conv3d(128, 256, kernel_size=3, padding=1),
+            #nn.ReLU(),
+            #nn.MaxPool3d(2)
         )
 
         # Fully connected layers
         self.fc_layers = nn.Sequential(
             nn.Flatten(),
             nn.Linear(128 * (input_shape[0] // 8) * (input_shape[1] // 8) * (input_shape[2] // 8), 256),
+            #nn.Linear(256 * (input_shape[0] // 16) * (input_shape[1] // 16) * (input_shape[2] // 16), 512),
             nn.ReLU(),
             nn.Dropout(0.5),
             nn.Linear(256, 1),
+            #nn.Linear(512, 1),
             nn.Sigmoid()  # For binary classification
         )
 
@@ -260,7 +266,6 @@ def main():
 
     train_loader = DataLoader(train_dataset, batch_size=16, shuffle=True)
     test_loader = DataLoader(test_dataset, batch_size=16, shuffle=False)
-
 
     # Initialize model
     input_shape=X_train.shape[2:]
