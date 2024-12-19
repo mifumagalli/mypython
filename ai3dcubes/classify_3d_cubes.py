@@ -215,7 +215,8 @@ def cubeloader(pathtodata,batch_size=0):
 
         # Extract label from filename
         table = Table.read(file, hdu=1)
-        if(('LAE' in table['type']) | ('lae' in table['type'])):
+        #if(('LAE' in table['type']) | ('lae' in table['type'])):
+        if(table['redshift'] > 0):
             label=1
         else:
             label=0
@@ -281,7 +282,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=0.001)
     
     # Train the model
-    train_model(model, train_loader, criterion, optimizer, device)
+    train_model(model, train_loader, criterion, optimizer, device, epochs=60)
     
     # Evaluate the model
     confusion_matrix = evaluate_model(model, test_loader, device)
