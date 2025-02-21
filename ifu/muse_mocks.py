@@ -745,7 +745,7 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
 
     
     cube      -> a MUSE cube [filename] to use for emitters injection
-    varcube   -> variance image for detection thresholding
+    varcube   -> variance cube for detection thresholding
     segmap    -> Segmentation map of the input image
     iters     -> Number of injection/detection iterations to run
     outdir    -> Name of the output directory
@@ -800,11 +800,28 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
         cube_mock = outdir+folder+'lmocks_'+os.path.basename(cube)
         shinecat  = outdir+folder+'lmocks_catalogue.txt'
 
-        
         #-------------------------------------------
         #extract sources
         print("Running SHINE")
-        SHINE.runextraction(cube_mock, varcube, mask2d=segmap, mask2dpost=segmap, snthreshold=3, maskspedge=0, extvardata=1, spatsmooth=2, usefftconv=fftconv, connectivity=26, mindz=3, maxdz=50, minvox = 27, minarea=9, outdir=outdir+folder, writelabels=False, writesmdata=False, writesmvar=False, writesmsnr=False, writesubcube=False, writevardata=False)
+        
+        smvarcube = outdir+folder+(os.path.basename(varcube)).replace('.fits','.FILTER_out.fits')
+
+        if os.path.isfile(smvarcube):
+           writesmvar=False
+           dovarsmooth=False
+           varuse=smvarcube
+           extvardata = 0
+        else:
+           writesmvar=True
+           dovarsmooth=True
+           varuse = varcube
+           extvardata = 1
+        
+        print('Using variance file {}'.format(varuse))  
+        
+        SHINE.runextraction(cube_mock, varuse, mask2d=segmap, mask2dpost=segmap, snthreshold=3, maskspedge=0, extvardata=extvardata, spatsmooth=2, usefftconv=fftconv, dovarsmooth=dovarsmooth, \
+                            connectivity=26, mindz=3, maxdz=50, minvox = 27, minarea=9, outdir=outdir+folder, writelabels=False, writesmdata=False, writesmvar=writesmvar, writesmsnr=False, \
+                            writesubcube=False, writevardata=False)
 
         extracted = Table.read(outdir + folder + os.path.basename(cube_mock).split('.fits')[0] + '.CATALOGUE_out.fits', format='fits')
 
