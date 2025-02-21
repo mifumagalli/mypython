@@ -52,10 +52,15 @@ def mocklines(cube,segmap,fluxlimits,badmask=None,output='./',num=500,real=None,
     else:
        segcube = segima
     
-    if(real):
-       
-       if np.isscalar(real):
-          real = [real]
+    if np.isscalar(real):
+       real = [real]
+
+    try:
+      dummy = len(real)
+    except:
+      real = [real]  
+    
+    if real[0] is not None:
        
        realcubes = []
        for rr in real:
@@ -714,6 +719,204 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, real
              sexflux2 = []
                  
     shutil.rmtree(outdir+folder)
+
+
+def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=False, real=None, extended=False, badmask=None, expmap=None, cov_poly=None, tmpdir='tmpdir', FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000):
+
+    from mypython.ifu import muse_emitters as emi
+    from astropy.io import fits, ascii
+    from astropy.table import Table
+    import subprocess
+    import numpy as np
+    import os, shutil
+    
+    from SHINE.shine import SHINE
+
+    """
+
+    Run several iterations of the mock injection and detection loop to build up a statistical
+    sample of simulated line emitters. 
+    
+    IMPORTANT: THIS VERSION USES THE SHINE EXTRACTION CODE.
+    Spectral Highlighting and Identification of Emission (SHINE) is publicy available on 
+    Zenodo: doi: 10.5281/zenodo.14710518
+    
+    Please install the code from github.com/matteofox/SHINE.git
+
+    
+    cube      -> a MUSE cube [filename] to use for emitters injection
+    varcube   -> variance image for detection thresholding
+    segmap    -> Segmentation map of the input image
+    iters     -> Number of injection/detection iterations to run
+    outdir    -> Name of the output directory
+    outfile   -> Name of the output filename
+    
+    fftconv   -> (Optional) if True, use fft convolution rather than the direct algorithm.
+    real      -> (Optional) path to a single or a list of small cubes with real sources. Theflux in these
+                 cubes must be normalized to 1. If set extended, FWHM_pix are disregarded
+    badmask   -> (Optional) injection will not happen on masked pixels (1)
+    expmap    -> (Optional) if supplied, the final catalogue will report the value of the expmap at
+                 the position of the injected source
+    extended  -> use an exponential profile in x,y with scalelength equal to the value. If false, use point sources.
+                 If the value is a list of values they will be randomly drawn in the mock run
+    fluxrange -> mock sources will be drawn in range [min,max] in 1E-20 erg/s/cm2
+    num       -> number of mock sources [default=1000, high numbers give better statistics but can lead to shadowing]
+    cov_poly  -> covariance array. If 1D assumed to be cov vs aperture size and valid at all waves. 
+                 If 2D, the polynomial fit at the closest wave is used.
+    SNRdet    -> SNR for detection (default = 5). Covariance is applied on top of this.
+    FWHM_pix  -> spatial FWHM for Gaussian model in pixel
+    
+    """
+    
+    mockxc   = []
+    mockyc   = []
+    mockwc   = []
+    mockflux = []
+    mockexp  = []
+    mocksig  = []
+    sexdet   = []
+    sexxc    = []
+    sexyc    = []
+    sexwc    = []
+    sexflux1 = []
+    
+    folder = '/'+tmpdir+'/'
+    
+    if expmap is not None:
+      #Read expmap
+      hduexp = fits.open(expmap)
+      expima = hduexp[0].data
+
+    if not os.path.isdir(outdir+folder):
+       os.makedirs(outdir+folder)
+            
+    for repeat in range(iters):
+        print("####################################")
+        print("Run " + str(repeat+1) + " of " + str(iters))
+
+        mocklines(cube,segmap,fluxrange,real=real,badmask=badmask,output=outdir+folder,num=num, spatwidth=FWHM_pix, wavewidth=2, outprefix='lmocks', exp=extended)
+        
+        # run on mock cube 
+        cube_mock = outdir+folder+'lmocks_'+os.path.basename(cube)
+        shinecat  = outdir+folder+'lmocks_catalogue.txt'
+
+        
+        #-------------------------------------------
+        #extract sources
+        print("Running SHINE")
+        SHINE.runextraction(cube_mock, varcube, mask2d=segmap, mask2dpost=segmap, snthreshold=3, maskspedge=0, extvardata=1, spatsmooth=2, usefftconv=fftconv, connectivity=26, mindz=3, maxdz=50, minvox = 27, minarea=9, outdir=outdir+folder, writelabels=False, writesmdata=False, writesmvar=False, writesmsnr=False, writesubcube=False, writevardata=False)
+
+        extracted = Table.read(outdir + folder + os.path.basename(cube_mock).split('.fits')[0] + '.CATALOGUE_out.fits', format='fits')
+
+        # read in catalogue of known mock sources
+        tmpmock = ascii.read(outdir+folder+"{}_catalogue.txt".format(os.path.basename(cube_mock).split('.fits')[0]))
+        
+        
+        for mockob in range(len(tmpmock)):
+        
+          thisxc = tmpmock['col1'][mockob]
+          thisyc = tmpmock['col2'][mockob]
+          thiswc = tmpmock['col3'][mockob]
+          thisflux = tmpmock['col4'][mockob]
+          thissigx = tmpmock['col5'][mockob]
+          thissigy = tmpmock['col6'][mockob]
+          
+          mockxc.append(thisxc)
+          mockyc.append(thisyc)
+          mockwc.append(thiswc)
+          mockflux.append(thisflux)
+          mocksig.append(thissigx)
+          
+          if expmap is not None:
+            mockexp.append(expima[int(thisyc), int(thisxc)])
+          else:
+            mockexp.append(1)
+
+          sexx = np.array(extracted['Xcent'])
+          sexy = np.array(extracted['Ycent'])
+          sexw = np.array(extracted['Zcent'])
+          sexflux_iso  = np.array(extracted['Flux'])
+          sexerr_iso   = np.array(extracted['Flux_err'])
+          sexsize      = np.sqrt(extracted['Nspat'])*0.2
+          
+          distarray = np.sqrt((sexx-thisxc)**2+(sexy-thisyc)**2+(sexw-thiswc)**2)
+          
+          tmpindmatch = np.nanargmin(distarray)
+            
+          if np.nanmin(distarray)<3.0:
+             indmatch = tmpindmatch  
+          elif np.nanmin(distarray)<9.0:
+              if (sexflux_iso[tmpindmatch] > 0.2*thisflux) and (sexflux_iso[tmpindmatch] < 5.0*thisflux):
+                indmatch = tmpindmatch
+              else:
+                indmatch = -1  
+          else:
+             indmatch = -1
+          
+          if indmatch>=0:
+                 
+             #Calculate SN including covariance
+             if cov_poly is None:
+                 covariance = 1.0
+             elif cov_poly.ndim == 1 :
+                 size = sexsize[indmatch]
+                 covariance = np.polyval(cov_poly,size)
+             elif cov_poly.ndim == 2 :
+                 size = sexsize[indmatch]
+                 try:
+                    okind = np.where(extracted['lambda_geow'][indmatch]>cov_poly[:,0])[0][-1]
+                 except:
+                    okind = 0 
+                 covariance = np.polyval(cov_poly[okind,2:],size)
+             
+             
+             sexdet.append((sexflux_iso[indmatch]/sexerr_iso[indmatch])/covariance)
+             
+             sexxc.append(sexx[indmatch])
+             sexyc.append(sexy[indmatch])
+             sexwc.append(sexw[indmatch])
+             sexflux1.append(sexflux_iso[indmatch])
+
+          else:
+             sexdet.append(0)
+             sexxc.append(-1)
+             sexyc.append(-1)
+             sexwc.append(-1) 
+             sexflux1.append(-1) 
+    
+                   
+        if (repeat%5 ==0):
+             
+             print('Output mode')
+             
+             if expmap is not None:
+               data = Table([mockxc, mockyc, mockwc, mockexp, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1])
+               header = '#mockxc mockyc mockwc mockexp mockflux sexdet sexxc sexyc sexwc sexfluxiso \n'
+             else:
+               data = Table([mockxc, mockyc, mockwc, mockflux, sexdet, sexxc, sexyc, sexwc, sexflux1])
+               header = '#mockxc mockyc mockwc mockflux sexdet sexxc sexyc sexwc sexfluxiso \n'
+             
+             if not os.path.isfile(outdir+outfile):
+                 with open(outdir+outfile, mode='w') as f:
+                   f.write(header)
+             
+             with open(outdir+outfile, mode='a') as f:
+                 data.write(f, format='ascii.no_header')
+             
+             mockxc   = []
+             mockyc   = []
+             mockwc   = []
+             mockflux = []
+             mockexp  = []
+             mocksig  = []
+             sexdet   = []
+             sexxc    = []
+             sexyc    = []
+             sexwc    = []
+             sexflux1 = []
+                 
+    shutil.rmtree(outdir+folder)
+
 
 
 def analyse_mockcont(infile, exprange=None, nbins=250, complfrac=0.9):
