@@ -721,7 +721,8 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, real
     shutil.rmtree(outdir+folder)
 
 
-def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=False, real=None, extended=False, badmask=None, expmap=None, cov_poly=None, tmpdir='tmpdir', FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000):
+def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=False, real=None, extended=False, badmask=None, expmap=None, cov_poly=None, \
+                        tmpdir='tmpdir', FWHM_pix=3.0, SNRdet=5.0, fluxrange=[10,3000], num=1000, extvardata=0):
 
     from mypython.ifu import muse_emitters as emi
     from astropy.io import fits, ascii
@@ -810,16 +811,16 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
            writesmvar=False
            dovarsmooth=False
            varuse=smvarcube
-           extvardata = 0
+           thisextvardata = 0
         else:
            writesmvar=True
            dovarsmooth=True
            varuse = varcube
-           extvardata = 1
+           thisextvardata = extvardata
         
         print('Using variance file {}'.format(varuse))  
         
-        SHINE.runextraction(cube_mock, varuse, mask2d=segmap, mask2dpost=segmap, snthreshold=3, maskspedge=0, extvardata=extvardata, spatsmooth=2, usefftconv=fftconv, dovarsmooth=dovarsmooth, \
+        SHINE.runextraction(cube_mock, varuse, mask2d=segmap, mask2dpost=segmap, snthreshold=3, maskspedge=0, extvardata=thisextvardata, spatsmooth=2, usefftconv=fftconv, dovarsmooth=dovarsmooth, \
                             connectivity=26, mindz=3, maxdz=50, minvox = 27, minarea=9, outdir=outdir+folder, writelabels=False, writesmdata=False, writesmvar=writesmvar, writesmsnr=False, \
                             writesubcube=False, writevardata=False)
 
