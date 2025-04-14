@@ -850,9 +850,9 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
           else:
             mockexp.append(1)
 
-          sexx = np.array(extracted['Xcent'])
-          sexy = np.array(extracted['Ycent'])
-          sexw = np.array(extracted['Zcent'])
+          sexx = np.array(extracted['XcentFL'])
+          sexy = np.array(extracted['YcentFL'])
+          sexw = np.array(extracted['ZcentFL'])
           sexflux_iso  = np.array(extracted['Flux'])
           sexerr_iso   = np.array(extracted['Flux_err'])
           sexsize      = np.sqrt(extracted['Nspat'])*0.2
