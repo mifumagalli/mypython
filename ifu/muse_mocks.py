@@ -646,7 +646,7 @@ def run_mocklines(cube, varcube, segmap, cubexfile, iters, outdir, outfile, real
             
           if np.nanmin(distarray)<3.0:
              indmatch = tmpindmatch  
-          elif np.nanmin(distarray)<9.0:
+          elif np.nanmin(distarray)<6.0:
               if (sexflux_iso[tmpindmatch] > 0.2*thisflux) and (sexflux_iso[tmpindmatch] < 5.0*thisflux):
                 indmatch = tmpindmatch
               else:
@@ -855,7 +855,7 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
           sexw = np.array(extracted['ZcentFL'])
           sexflux_iso  = np.array(extracted['Flux'])
           sexerr_iso   = np.array(extracted['Flux_err'])
-          sexsize      = np.sqrt(extracted['Nspat'])*0.2
+          sexsize      = np.clip(np.sqrt(extracted['Nspat'])*0.2, 1, 30) #clip to at most 30 pixels
           
           distarray = np.sqrt((sexx-thisxc)**2+(sexy-thisyc)**2+(sexw-thiswc)**2)
           
@@ -863,7 +863,7 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
             
           if np.nanmin(distarray)<3.0:
              indmatch = tmpindmatch  
-          elif np.nanmin(distarray)<9.0:
+          elif np.nanmin(distarray)<6.0:
               if (sexflux_iso[tmpindmatch] > 0.2*thisflux) and (sexflux_iso[tmpindmatch] < 5.0*thisflux):
                 indmatch = tmpindmatch
               else:
@@ -882,8 +882,9 @@ def run_mocklines_shine(cube, varcube, segmap, iters, outdir, outfile, fftconv=F
              elif cov_poly.ndim == 2 :
                  size = sexsize[indmatch]
                  try:
-                    okind = np.where(extracted['lambda_geow'][indmatch]>cov_poly[:,0])[0][-1]
+                    okind = np.where(extracted['LambdaFL'][indmatch]>cov_poly[:,0])[0][-1]
                  except:
+                    print('WARNING: Covariance wavelength index not found for wave {}. Using index 0'.format(extracted['LambdaFL'][indmatch]))
                     okind = 0 
                  covariance = np.polyval(cov_poly[okind,2:],size)
              
