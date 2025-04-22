@@ -6,18 +6,21 @@ Assumes file written with the muse_emitters.py procedures
 """
 
 try:
- import Tkinter as tkinter
- import tkFont as tkfont
- from Tkinter import Tk
- import tkFileDialog as filedialog
+    import Tkinter as tkinter
+    import tkFont as tkfont
+    from Tkinter import Tk
+    import tkFileDialog as filedialog
+    import tkMessageBox
+    import tkFileDialog
+    
 except:
- import tkinter
- from tkinter import font as tkfont
- from tkinter import Tk
- from tkinter import filedialog 
- 
-import tkMessageBox
-import tkFileDialog
+    import tkinter
+    from tkinter import font as tkfont
+    from tkinter import Tk
+    from tkinter import filedialog 
+    from tkinter import filedialog as tkFileDialog
+    from tkinter import messagebox as tkMessageBox
+
 import argparse
 import sys
 from astropy.io import fits
@@ -28,6 +31,7 @@ import subprocess
 import os
 import signal
 from mypython.ifu import muse_utils as utl
+
 
 
 class TableEdit(tkinter.Frame):
@@ -236,13 +240,28 @@ class Window(tkinter.Tk):
         #create reverse option
         self.reverselist_w = tkinter.Button(self.menuframe,text="Reverse",command=self.reversetab)
         self.reverselist_w.grid(column=5,row=1)
+        
+        #------------------------------------------
+        # added by D.T. 
+        
+        # create go to page option
+        page_lab = tkinter.Label(self.menuframe, text="Go to page:")
+        page_lab.grid(row=0, column=7)
+        self.page_input = tkinter.StringVar()
+        self.page_inputcntr = tkinter.Entry(self.menuframe,textvariable=self.page_input, width=6)
+        self.page_inputcntr.grid(row=0, column=8)
+        
+        self.page_inputcntr.bind('<Return>', self.goto_page_command) 
+        #------------------------------------------
+        
+        
     
         #redshift reference
         zlab = tkinter.Label(self.menuframe, text="z_ref = ")
-        zlab.grid(column=7,row=0)
+        zlab.grid(column=9,row=0)
         self.relvel = tkinter.StringVar()
-        self.relvelcntr = tkinter.Entry(self.menuframe,textvariable=self.relvel)
-        self.relvelcntr.grid(column=8,row=0)
+        self.relvelcntr = tkinter.Entry(self.menuframe,textvariable=self.relvel, width=6)
+        self.relvelcntr.grid(column=10,row=0)
         self.relvel.set("0.0000")
         #set the redshift in a trace state
         self.relvel.trace("w",self.updaterelvel)
@@ -252,12 +271,14 @@ class Window(tkinter.Tk):
         llab = tkinter.Label(self.menuframe, text="lam_ref = ")
         llab.grid(column=7,row=1)
         self.rellam = tkinter.StringVar()
-        self.rellamcntr = tkinter.Entry(self.menuframe,textvariable=self.rellam)
+        self.rellamcntr = tkinter.Entry(self.menuframe,textvariable=self.rellam, width=6)
         self.rellamcntr.grid(column=8,row=1)
         self.rellam.set("1215.6701")
         #set the redshift in a trace state
         self.rellam.trace("w",self.updaterelvel)
-        
+
+        #start flux analysis GUI by D.T.
+        #self.FluxAnalysisCurrentButton = tkinter.Button(self.menuframe, text="GUI Flux Analysis Current ",command=self.GUIFluxAnalysisCurrent).grid(row=1,column=9,columnspan=2)
 
     def init_dataframe(self):
 
@@ -416,7 +437,9 @@ class Window(tkinter.Tk):
             #update entries if table has been drawn already
             self.record_changes()
             self.update_tabdisplay()
+            
 
+    
 
     def inspect_current(self,oldformat=False):
         
@@ -433,28 +456,30 @@ class Window(tkinter.Tk):
         idlambda=self.keycol.index('lambda_fluxw')
         focusid=self.table_data.get(row,idid)        
         #launch displays
-        print('Triggering inspect')
+        
+        ds9_path = 'ds9'
+        
         try:
             #control ds9
             if(oldformat):
                 rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
             else:
                 rtname='objs/id{}/id{}_img.fits'.format(focusid,focusid)
-
+                
+            print(rtname)
             if(self.white is not None):
                 if(oldformat):
-                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+                    ds9=subprocess.Popen([ds9_path,'-scale','clezscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
                 else:
-                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
             else:
                 if(oldformat):
-                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
+                    ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
                 else:
-                    ds9=subprocess.Popen(['ds9','-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
             #collect processes
             self.processes.append(ds9)
             
-
             #control spectra gui
             tmpz=float(self.table_data.get(row,idred))
             if(tmpz > 0):
@@ -469,9 +494,9 @@ class Window(tkinter.Tk):
   
             #view cube
             if(oldformat):
-                ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/segcube.fits'.format(focusid),'-3d','vp','90','0','-cmap','color'])
+                ds93d=subprocess.Popen([ds9_path,'-3d','objs/id{}/segcube.fits'.format(focusid),'-3d','vp','90','0','-cmap','color'])
             else:
-                ds93d=subprocess.Popen(['ds9','-3d','objs/id{}/id{}_img.fits[1]'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
+                ds93d=subprocess.Popen([ds9_path,'-3d','objs/id{}/id{}_img.fits[1]'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
             self.processes.append(ds93d)
 
         except:
@@ -516,6 +541,41 @@ class Window(tkinter.Tk):
             self.update_tabdisplay()
         else:
             pass
+        
+    #added by D.T.: this is a fucntion that allows to go to a specific page if the number is provided   
+    def goto_page(self, page_number):
+        
+        try:
+            
+            #Convert the input to an integer
+            page_number = int(page_number)
+            
+            if 1 <= page_number <= int(self.allpages.get()):
+                
+                #freeze current changes
+                self.record_changes()
+                #step page and update
+                self.currentpage.set(page_number)
+                self.statuspage.set("Page {}/{}".format(self.currentpage.get(), self.allpages.get()))
+                self.update_tabdisplay()
+                
+            else:
+                print("Invalid page number. Please enter a number between 1 and {}.".format(self.allpages.get()))
+                pass
+        
+        except ValueError:
+            print("Invalid input. Please enter a valid page number.")
+            pass
+    
+    
+    def goto_page_command(self, event):
+        
+        #the event is the <Return> I give from the "enter" on the keyboard
+        #this function define the command to go to a certain page
+        page_number = self.page_input.get()
+        self.goto_page(page_number)
+     # -- -- -- -- -- -- -- -- -- -- -- --  -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- 
+        
             
     def sorttab(self,*args):
     
