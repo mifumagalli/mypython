@@ -31,7 +31,7 @@ import subprocess
 import os
 import signal
 from mypython.ifu import muse_utils as utl
-
+import numpy as np
 
 
 class TableEdit(tkinter.Frame):
@@ -136,6 +136,16 @@ class Window(tkinter.Tk):
 
         #start tk
         self.tk=Tk()
+
+        #change getboolean: in Py3 return "??" when using go to page option. With this is ok.
+        orig_getbool = self.tk.getboolean
+        def safe_getboolean(s):
+            try:
+                return orig_getbool(s)
+            except (ValueError, tkinter.TclError):
+                return False
+        self.tk.getboolean = safe_getboolean
+        
         
         #set min and preferred size of main gui
         self.minwinwidth=400
@@ -323,7 +333,7 @@ class Window(tkinter.Tk):
 
         #find number of pages
         self.rowppage=15
-        self.pagenum=len(self.catdata)/self.rowppage
+        self.pagenum=len(self.catdata) // self.rowppage
         if((len(self.catdata) % self.rowppage) > 0):
             self.pagenum=self.pagenum+1
         
@@ -544,7 +554,6 @@ class Window(tkinter.Tk):
         
     #added by D.T.: this is a fucntion that allows to go to a specific page if the number is provided   
     def goto_page(self, page_number):
-        
         try:
             
             #Convert the input to an integer
@@ -569,7 +578,6 @@ class Window(tkinter.Tk):
     
     
     def goto_page_command(self, event):
-        
         #the event is the <Return> I give from the "enter" on the keyboard
         #this function define the command to go to a certain page
         page_number = self.page_input.get()
