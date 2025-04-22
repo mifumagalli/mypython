@@ -148,7 +148,7 @@ class Window(tkinter.Tk):
         self.geometry("{}x{}".format(self.preferwinwidth,self.preferwinheight))
 
         #tweak the aspect ratio of the menu and data gui
-        self.menuaspect=[1,0.2]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
+        self.menuaspect=[1,0.2]        #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
         self.dataaspect=[1,1-0.2]     #Ruari 24/05 fixes bug where different resolutions cause the menu to be cut off 
         self.dpi=80
 
