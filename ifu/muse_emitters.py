@@ -1305,6 +1305,25 @@ def finalcatalogue(fcube,fcube_var,catname,target_z=None,rest_line=None,vel_cut=
 
 def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, plots=False):
 
+    """
+    *Input: 
+    
+    nbima      = the narrow band image (the array);
+    nbvar      = the associated variance (the array);
+    xc         = the x pixel center of the source;
+    yc         = the y pixel center of the source;
+    maxrad     = the maximum radius (in pixel) to calculate the total flux;
+    growthlim  = the growth limit at which we can stop to calculate the total flux;
+    plots      = default False, is a plot check (image with aperture, flux growth and curve of growth). 
+
+    *Output:
+
+    fluxarr  = the total flux in the aperture;
+    errarr   = the error associated with the flux;
+    radarr   = the radius (in pixels) used to calculate the total flux.
+    
+    """
+
     from photutils import CircularAperture, CircularAnnulus
     from photutils import aperture_photometry
     from astropy.stats import sigma_clipped_stats as scl
@@ -1353,6 +1372,30 @@ def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, plots=False):
     return fluxarr, errarr, radarr
 
 def emi_cogphot(fcube, fcube_var, fsegcube, fcatalog, idlist, dz=24, maxrad=15, offx=0, offy=0, growthlim=1.025, writeNB=False, plots=False):
+
+    """
+    *Input
+
+    fcube      = the cube to use to extract the narrow band (.fits path file);
+    fcube_var  = the variance cube to use to calculate the error in the extract the narrow band (.fits path file);
+    fsegcube   = the segementation cube to use to extract the narrow band (.fits path file);
+    fcatalog   = the source catalog (.fits path file);
+    idlist     = the id list of the sources we want to use (e.g. the LAEs);
+    dz         = the width (in pixels) in the z direction to extract the narrow band (deafult = 24, i.e. 30 Å);
+    maxrad     = the maximum radius (in pixel) to calculate the total flux;
+    offx       = the x offset to recenter the source;
+    offy       = the y offset to recenter the source;
+    growthlim  = the growth limit at which we can stop to calculate the total flux;
+    writeNB    = if I need the narrow band in a .fits file;
+    plots      = default False, is a plot check (image with aperture, flux growth and curve of growth)
+    
+    *Output:
+
+    fluxarr  = the total flux in the aperture of the sources (array);
+    errarr   = the error associated with the flux of the sources (array);
+    radarr   = the radius (in pixels) used to calculate the total flux of the sources (array).
+    """
+
     
     try:
       cube = fits.open(fcube)[1].data
