@@ -474,19 +474,28 @@ class Window(tkinter.Tk):
             if(oldformat):
                 rtname='objs/id{}/Pstamp_id{}'.format(focusid,focusid)
             else:
-                rtname='objs/id{}/id{}_img.fits'.format(focusid,focusid)
+                rtname  ='objs/id{}/id{}_img.fits'.format(focusid,focusid)
+                hdulist = fits.open(rtname)
+                nexten  = len(hdulist)
                 
-            print(rtname)
             if(self.white is not None):
                 if(oldformat):
                     ds9=subprocess.Popen([ds9_path,'-scale','clezscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
                 else:
-                    ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    if nexten > 7:
+                        ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    else:
+                        ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[3]',rtname+'[4]',rtname+'[5]','-smooth'])
+                        
             else:
                 if(oldformat):
                     ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'_mean.fits',rtname+'_median.fits',rtname+'_half1.fits',rtname+'_half2.fits',rtname+'_det.fits','-smooth'])
                 else:
-                    ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    if nexten > 7:
+                        ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
+                    else:
+                        ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',rtname+'[3]',rtname+'[4]',rtname+'[5]','-smooth'])
+                        
             #collect processes
             self.processes.append(ds9)
             

@@ -173,9 +173,9 @@ def make_images_fast_SHINE(cubelist, segcube, header, catentry, Id, outdir, outn
     z2   = int(catentry['Zmax'])
     
     xpad1 = max(x1-padding,0)
-    xpad2 = min(x1+padding,mx)
+    xpad2 = min(x2+padding,mx)
     ypad1 = max(y1-padding,0)
-    ypad2 = min(y1+padding,my)
+    ypad2 = min(y2+padding,my)
     zpad1 = max(z1-2,0)
     zpad2 = min(z2+2,mz)
     
@@ -534,7 +534,10 @@ def finalcatalogue_SHINE(fcube, fcube_var, fsegmap, catpath, target_z=None, rest
             
         #loop over detections
         total = len(catalog)
-        step  = total // 10  # 10 step = 10% each
+        if total < 10:
+            step = total
+        else:
+            step  = total // 10  # 10 step = 10% each
 
         for ii in range(startind,len(catalog)):
 
@@ -562,6 +565,7 @@ def finalcatalogue_SHINE(fcube, fcube_var, fsegmap, catpath, target_z=None, rest
                     savename = objdir+"/spectrum.fits".format(objid)
                     utl.cube2spec(fcube_orig, 0.0, 0.0, 0.0 , shape='mask', helio=0, mask=segmap, \
                                   twod=True, tovac=True, write=savename, idsource=objid)
+
 
             if (ii - startind) % step == 0:
                 progress = ((ii - startind) / total) * 100
