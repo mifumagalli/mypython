@@ -1485,7 +1485,8 @@ def nb_cogphot(nbima, nbvar, xc, yc, maxrad=15, growthlim=1.025, id=0, plots=Fal
         
         filtimage = convolve(nbima, Box2DKernel(5))
 
-        ax[0].imshow(filtimage, vmin=-2.5, vmax=1.05*filtimage[int(np.round(yc)), int(np.round(xc))], origin='lower')
+        ax[0].imshow(filtimage, vmin=-2.5, vmax=2*filtimage[int(np.round(yc)), int(np.round(xc))], origin='lower', cmap='twilight')
+        #ax[0].imshow(filtimage, origin='lower', cmap='twilight')
         
         circ = plt.Circle((xc-1,yc-1), rad[rlim], color='r', fill=False, lw=3)
         ax[0].plot(xc-1,yc-1, marker='P', c='r', ms=10)

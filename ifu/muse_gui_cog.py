@@ -317,6 +317,7 @@ class FluxGUI:
             self.maxrad.set(15)
             self.offx.set(0)
             self.offy.set(0)
+            self.offz.set(0)
             self.growthlim.set(1.025)
 
             self.status.config(text="Ready for new ID. Click 'Run Analysis' to proceed.", fg='limegreen')
