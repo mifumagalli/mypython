@@ -7,6 +7,7 @@ import sys
 import subprocess
 import matplotlib.pyplot as plt
 import argparse
+import os
 
 from mypython.ifu import muse_emitters as mf
 
@@ -55,7 +56,8 @@ class FluxGUI:
         #self.root.geometry("800x600")
         self.root.resizable(False, False)
 
-        png_icon_path = 'icon_gui.png'
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        png_icon_path = os.path.join(script_dir, 'icon_gui.png')
 
         img = Image.open(png_icon_path)
         img = img.resize((128, 128))  
