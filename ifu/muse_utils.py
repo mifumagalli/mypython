@@ -491,7 +491,11 @@ def readcube(cube, helio=0,mmap=False):
     #reconstruct wave array
     #wave in air
     sz=cubdata.shape
-    delta_lambda=cfits[1].header["CD3_3"]*hel_corr
+    try:
+    	delta_lambda=cfits[1].header["CD3_3"]*hel_corr
+    except:
+    	delta_lambda=cfits[1].header["CDELT3"]*hel_corr
+    	
     zero_lambda=cfits[1].header["CRVAL3"]*hel_corr
     wavec=np.arange(0,sz[0],1)*delta_lambda+zero_lambda
  
