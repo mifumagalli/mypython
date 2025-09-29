@@ -468,6 +468,9 @@ class Window(tkinter.Tk):
         #launch displays
         
         ds9_path = 'ds9'
+        print('')
+        print('... Reading files')
+        print('')
         
         try:
             #control ds9
@@ -485,6 +488,7 @@ class Window(tkinter.Tk):
                     if nexten > 7:
                         ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[8]',rtname+'[9]',rtname+'[10]',rtname+'[11]',rtname+'[7]','-smooth'])
                     else:
+                        print('... Opening ', rtname)
                         ds9=subprocess.Popen([ds9_path, '-scale','zscale','-lock','smooth','-lock','frame','wcs',self.white,rtname+'[3]',rtname+'[4]',rtname+'[5]','-smooth'])
                         
             else:
@@ -506,7 +510,8 @@ class Window(tkinter.Tk):
             else:
                 currentl=float(self.rellam.get())
                 tmpz=float(self.table_data.get(row,idlambda))/currentl-1
-                print(tmpz)
+                print('... Redshift: {} '.format(tmpz))
+                print('... Opening spectrum')
             spc=subprocess.Popen(['python','{}/redshifts/zfit.py'.format(os.environ['MYPYTHON']),'-i','objs/id{}/spectrum.fits'.format(focusid),'-z','{}'.format(tmpz)])
             self.processes.append(spc)
           
@@ -518,7 +523,10 @@ class Window(tkinter.Tk):
                 ds93d=subprocess.Popen([ds9_path,'-3d','objs/id{}/id{}_img.fits[1]'.format(focusid,focusid),'-3d','vp','90','0','-cmap','color'])
             self.processes.append(ds93d)
 
-        except:
+        except Exception as e:
+            import traceback
+            print('Skipping this source for some reason')
+            traceback.print_exc()
             pass
 
 
