@@ -27,6 +27,7 @@ class Filter:
         data=fil.readlines()[data_start:data_start+data_end-1]
         fil.close()
 
+        
         #store in dictionary 
         wv=[]
         tr=[]
