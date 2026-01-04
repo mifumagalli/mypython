@@ -1,18 +1,3 @@
-"""
-
-All in one GUI to:
-
-1. display spectra
-2. ID lines
-3. continuum fit 
-
-
-Generated with antigravity/Gemini 3 pro (high) and few human interactions. 
-
-
-"""
-
-
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -34,6 +19,7 @@ def load_spectrum(filename):
 
 from matplotlib.widgets import Button, TextBox, CheckButtons, RadioButtons
 from linetools.lists.linelist import LineList
+from astropy.stats import sigma_clipped_stats
 import warnings
 
 # Suppress linetools warnings if any
@@ -124,19 +110,56 @@ class SpectraViewer:
         ax_text_poly = self.fig.add_axes([0.82, 0.45, 0.15, 0.05])
         self.text_poly = TextBox(ax_text_poly, 'Poly Order: ', initial=str(self.poly_order))
         self.text_poly.on_submit(self.submit_poly_order)
+
+        # Auto Continuum Button
+        # y: 0.25? No, putting it between Poly Order (0.45) and Save (0.35)?
+        # Or below Save?
+        # User said "in continuum part".
+        # Let's put it above Save.
+        # Save is at 0.35. Let's move Save down or put Auto at 0.25?
+        # Actually ample space below 0.35.
+        # Let's putting Auto at 0.25.
+        
+        # Auto Continuum Button
+        # Moved up from 0.25 to 0.37 to close gap from PolyOrder (0.45)
+        ax_auto = self.fig.add_axes([0.82, 0.37, 0.15, 0.05])
+        self.btn_auto = Button(ax_auto, 'Auto Cont')
+        self.btn_auto.on_clicked(self.auto_continuum)
         
         # Save Fit Button
-        # y: 0.35. Gap 0.10.
-        ax_save = self.fig.add_axes([0.82, 0.35, 0.15, 0.05])
+        # Moved up from 0.18 to 0.30
+        ax_save = self.fig.add_axes([0.82, 0.30, 0.15, 0.05])
         self.btn_save = Button(ax_save, 'Accept fit to save')
         self.btn_save.on_clicked(self.save_fit)
-        # Initially color visual cue it's disabled? 
         self.btn_save.label.set_fontsize(8)
-        self.btn_save.color = '0.9' # Light grey default
-        self.btn_save.hovercolor = '0.9' # No hover effect initially
+        self.btn_save.color = '0.9' 
+        self.btn_save.hovercolor = '0.9'
+
+        # --- Equivalent Width ---
+        # Moved up from 0.15 to 0.25
+        self.fig.text(0.82, 0.25, "Equivalent Width", fontweight='bold', fontsize=10)
+        line3 = plt.Line2D([0.82, 0.97], [0.23, 0.23], transform=self.fig.transFigure, color='k', linewidth=1)
+        self.fig.add_artist(line3)
+        
+        # Checkbox for Linear Fallback
+        # Moved up from 0.10 to 0.19
+        ax_check_ew = self.fig.add_axes([0.82, 0.19, 0.15, 0.03]) # Smaller height
+        self.linear_cont_fallback = False # Default Off
+        self.check_ew = CheckButtons(ax_check_ew, ['Linear Cont'], [self.linear_cont_fallback])
+        self.check_ew.on_clicked(self.toggle_linear_fallback)
+        
+        # Ew Labels (using figure text for simple display)
+        # Moved up from 0.07/0.05 to 0.15/0.13
+        self.text_ew_obs = self.fig.text(0.82, 0.15, "Obs: --", fontsize=9)
+        self.text_ew_rest = self.fig.text(0.82, 0.13, "Rest: --", fontsize=9)
+        
+        self.ew_start = None
+        self.ew_guide = None
+        self.ew_poly = None # Store plotted area polygon
+        self.ew_obs_value = None # Store last calculated Obs EW
         
         # Help Button
-        ax_help = self.fig.add_axes([0.82, 0.05, 0.15, 0.05])
+        ax_help = self.fig.add_axes([0.82, 0.02, 0.15, 0.05])
         self.btn_help = Button(ax_help, 'Help')
         self.btn_help.on_clicked(self.show_help)
 
@@ -149,6 +172,7 @@ class SpectraViewer:
         print("  t     : Set top Y limit to cursor position")
         print("  w     : Reset window to default view")
         print("  m     : Identify line at cursor")
+        print("  e     : Equivalent Width (press twice for range)")
         print("  l/L   : Toggle log scales on y/x axis")
         print("  q     : Quit GUI")
         print("\nContinuum Mode Controls (when enabled):")
@@ -179,6 +203,10 @@ class SpectraViewer:
             # For now, just toggle state.
             pass
 
+    def toggle_linear_fallback(self, label):
+        self.linear_cont_fallback = not self.linear_cont_fallback
+        print(f"Linear Continuum Fallback: {self.linear_cont_fallback}")
+
     def submit_poly_order(self, text):
         try:
             self.poly_order = int(text)
@@ -189,6 +217,13 @@ class SpectraViewer:
         try:
             self.current_z = float(text)
             self.draw_lines()
+            
+            # Update Rest EW if available
+            if self.ew_obs_value is not None:
+                ew_rest = self.ew_obs_value / (1 + self.current_z)
+                self.text_ew_rest.set_text(f"Rest: {ew_rest:.3f} A")
+                self.fig.canvas.draw_idle()
+                
         except ValueError:
             print("Invalid redshift value")
 
@@ -419,6 +454,20 @@ class SpectraViewer:
                 self.handle_unfreeze(event.xdata)
             elif key == 'a':
                 self.handle_accept_all()
+        
+        # We should allow 'e' even if not in continuum mode?
+        # Requirement says "This mode is activated by hitting 'e'".
+        # Implies it might be independent.
+        # But control panel section implies it's always there.
+        # Let's assume global access or continuum mode? 
+        # Usually analysis like EW is general.
+        # But my implementation relies on handle_ew being called.
+        # Let's move it OUTSIDE continuum_mode block allow it generally or check my previous 'm' (Identify) logic.
+        # 'm' is separate.
+        # Let's put 'e' at same level as 'm'.
+        
+        if key == 'e' and event.inaxes == self.ax:
+             self.handle_ew(event.xdata)
 
         self.fig.canvas.draw_idle()
 
@@ -633,10 +682,18 @@ Continuum Fitting Mode:
   1. Toggle 'Continuum' checkbox to enable.
   2. Set Polynomial Order.
 
+  Auto Cont : Initialize anchors using sigma-clipped median (100px chunks).
   x         : Add Anchor Point at cursor
   d         : Delete closest Anchor Point
   c         : Compute/Update Polynomial Fit
 
+Equivalent Width:
+  e (x2)    : Define integration window.
+              - Uses current continuum model if available.
+              - Fallback (if no fit):
+                - 'Linear Cont' Checked: Linear interpolation.
+                - 'Linear Cont' Unchecked: Assumes Cont=1.0.
+  
 Frozen Segments:
   Space (x2): Freeze a region. Press once to start, again to end.
               - The fit in this region is locked (grey).
@@ -652,10 +709,166 @@ Saving:
               - Saves '_norm.txt' (Normalized Spectrum)
 """
         # Create popup window
-        hfig = plt.figure(figsize=(6, 8))
+        hfig = plt.figure(figsize=(6, 9)) # Taller for more text
         hfig.canvas.manager.set_window_title("Spectra Viewer Help")
         hfig.text(0.05, 0.95, help_text, fontsize=10, family='monospace', verticalalignment='top')
         plt.show()
+
+    def handle_ew(self, x):
+        if self.ew_start is None:
+            # Start
+            self.ew_start = x
+            self.ew_guide = self.ax.axvline(x, color='green', linestyle='--', alpha=0.5)
+            print(f"EW Integration Start: {x:.2f}. Press 'e' again to end.")
+            
+            # Reset display
+            self.text_ew_obs.set_text("Obs: --")
+            self.text_ew_rest.set_text("Rest: --")
+            if self.ew_poly:
+                self.ew_poly.remove()
+                self.ew_poly = None
+            self.fig.canvas.draw_idle()
+        else:
+            # End
+            start = min(self.ew_start, x)
+            end = max(self.ew_start, x)
+            print(f"EW Integration Range: {start:.2f} - {end:.2f}")
+            
+            # Remove guide
+            if self.ew_guide:
+                self.ew_guide.remove()
+                self.ew_guide = None
+            self.ew_start = None
+            
+            # Compute EW
+            mask = (self.wavelength >= start) & (self.wavelength <= end)
+            if not np.any(mask):
+                print("No data in range.")
+                return
+            
+            wave_seg = self.wavelength[mask]
+            flux_seg = self.flux[mask]
+            
+            # Determine Continuum
+            cont_seg = None
+            
+            # 1. Try global model (e.g. from Save/Accept All)
+            if hasattr(self, 'continuum_model') and not np.all(np.isnan(self.continuum_model[mask])):
+                 cont_seg = self.continuum_model[mask]
+                 mode = "Global Model"
+                 
+            # 2. Try current active poly
+            elif hasattr(self, 'current_poly') and self.current_poly is not None:
+                 # Check if poly covers this region (it's global usually)
+                 cont_seg = self.current_poly(wave_seg)
+                 mode = "Active Poly"
+            
+            # 3. Fallback
+            else:
+                 if self.linear_cont_fallback:
+                     # Interpolate between flux at edges
+                     # Find flux closest to start/end
+                     idx_s = np.abs(self.wavelength - start).argmin()
+                     idx_e = np.abs(self.wavelength - end).argmin()
+                     
+                     # Simple linear function
+                     y1 = self.flux[idx_s]
+                     y2 = self.flux[idx_e]
+                     x1 = self.wavelength[idx_s]
+                     x2 = self.wavelength[idx_e]
+                     
+                     gradient = (y2 - y1) / (x2 - x1) if x2 != x1 else 0
+                     cont_seg = y1 + gradient * (wave_seg - x1)
+                     mode = "Linear Fallback"
+                 else:
+                     # Assume input is already normalized (Cont=1.0)
+                     cont_seg = np.ones_like(flux_seg)
+                     mode = "Normalized (1.0)"
+            
+            # Integrate: Integral (1 - F/C) dl
+            norm_flux = flux_seg / cont_seg
+            integrand = 1.0 - norm_flux
+            
+            # Trapezoidal integration
+            ew_obs = np.trapz(integrand, x=wave_seg)
+            self.ew_obs_value = ew_obs # Store for updates
+            ew_rest = ew_obs / (1 + self.current_z)
+            
+            print(f"EW ({mode}): Obs={ew_obs:.3f}, Rest={ew_rest:.3f}")
+            
+            # Update labels
+            self.text_ew_obs.set_text(f"Obs: {ew_obs:.3f} A")
+            self.text_ew_rest.set_text(f"Rest: {ew_rest:.3f} A")
+            
+            # Visualize integration area
+            # Fill between continuum and flux
+            # Typically show what was integrated
+            # We want to shade the area between cont_seg and flux_seg where cont > flux (absorption)
+            # But EW technically integrates everything.
+            # Let's shade between cont and flux.
+            
+            self.ew_poly = self.ax.fill_between(wave_seg, cont_seg, flux_seg, color='green', alpha=0.3)
+            self.fig.canvas.draw_idle()
+
+    def auto_continuum(self, event):
+        if not self.continuum_mode:
+            print("Please enable Continuum Mode first.")
+            return
+
+        # Clear existing anchors
+        # But wait, should we clear only unfrozen anchors?
+        # "Initialized anchor points" implies a fresh start usually.
+        # But if user has frozen segments, we probably shouldn't mess with them?
+        # Prompt: "initialize anchor points".
+        # Safe bet: Clear active anchors, respect frozen segments?
+        # Or just clear all active anchors.
+        
+        # Let's clear active anchors (continuum_anchors list).
+        for pt in self.continuum_plots:
+            pt.remove()
+        self.continuum_anchors = []
+        self.continuum_plots = []
+        
+        print("Auto-generating anchors...")
+        
+        # Chunk size
+        chunk_size = 100
+        n_pixels = len(self.wavelength)
+        
+        for i in range(0, n_pixels, chunk_size):
+            end = min(i + chunk_size, n_pixels)
+            if end - i < 10: continue # Skip tiny chunks
+            
+            wave_chunk = self.wavelength[i:end]
+            flux_chunk = self.flux[i:end]
+            
+            # Sigma clip stats
+            # Ignore NaNs/Infs
+            # sigma_clipped_stats returns (mean, median, stddev)
+            # We use median.
+            mean, median, std = sigma_clipped_stats(flux_chunk, sigma=3.0, maxiters=5)
+            
+            if np.ma.is_masked(median):
+                 # if everything masked, skip
+                 continue
+                 
+            # Add anchor at middle of chunk wavelenght? Or mean wavelength?
+            anchor_x = np.mean(wave_chunk)
+            anchor_y = float(median) # Ensure float
+            
+            # Check if this anchor falls into a frozen segment
+            # If so, we skip adding it to active anchors
+            in_frozen = False
+            for seg in self.frozen_segments:
+                if seg['range'][0] <= anchor_x <= seg['range'][1]:
+                    in_frozen = True
+                    break
+            
+            if not in_frozen:
+                self.add_anchor(anchor_x, anchor_y)
+                
+        print(f"Added {len(self.continuum_anchors)} anchors.")
+        self.update_fit() # Optional: Trigger fit immediately? Yes, good UX.
 
     def add_anchor(self, x, y):
         # Check if in frozen region
