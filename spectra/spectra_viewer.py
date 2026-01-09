@@ -491,7 +491,7 @@ class SpectraViewer:
                 
             # Measure EW Button
             ax_measure = check_fig.add_axes([0.65, 0.05, 0.12, 0.05])
-            b_measure = Button(ax_measure, 'Measure EW')
+            b_measure = Button(ax_measure, 'Save EW table')
             b_measure.on_clicked(self.measure_ew_batch)
             self.check_buttons.append(b_measure)
                 
@@ -707,7 +707,7 @@ class SpectraViewer:
              return
              
         # Write to file
-        fname = os.path.splitext(self.filename)[0] + "_EW.txt"
+        fname = os.path.splitext(self.filename)[0] + "_z{:0.4f}_EW.txt".format(self.current_z)
         
         try:
              with open(fname, 'w') as f:
