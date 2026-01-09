@@ -34,6 +34,8 @@ class SpectraViewer:
         self.current_z = 0.0
         self.vlines = []
 
+        # EW State: Key = (name, wrest.value), Value = {'selected': bool, 'custom_window': (min, max) or None}
+        self.line_ew_state = {}
         # Setup Figure and Gridspec
         self.fig = plt.figure(figsize=(12, 6))
         # Main plot takes 80%, Control panel takes 20%
@@ -172,6 +174,7 @@ class SpectraViewer:
         print("  t     : Set top Y limit to cursor position")
         print("  w     : Reset window to default view")
         print("  m     : Identify line at cursor")
+        print("  z     : Open Line Check Window (3x2 grid of lines)")
         print("  e     : Equivalent Width (press twice for range)")
         print("  l/L   : Toggle log scales on y/x axis")
         print("  q     : Quit GUI")
@@ -187,6 +190,11 @@ class SpectraViewer:
 
     def connect(self):
         self.cid = self.fig.canvas.mpl_connect('key_press_event', self.on_key)
+        self.ax.callbacks.connect('xlim_changed', self.on_xlim_changed)
+
+    def on_xlim_changed(self, event_ax):
+        if self.lines_visible:
+            self.draw_lines()
 
     def toggle_lines(self, label):
         self.lines_visible = not self.lines_visible
@@ -370,6 +378,349 @@ class SpectraViewer:
         draw_page()
         plt.show()
 
+    def show_line_check_window(self):
+        # Determine observed range
+        min_obs = np.min(self.wavelength)
+        max_obs = np.max(self.wavelength)
+        
+        # Calculate observed wavelengths for all lines
+        # linelist.wrest is a Quantity array (Astropy)
+        all_obs_waves = self.linelist.wrest.value * (1 + self.current_z)
+        
+        # Filter
+        in_range_mask = (all_obs_waves >= min_obs) & (all_obs_waves <= max_obs)
+        
+        if not np.any(in_range_mask):
+             print(f"No lines found in range {min_obs:.1f} - {max_obs:.1f} A for z={self.current_z:.4f}")
+             return
+
+        # Get filtered subset
+        filtered_names = self.linelist.name[in_range_mask]
+        filtered_wrest = self.linelist.wrest[in_range_mask]
+        
+        # Sort lines by rest wavelength
+        sorted_indices = filtered_wrest.argsort()
+        sorted_names = filtered_names[sorted_indices]
+        sorted_wrest = filtered_wrest[sorted_indices]
+        
+        # 3x2 grid
+        COLS = 3
+        ROWS = 2
+        N_PER_PAGE = COLS * ROWS
+        
+        # Figure setup
+        check_fig = plt.figure(figsize=(15, 8))
+        check_fig.canvas.manager.set_window_title(f"Line Check (z={self.current_z:.4f})")
+        
+        self.check_current_page = 0
+        self.check_buttons = []
+        
+        def draw_check_page():
+            # Clear axes and map
+            check_fig.clf()
+            self.check_buttons = []
+            self.check_axes_map = {}
+            
+            # Subplots
+            # We want to use add_subplot usually, but let's manage them carefully to allow buttons at bottom
+            # Reserve bottom 0.1 for buttons
+            gs = check_fig.add_gridspec(ROWS, COLS, bottom=0.15, top=0.95, hspace=0.4, wspace=0.3)
+            
+            start_idx = self.check_current_page * N_PER_PAGE
+            
+            for i in range(N_PER_PAGE):
+                idx = start_idx + i
+                if idx >= len(sorted_names): break
+                
+                rest_wave = sorted_wrest[idx].value
+                name = sorted_names[idx]
+                
+                obs_wave = rest_wave * (1 + self.current_z)
+                
+                # +/- 1000 km/s window
+                # dv/c = dlambda/lambda => dlambda = lambda * (dv/c)
+                c_kms = 299792.458
+                delta_wave = obs_wave * (1000.0 / c_kms)
+                
+                w_min = obs_wave - delta_wave
+                w_max = obs_wave + delta_wave
+                
+                # Get data in range
+                mask = (self.wavelength >= w_min) & (self.wavelength <= w_max)
+                
+                row = i // COLS
+                col = i % COLS
+                ax = check_fig.add_subplot(gs[row, col])
+                
+                # Store map
+                self.check_axes_map[ax] = (name, rest_wave)
+                
+                if np.any(mask):
+                    ax.plot(self.wavelength[mask], self.flux[mask], 'b-', linewidth=1)
+                    ax.plot(self.wavelength[mask], self.error[mask], 'orange', alpha=0.5, linewidth=1)
+                
+                # Center line
+                ax.axvline(obs_wave, color='k', linestyle='--')
+                
+                ax.set_title(f"{name}\nRest: {rest_wave:.1f}, Obs: {obs_wave:.1f}", fontsize=10)
+                ax.set_xlim(w_min, w_max)
+                # Auto ylim if data exists
+                if np.any(mask):
+                    y_seg = self.flux[mask]
+                    # Robust scaling?
+                    # simple min max for now
+                    if len(y_seg) > 0:
+                         ymin, ymax = np.min(y_seg), np.max(y_seg)
+                         margin = (ymax - ymin) * 0.1 if ymax != ymin else 1.0
+                         ax.set_ylim(ymin - margin, ymax + margin)
+
+            # Navigation Buttons
+            # Prev
+            if self.check_current_page > 0:
+                ax_prev = check_fig.add_axes([0.1, 0.05, 0.1, 0.05])
+                b_prev = Button(ax_prev, 'Previous')
+                b_prev.on_clicked(lambda e: change_page(-1))
+                self.check_buttons.append(b_prev)
+            
+            # Next
+            if (self.check_current_page + 1) * N_PER_PAGE < len(sorted_names):
+                ax_next = check_fig.add_axes([0.8, 0.05, 0.1, 0.05])
+                b_next = Button(ax_next, 'Next')
+                b_next.on_clicked(lambda e: change_page(1))
+                self.check_buttons.append(b_next)
+                
+            # Measure EW Button
+            ax_measure = check_fig.add_axes([0.65, 0.05, 0.12, 0.05])
+            b_measure = Button(ax_measure, 'Measure EW')
+            b_measure.on_clicked(self.measure_ew_batch)
+            self.check_buttons.append(b_measure)
+                
+            # Page Info
+            check_fig.text(0.5, 0.075, f"Page {self.check_current_page + 1} / {int(np.ceil(len(sorted_names)/N_PER_PAGE))}", 
+                           horizontalalignment='center', fontsize=12)
+
+            # Usage Hint
+            hint_text = "Controls: 'u' Select | 'd' Deselect | 'e'+'e' Custom Window"
+            check_fig.text(0.5, 0.02, hint_text, horizontalalignment='center', fontsize=10, color='blue')
+            
+            check_fig.canvas.draw()
+            
+        def change_page(delta):
+            self.check_current_page += delta
+            draw_check_page()
+            
+        # Connect key press for this window
+        check_fig.canvas.mpl_connect('key_press_event', self.on_check_key)
+        
+        # Store for key handler access
+        self.check_fig = check_fig
+        self.sorted_names_cache = sorted_names
+        self.sorted_wrest_cache = sorted_wrest
+        self.check_axes_cache = {} # Map (row, col) to data index or similar? 
+        # Actually better to map axes to line info.
+        
+        draw_check_page()
+        plt.show()
+
+    def on_check_key(self, event):
+        if not event.inaxes: return
+        
+        # Identify which sub-plot (line) we are in
+        # We need a way to map axes to the specific line index.
+        # Let's simple iterate over axes in the figure?
+        # Or store metadata on axes?
+        # Matplotlib axes don't easily store custom data, but we can check equality.
+        
+        # Re-derive index from logical layout is tricky if we don't store it.
+        # Let's modify draw_check_page to store a map: self.check_axes_map[ax] = (name, wrest)
+        
+        if not hasattr(self, 'check_axes_map') or event.inaxes not in self.check_axes_map:
+             return
+             
+        name, wrest_val = self.check_axes_map[event.inaxes]
+        key_id = (name, wrest_val)
+        
+        # Ensure state entry exists
+        if key_id not in self.line_ew_state:
+             self.line_ew_state[key_id] = {'selected': False, 'custom_window': None}
+        
+        state = self.line_ew_state[key_id]
+        
+        if event.key == 'u':
+             state['selected'] = True
+             self.update_check_panel_title(event.inaxes, name, wrest_val, state)
+             
+        elif event.key == 'd':
+             state['selected'] = False
+             state['custom_window'] = None # Reset custom window on deselect? Or keep?
+             # User says "excluded from list". 
+             self.update_check_panel_title(event.inaxes, name, wrest_val, state)
+             
+        elif event.key == 'e':
+             # Custom window logic
+             # We need a temporary state: "waiting for second 'e'"
+             if 'ew_wait_start' not in state:
+                 state['ew_wait_start'] = event.xdata
+                 # Draw guide
+                 guide = event.inaxes.axvline(event.xdata, color='green', linestyle='--')
+                 state['guide_artist'] = guide
+                 event.inaxes.set_title(f"Define End...", color='blue') # Feedback
+                 event.canvas.draw_idle()
+             else:
+                 # End
+                 start = min(state['ew_wait_start'], event.xdata)
+                 end = max(state['ew_wait_start'], event.xdata)
+                 state['custom_window'] = (start, end)
+                 
+                 # Cleanup
+                 if 'guide_artist' in state:
+                     state['guide_artist'].remove()
+                     del state['guide_artist']
+                 del state['ew_wait_start']
+                 
+                 # Auto-select if defining window? Probably yes.
+                 state['selected'] = True
+                 
+                 self.draw_check_panel_extras(event.inaxes, state)
+                 self.update_check_panel_title(event.inaxes, name, wrest_val, state)
+
+    def update_check_panel_title(self, ax, name, wrest, state):
+        obs = wrest * (1 + self.current_z)
+        title_text = f"{name}\nRest: {wrest:.1f}, Obs: {obs:.1f}"
+        
+        color = 'black'
+        if state.get('selected'):
+             color = 'green'
+        
+        # Explicit check for FALSE vs not present? 
+        # Logic: 'u' -> True (included). 'd' -> False (excluded).
+        # Default? If unknown, black.
+        
+        if state.get('selected') is False: # Explicitly False
+             color = 'red'
+             
+        ax.set_title(title_text, color=color, fontsize=10)
+        self.check_fig.canvas.draw_idle()
+
+    def draw_check_panel_extras(self, ax, state):
+        # Clear previous extras (shaded regions)
+        # We need to track them. Let's clear specific artists if we stored them, or just rely on redraw?
+        # Redrawing the whole page is expensive.
+        # Let's try to manage just the patch.
+        
+        if 'window_patch' in state and state['window_patch']:
+             try:
+                 state['window_patch'].remove()
+             except: pass
+             state['window_patch'] = None
+             
+        if state.get('custom_window'):
+             w_min, w_max = state['custom_window']
+             # Draw shaded region
+             patch = ax.axvspan(w_min, w_max, color='green', alpha=0.2)
+             state['window_patch'] = patch
+             
+        # Also maybe default window?
+        # Requirement: "Default of +/- 200 km/s".
+        # Should we visualize the default if selected but no custom window?
+        # User didn't explicitly ask, but it's helpful.
+        # "Title turns green". 
+        
+        self.check_fig.canvas.draw_idle()
+
+    def measure_ew_batch(self, event):
+        print("Measuring EW for selected lines...")
+        
+        results = []
+        
+        # Iterate over all possible lines or just state?
+        # State might only contain lines we interacted with.
+        # User might want to 'u' a line.
+        # If a line is NOT in state, is it selected? Default NO.
+        
+        for key_id, state in self.line_ew_state.items():
+             if state.get('selected'):
+                 name, wrest = key_id
+                 
+                 # Determine window
+                 if state.get('custom_window'):
+                     w_start, w_end = state['custom_window']
+                     is_custom = True
+                 else:
+                     # Default +/- 200 km/s
+                     obs_wave = wrest * (1 + self.current_z)
+                     c_kms = 299792.458
+                     delta = obs_wave * (200.0 / c_kms)
+                     w_start = obs_wave - delta
+                     w_end = obs_wave + delta
+                     is_custom = False
+                     
+                 # Calculation
+                 # Reuse logic from handle_ew? Or copy for batch efficiency/customization.
+                 
+                 # Get data slice
+                 mask = (self.wavelength >= w_start) & (self.wavelength <= w_end)
+                 if not np.any(mask):
+                     print(f"Skipping {name}: No data in window.")
+                     continue
+                 
+                 wave_seg = self.wavelength[mask]
+                 flux_seg = self.flux[mask]
+                 err_seg = self.error[mask]
+                 
+                 # Determine Continuum
+                 # 1. Global model
+                 cont_seg = None
+                 if hasattr(self, 'continuum_model') and not np.all(np.isnan(self.continuum_model[mask])):
+                     cont_seg = self.continuum_model[mask]
+                 elif hasattr(self, 'current_poly') and self.current_poly is not None:
+                     cont_seg = self.current_poly(wave_seg)
+                 else:
+                     # Fallback 1.0
+                     cont_seg = np.ones_like(flux_seg)
+                     
+                 # EW
+                 norm_flux = flux_seg / cont_seg
+                 integrand = 1.0 - norm_flux
+                 
+                 ew_obs = np.trapz(integrand, x=wave_seg) # Positive for absorption
+                 
+                 # Error
+                 # Propagate error: sigma_EW^2 = sum( (sigma_flux / Cont * dlambda)^2 ) approximately
+                 # assuming independent errors per pixel.
+                 # dlambda can be approximated by gradient or diff
+                 # Let's use simple mid-point spacing
+                 dl = np.gradient(wave_seg)
+                 term = (err_seg / cont_seg) * dl
+                 ew_err_obs = np.sqrt(np.sum(term**2))
+                 
+                 ew_rest = ew_obs / (1 + self.current_z)
+                 ew_err_rest = ew_err_obs / (1 + self.current_z)
+                 
+                 obs_center = wrest * (1 + self.current_z)
+                 
+                 # Columns: Name, RestWave, ObsWave, WinStart, WinEnd, EW_Obs, Err_Obs, EW_Rest, Err_Rest
+                 results.append((name, wrest, obs_center, w_start, w_end, ew_obs, ew_err_obs, ew_rest, ew_err_rest))
+                 
+        if not results:
+             print("No lines selected or valid for measurement.")
+             return
+             
+        # Write to file
+        fname = os.path.splitext(self.filename)[0] + "_EW.txt"
+        
+        try:
+             with open(fname, 'w') as f:
+                 f.write("# Name RestWave ObsWave WinStart WinEnd EW_Obs Err_Obs EW_Rest Err_Rest\n")
+                 for res in results:
+                     # Format: ensure Name handles spaces? usually name has no spaces or we quote
+                     # Assuming name is safe.
+                     line_fmt = "{:s} {:.2f} {:.2f} {:.2f} {:.2f} {:.4f} {:.4f} {:.4f} {:.4f}\n"
+                     f.write(line_fmt.format(*res))
+             print(f"Saved measurements for {len(results)} lines to {fname}")
+        except Exception as e:
+             print(f"Error saving EW file: {e}")
+
     def on_key(self, event):
         if not event.inaxes and event.key != 'l': # 'l' might be pressed without axes focus? No, needs cursor position.
              if event.key != 'l': return
@@ -468,6 +819,9 @@ class SpectraViewer:
         
         if key == 'e' and event.inaxes == self.ax:
              self.handle_ew(event.xdata)
+
+        if key == 'z':
+             self.show_line_check_window()
 
         self.fig.canvas.draw_idle()
 
@@ -676,6 +1030,7 @@ Navigation:
 
 Analysis:
   m         : Identify line at cursor (opens selection)
+  z         : Open Line Check Window (3x2 grid of lines)
   Redshift  : Enter value in box to shift lines
 
 Continuum Fitting Mode:
