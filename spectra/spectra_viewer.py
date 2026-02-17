@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 import os
+from scipy.interpolate import UnivariateSpline
 
 def load_spectrum(filename):
     """Loads spectrum from an ASCII file (wavelength, flux, error)."""
@@ -122,15 +123,21 @@ class SpectraViewer:
         # Actually ample space below 0.35.
         # Let's putting Auto at 0.25.
         
-        # Auto Continuum Button
-        # Moved up from 0.25 to 0.37 to close gap from PolyOrder (0.45)
+        # Auto Continuum Button (Renamed to Make Anchors)
+        # y: 0.37
         ax_auto = self.fig.add_axes([0.82, 0.37, 0.15, 0.05])
-        self.btn_auto = Button(ax_auto, 'Auto Cont')
+        self.btn_auto = Button(ax_auto, 'Make Anchors')
         self.btn_auto.on_clicked(self.auto_continuum)
+
+        # Fit Spline Button (New)
+        # y: 0.31
+        ax_spline = self.fig.add_axes([0.82, 0.31, 0.15, 0.05])
+        self.btn_spline = Button(ax_spline, 'Fit Spline')
+        self.btn_spline.on_clicked(self.fit_spline)
         
         # Save Fit Button
-        # Moved up from 0.18 to 0.30
-        ax_save = self.fig.add_axes([0.82, 0.30, 0.15, 0.05])
+        # Moved down to 0.25
+        ax_save = self.fig.add_axes([0.82, 0.25, 0.15, 0.05])
         self.btn_save = Button(ax_save, 'Accept fit to save')
         self.btn_save.on_clicked(self.save_fit)
         self.btn_save.label.set_fontsize(8)
@@ -138,22 +145,22 @@ class SpectraViewer:
         self.btn_save.hovercolor = '0.9'
 
         # --- Equivalent Width ---
-        # Moved up from 0.15 to 0.25
-        self.fig.text(0.82, 0.25, "Equivalent Width", fontweight='bold', fontsize=10)
-        line3 = plt.Line2D([0.82, 0.97], [0.23, 0.23], transform=self.fig.transFigure, color='k', linewidth=1)
+        # Moved down to 0.20
+        self.fig.text(0.82, 0.20, "Equivalent Width", fontweight='bold', fontsize=10)
+        line3 = plt.Line2D([0.82, 0.97], [0.18, 0.18], transform=self.fig.transFigure, color='k', linewidth=1)
         self.fig.add_artist(line3)
         
         # Checkbox for Linear Fallback
-        # Moved up from 0.10 to 0.19
-        ax_check_ew = self.fig.add_axes([0.82, 0.19, 0.15, 0.03]) # Smaller height
+        # Moved down to 0.14
+        ax_check_ew = self.fig.add_axes([0.82, 0.14, 0.15, 0.03]) # Smaller height
         self.linear_cont_fallback = False # Default Off
         self.check_ew = CheckButtons(ax_check_ew, ['Linear Cont'], [self.linear_cont_fallback])
         self.check_ew.on_clicked(self.toggle_linear_fallback)
         
         # Ew Labels (using figure text for simple display)
-        # Moved up from 0.07/0.05 to 0.15/0.13
-        self.text_ew_obs = self.fig.text(0.82, 0.15, "Obs: --", fontsize=9)
-        self.text_ew_rest = self.fig.text(0.82, 0.13, "Rest: --", fontsize=9)
+        # Moved down to 0.10/0.08
+        self.text_ew_obs = self.fig.text(0.82, 0.10, "Obs: --", fontsize=9)
+        self.text_ew_rest = self.fig.text(0.82, 0.08, "Rest: --", fontsize=9)
         
         self.ew_start = None
         self.ew_guide = None
@@ -1037,10 +1044,11 @@ Continuum Fitting Mode:
   1. Toggle 'Continuum' checkbox to enable.
   2. Set Polynomial Order.
 
-  Auto Cont : Initialize anchors using sigma-clipped median (100px chunks).
+  Make Anchors : Initialize anchors using sigma-clipped median (100px chunks).
   x         : Add Anchor Point at cursor
   d         : Delete closest Anchor Point
   c         : Compute/Update Polynomial Fit
+  Fit Spline: Fit a cubic spline to the anchors (ignores Poly Order)
 
 Equivalent Width:
   e (x2)    : Define integration window.
@@ -1308,6 +1316,57 @@ Saving:
             
         except Exception as e:
             print(f"Fit failed: {e}")
+
+    def fit_spline(self, event):
+        # Exclude anchors in frozen regions
+        active_anchors = []
+        for p in self.continuum_anchors:
+            in_frozen = False
+            for seg in self.frozen_segments:
+                if seg['range'][0] <= p[0] <= seg['range'][1]:
+                    in_frozen = True
+                    break
+            if not in_frozen:
+                active_anchors.append(p)
+                
+        if len(active_anchors) < 2:
+            print("Not enough active anchors for spline fit (need at least 2).")
+            return
+
+        # Sort anchors by x
+        anchors = sorted(active_anchors, key=lambda p: p[0])
+        x_anchors = np.array([p[0] for p in anchors])
+        y_anchors = np.array([p[1] for p in anchors])
+        
+        try:
+            # Spline fit
+            # s=0 for interpolation (forced through points), s=None/positive for smoothing
+            # Given these are "anchors", user likely wants the line to go THROUGH them or very close.
+            # But if using Make Anchors (Auto Cont), there are many points, so smoothing might be better?
+            # Let's try default s=0 (pass through) first as they are "anchors".
+            # If it's too wiggly, we might need smoothing.
+            # But let's assume they want it to pass through.
+            # k=3 (cubic) is default.
+            
+            # Use a small smoothing factor to avoid oscillations if points are close?
+            # Or just s=0.
+            self.current_poly = UnivariateSpline(x_anchors, y_anchors, k=self.poly_order, s=0)
+            
+            # Plot
+            xmin, xmax = self.ax.get_xlim()
+            x_plot = np.linspace(xmin, xmax, 1000)
+            y_plot = self.current_poly(x_plot)
+            
+            # Remove old fit
+            if self.continuum_fit_line:
+                self.continuum_fit_line.remove()
+                
+            self.continuum_fit_line, = self.ax.plot(x_plot, y_plot, color='magenta',linestyle='dashed',  linewidth=2, label='Spline Fit') # Blue for spline?
+            self.fig.canvas.draw_idle()
+            print("Fitted Spline to anchors.")
+            
+        except Exception as e:
+            print(f"Spline fit failed: {e}")
 
 
 if __name__ == "__main__":
