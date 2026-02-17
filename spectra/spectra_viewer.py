@@ -1231,7 +1231,7 @@ Saving:
                 self.add_anchor(anchor_x, anchor_y)
                 
         print(f"Added {len(self.continuum_anchors)} anchors.")
-        self.update_fit() # Optional: Trigger fit immediately? Yes, good UX.
+        #self.update_fit() # Optional: Trigger fit immediately? Yes, good UX.
 
     def add_anchor(self, x, y):
         # Check if in frozen region
@@ -1295,14 +1295,20 @@ Saving:
         y_anchors = np.array([p[1] for p in anchors])
         
         try:
-            # Polyfit
-            coeffs = np.polyfit(x_anchors, y_anchors, self.poly_order)
-            self.current_poly = np.poly1d(coeffs) # Store Poly1d obj
+            # Spline fit
+            # s=0 for interpolation (forced through points), s=None/positive for smoothing
+            # Given these are "anchors", user likely wants the line to go THROUGH them or very close.
+            # But if using Make Anchors (Auto Cont), there are many points, so smoothing might be better?
+            # Let's try default s=0 (pass through) first as they are "anchors".
+            # If it's too wiggly, we might need smoothing.
+            # But let's assume they want it to pass through.
+            # k=3 (cubic) is default.
             
-            # Generate line on view grid for display? Or full grid?
-            # Let's compute on full wavelength grid but only plot within view or handle appropriately?
-            # Plotting usually uses view limits for speed, but for consistency let's just plot on x_plot within view.
+            # Use a small smoothing factor to avoid oscillations if points are close?
+            # Or just s=0.
+            self.current_poly = UnivariateSpline(x_anchors, y_anchors, k=self.poly_order, s=0)
             
+            # Plot
             xmin, xmax = self.ax.get_xlim()
             x_plot = np.linspace(xmin, xmax, 1000)
             y_plot = self.current_poly(x_plot)
@@ -1311,8 +1317,9 @@ Saving:
             if self.continuum_fit_line:
                 self.continuum_fit_line.remove()
                 
-            self.continuum_fit_line, = self.ax.plot(x_plot, y_plot, 'k:', linewidth=2)
+            self.continuum_fit_line, = self.ax.plot(x_plot, y_plot, color='magenta',linestyle='dashed',  linewidth=2, label='Spline Fit') # Blue for spline?
             self.fig.canvas.draw_idle()
+            print("Fitted Spline to anchors.")
             
         except Exception as e:
             print(f"Fit failed: {e}")
