@@ -40,9 +40,11 @@ class SpectraViewer:
         # Setup Figure and Gridspec
         self.fig = plt.figure(figsize=(12, 6))
         # Main plot takes 80%, Control panel takes 20%
-        self.gs = self.fig.add_gridspec(1, 2, width_ratios=[4, 1])
+        # Now use 2x2 gridspec so we can split the left panel vertically later
+        self.gs = self.fig.add_gridspec(2, 2, width_ratios=[4, 1], height_ratios=[4, 1], hspace=0.1)
         
-        self.ax = self.fig.add_subplot(self.gs[0])
+        # Initially ax spans both rows on the left
+        self.ax = self.fig.add_subplot(self.gs[:, 0])
         self.line, = self.ax.plot(self.wavelength, self.flux, 'b-', label='Flux')
         self.error_line, = self.ax.plot(self.wavelength, self.error, 'orange', label='Error', alpha=0.7)
         
@@ -57,7 +59,7 @@ class SpectraViewer:
         self.ax.autoscale_view()
 
         # Control Panel
-        self.panel_ax = self.fig.add_subplot(self.gs[1])
+        self.panel_ax = self.fig.add_subplot(self.gs[:, 1])
         self.panel_ax.axis('off')
 
         # --- Spectrum Controls ---
@@ -74,7 +76,8 @@ class SpectraViewer:
         
         # Textbox for Redshift
         # y: 0.75 - 0.80
-        ax_text = self.fig.add_axes([0.82, 0.75, 0.15, 0.05])
+        # Reduced width from 0.15 to 0.10, and shifted x to 0.87 so label has 0.05 width space.
+        ax_text = self.fig.add_axes([0.875, 0.75, 0.095, 0.05])
         self.text_box = TextBox(ax_text, 'Redshift: ', initial=str(self.current_z))
         self.text_box.on_submit(self.submit_redshift)
 
@@ -110,18 +113,9 @@ class SpectraViewer:
         # y: 0.45 -> Move to 0.47? Standard spacing of 0.08?
         # 0.55 - 0.08 = 0.47.
         # Let's keep 0.45 (Gap 0.10).
-        ax_text_poly = self.fig.add_axes([0.82, 0.45, 0.15, 0.05])
+        ax_text_poly = self.fig.add_axes([0.89, 0.45, 0.08, 0.05])
         self.text_poly = TextBox(ax_text_poly, 'Poly Order: ', initial=str(self.poly_order))
         self.text_poly.on_submit(self.submit_poly_order)
-
-        # Auto Continuum Button
-        # y: 0.25? No, putting it between Poly Order (0.45) and Save (0.35)?
-        # Or below Save?
-        # User said "in continuum part".
-        # Let's put it above Save.
-        # Save is at 0.35. Let's move Save down or put Auto at 0.25?
-        # Actually ample space below 0.35.
-        # Let's putting Auto at 0.25.
         
         # Auto Continuum Button (Renamed to Make Anchors)
         # y: 0.37
@@ -207,16 +201,77 @@ class SpectraViewer:
         self.lines_visible = not self.lines_visible
         self.draw_lines()
 
+    def update_ratio_plot(self):
+        if not hasattr(self, 'ax_ratio') or not self.ax_ratio.get_visible():
+            return
+            
+        current_xlim = self.ax.get_xlim()
+        self.ax_ratio.clear()
+        self.ax_ratio.axhline(1, color='k', linestyle='-')
+        
+        # Build current continuum
+        cont = np.full_like(self.flux, np.nan)
+        if hasattr(self, 'current_poly') and self.current_poly is not None:
+            cont = self.current_poly(self.wavelength)
+            
+        if hasattr(self, 'frozen_segments') and self.frozen_segments:
+            sum_y = np.zeros(len(self.wavelength))
+            count_y = np.zeros(len(self.wavelength))
+            for seg in self.frozen_segments:
+                idx = seg['mask_idx']
+                sum_y[idx] += seg['y']
+                count_y[idx] += 1
+            mask_valid = count_y > 0
+            cont[mask_valid] = sum_y[mask_valid] / count_y[mask_valid]
+            
+        if not np.all(np.isnan(cont)):
+            ratio = self.flux / cont
+            ratio_err = self.error / cont
+            self.ax_ratio.plot(self.wavelength, ratio, 'b-', label='Flux / Cont', linewidth=1)
+            self.ax_ratio.fill_between(self.wavelength, ratio - ratio_err, ratio + ratio_err, color='orange', alpha=0.5, label='+/- 1 Sigma')
+            
+            ratio_finite = ratio[np.isfinite(ratio)]
+            if len(ratio_finite) > 0:
+                _, _, stdVal = sigma_clipped_stats(ratio_finite, sigma=3.0, maxiters=5)
+                stdVal = max(stdVal, 0.01)
+                self.ax_ratio.set_ylim(1 - 3*stdVal, 1 + 3*stdVal)
+            
+            # Set y-limits to 0.7-1.3
+            #self.ax_ratio.set_ylim(-0.1, 2.1)
+
+        self.ax_ratio.set_ylabel('Flux/Cont')
+        self.ax_ratio.set_xlabel('Wavelength')
+        
+        self.ax_ratio.set_xlim(current_xlim)
+        self.fig.canvas.draw_idle()
+
     def toggle_continuum_mode(self, label):
         self.continuum_mode = not self.continuum_mode
-        if not self.continuum_mode:
-            # Clear anchors and fit if exiting mode
-            # Or keep them visual? Usually exiting mode clears temporary visuals or keeps them?
-            # User might want to toggle mode to interact with other things and come back.
-            # But let's say visuals persist until cleared explicitly?
-            # Requirement doesn't specify. I'll persist data but maybe hide if desired?
-            # For now, just toggle state.
-            pass
+        if self.continuum_mode:
+            # Enable ratio plot
+            self.ax.set_subplotspec(self.gs[0, 0])
+            self.ax.set_position(self.gs[0, 0].get_position(self.fig))
+            
+            self.ax.tick_params(labelbottom=False)
+            self.ax.set_xlabel('')
+            
+            if not hasattr(self, 'ax_ratio'):
+                self.ax_ratio = self.fig.add_subplot(self.gs[1, 0], sharex=self.ax)
+            else:
+                self.ax_ratio.set_visible(True)
+                
+            self.update_ratio_plot()
+        else:
+            # Disable ratio plot
+            self.ax.set_subplotspec(self.gs[:, 0])
+            self.ax.set_position(self.gs[:, 0].get_position(self.fig))
+            self.ax.tick_params(labelbottom=True)
+            self.ax.set_xlabel('Wavelength')
+            
+            if hasattr(self, 'ax_ratio'):
+                self.ax_ratio.set_visible(False)
+                
+        self.fig.canvas.draw_idle()
 
     def toggle_linear_fallback(self, label):
         self.linear_cont_fallback = not self.linear_cont_fallback
@@ -733,12 +788,18 @@ class SpectraViewer:
              if event.key != 'l': return
 
         # ... existing logic ...
+        
+        valid_axes = [self.ax]
+        if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+             valid_axes.append(self.ax_ratio)
+             
+        nav_keys = ['i', 'o', '[', ']', 'b', 't', 'w', 'l', 'L', 'm', 'z', 'e', 'x', 'd', 'c', ' ', 'u', 'a']
+        if event.inaxes not in valid_axes and event.key in nav_keys:
+             return
 
         # Get current limits
         xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
         x_range = xlim[1] - xlim[0]
-        y_range = ylim[1] - ylim[0]
 
         key = event.key
         
@@ -754,6 +815,8 @@ class SpectraViewer:
             new_min = center - new_range / 2
             new_max = center + new_range / 2
             self.ax.set_xlim(new_min, new_max)
+            if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+                self.ax_ratio.set_xlim(new_min, new_max)
             
         elif key == 'o': # Zoom Out
             scale_factor = 2.0 # Zoom out by 2x
@@ -762,27 +825,33 @@ class SpectraViewer:
             new_min = center - new_range / 2
             new_max = center + new_range / 2
             self.ax.set_xlim(new_min, new_max)
+            if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+                self.ax_ratio.set_xlim(new_min, new_max)
 
         # Panning
         elif key == '[': # Pan Left
             pan_amount = x_range * 0.2
             self.ax.set_xlim(xlim[0] - pan_amount, xlim[1] - pan_amount)
+            if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+                self.ax_ratio.set_xlim(xlim[0] - pan_amount, xlim[1] - pan_amount)
             
         elif key == ']': # Pan Right
             pan_amount = x_range * 0.2
             self.ax.set_xlim(xlim[0] + pan_amount, xlim[1] + pan_amount)
+            if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+                self.ax_ratio.set_xlim(xlim[0] + pan_amount, xlim[1] + pan_amount)
 
         # Vertical Limits
         elif key == 'b': # Set bottom
-            self.ax.set_ylim(bottom=event.ydata)
+            event.inaxes.set_ylim(bottom=event.ydata)
             
         elif key == 't': # Set top
-            self.ax.set_ylim(top=event.ydata)
+            event.inaxes.set_ylim(top=event.ydata)
 
         elif key == 'l':
-             self.ax.set_yscale('log' if self.ax.get_yscale() == 'linear' else 'linear')
+             event.inaxes.set_yscale('log' if event.inaxes.get_yscale() == 'linear' else 'linear')
         elif key == 'L':
-             self.ax.set_xscale('log' if self.ax.get_xscale() == 'linear' else 'linear')
+             event.inaxes.set_xscale('log' if event.inaxes.get_xscale() == 'linear' else 'linear')
         elif key == 'q':
              plt.close('all')
              sys.exit(0)
@@ -792,6 +861,8 @@ class SpectraViewer:
             self.ax.autoscale(enable=True, axis='both', tight=True)
             self.ax.relim()
             self.ax.autoscale_view()
+            if hasattr(self, 'ax_ratio') and self.ax_ratio.get_visible():
+                self.ax_ratio.set_xlim(self.ax.get_xlim())
             self.draw_lines() # Re-draw lines to match new view if needed? No, lines are absolute coords.
             
         elif key == 'm': # Identify line
@@ -979,7 +1050,10 @@ class SpectraViewer:
              self.frozen_line_obj.remove()
         
         self.frozen_line_obj, = self.ax.plot(self.wavelength, self.continuum_model, color='grey', linewidth=2, linestyle='-')
-        self.fig.canvas.draw_idle()
+        if hasattr(self, 'update_ratio_plot'):
+            self.update_ratio_plot()
+        else:
+            self.fig.canvas.draw_idle()
         
     def save_fit(self, event):
         if not self.model_accepted:
@@ -1318,7 +1392,10 @@ Saving:
                 self.continuum_fit_line.remove()
                 
             self.continuum_fit_line, = self.ax.plot(x_plot, y_plot, color='magenta',linestyle='dashed',  linewidth=2, label='Spline Fit') # Blue for spline?
-            self.fig.canvas.draw_idle()
+            if hasattr(self, 'update_ratio_plot'):
+                self.update_ratio_plot()
+            else:
+                self.fig.canvas.draw_idle()
             print("Fitted Spline to anchors.")
             
         except Exception as e:
@@ -1369,7 +1446,10 @@ Saving:
                 self.continuum_fit_line.remove()
                 
             self.continuum_fit_line, = self.ax.plot(x_plot, y_plot, color='magenta',linestyle='dashed',  linewidth=2, label='Spline Fit') # Blue for spline?
-            self.fig.canvas.draw_idle()
+            if hasattr(self, 'update_ratio_plot'):
+                self.update_ratio_plot()
+            else:
+                self.fig.canvas.draw_idle()
             print("Fitted Spline to anchors.")
             
         except Exception as e:
