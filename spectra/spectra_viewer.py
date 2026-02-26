@@ -13,6 +13,9 @@ def load_spectrum(filename):
         wavelength = data[:, 0]
         flux = data[:, 1]
         error = data[:, 2] if data.shape[1] > 2 else np.zeros_like(flux)
+        mask = np.logical_not(np.isfinite(flux))
+        flux[mask] = 0
+        error[mask] = 0
         return wavelength, flux, error
     except Exception as e:
         print(f"Error loading file: {e}")
