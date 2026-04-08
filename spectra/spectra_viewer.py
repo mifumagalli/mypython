@@ -1273,7 +1273,7 @@ class SpectraViewer:
             np.savetxt(
                 cont_fname,
                 np.column_stack((self.wavelength, self.continuum_model, is_anchor)),
-                header="IsContAnchor",
+                header="Wavelength Continuum IsAnchor",
             )
             norm_flux = self.flux / self.continuum_model
             norm_err = self.error / self.continuum_model
