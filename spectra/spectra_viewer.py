@@ -329,41 +329,61 @@ class SpectraViewer:
         self.continuum_anchors = []
         self.continuum_plots = []
 
-        chunk_size = 100
-        n_pixels = len(self.wavelength)
         anchor_count = 0
+        has_anchor_col = False
+        if data.shape[1] >= 3:
+            is_anchor = data[:, -1]
+            if set(np.unique(is_anchor)).issubset({0, 1}):
+                is_anchor_sorted = is_anchor[sort_idx]
+                has_anchor_col = True
 
-        for i in range(0, n_pixels, chunk_size):
-            end = min(i + chunk_size, n_pixels)
+        if has_anchor_col:
+            for wave, cont, is_anch in zip(cont_wave, cont_flux, is_anchor_sorted):
+                if is_anch == 1 and np.isfinite(cont):
+                    in_frozen = any(
+                        seg["range"][0] <= wave <= seg["range"][1]
+                        for seg in self.frozen_segments
+                    )
+                    if not in_frozen:
+                        self.continuum_anchors.append((wave, cont))
+                        (pt,) = self.ax.plot(wave, cont, "m*", markersize=10)
+                        self.continuum_plots.append(pt)
+                        anchor_count += 1
+        else:
+            chunk_size = 100
+            n_pixels = len(self.wavelength)
 
-            wave_chunk = self.wavelength[i:end]
-            cont_chunk = self.continuum_model[i:end]
+            for i in range(0, n_pixels, chunk_size):
+                end = min(i + chunk_size, n_pixels)
 
-            finite_mask = np.isfinite(cont_chunk)
-            if np.sum(finite_mask) < 5:
-                continue
+                wave_chunk = self.wavelength[i:end]
+                cont_chunk = self.continuum_model[i:end]
 
-            anchor_x = float(np.mean(wave_chunk[finite_mask]))
-            anchor_y = float(np.mean(cont_chunk[finite_mask]))
+                finite_mask = np.isfinite(cont_chunk)
+                if np.sum(finite_mask) < 5:
+                    continue
 
-            # Respect frozen regions
-            in_frozen = any(
-                seg["range"][0] <= anchor_x <= seg["range"][1]
-                for seg in self.frozen_segments
-            )
-            if in_frozen:
-                continue
+                anchor_x = float(np.mean(wave_chunk[finite_mask]))
+                anchor_y = float(np.mean(cont_chunk[finite_mask]))
 
-            self.continuum_anchors.append((anchor_x, anchor_y))
-            (pt,) = self.ax.plot(anchor_x, anchor_y, "m*", markersize=10)
-            self.continuum_plots.append(pt)
-            anchor_count += 1
+                in_frozen = any(
+                    seg["range"][0] <= anchor_x <= seg["range"][1]
+                    for seg in self.frozen_segments
+                )
+                if in_frozen:
+                    continue
+
+                self.continuum_anchors.append((anchor_x, anchor_y))
+                (pt,) = self.ax.plot(anchor_x, anchor_y, "m*", markersize=10)
+                self.continuum_plots.append(pt)
+                anchor_count += 1
 
         n_valid = int(np.sum(np.isfinite(self.continuum_model)))
         print(
             f"Auto Continuum: loaded '{os.path.basename(cont_file)}' "
             f"({n_valid}/{len(self.wavelength)} px covered), "
-            f"placed {anchor_count} anchors."
+            f"placed {anchor_count} anchors"
+            + (" (from IsAnchor column)." if has_anchor_col else " (auto-generated).")
         )
 
         # 5. Enable continuum mode if not already on --------------------
@@ -959,6 +979,36 @@ class SpectraViewer:
         self.btn_save.color = "0.85"
         self.btn_save.hovercolor = "0.95"
 
+        # Check for anchors in the loaded file
+        for pt in self.continuum_plots:
+            try:
+                pt.remove()
+            except Exception:
+                pass
+        self.continuum_anchors = []
+        self.continuum_plots = []
+        
+        anchor_count = 0
+        has_anchor_col = False
+        if data.shape[1] >= 3:
+            is_anchor = data[:, -1]
+            if set(np.unique(is_anchor)).issubset({0, 1}):
+                is_anchor_sorted = is_anchor[sort_idx]
+                has_anchor_col = True
+                
+        if has_anchor_col:
+            for wave, cont, is_anch in zip(cont_wave, cont_flux, is_anchor_sorted):
+                if is_anch == 1 and np.isfinite(cont):
+                    in_frozen = any(
+                        seg["range"][0] <= wave <= seg["range"][1]
+                        for seg in self.frozen_segments
+                    )
+                    if not in_frozen:
+                        self.continuum_anchors.append((wave, cont))
+                        (pt,) = self.ax.plot(wave, cont, "m*", markersize=10)
+                        self.continuum_plots.append(pt)
+                        anchor_count += 1
+
         if self.continuum_fit_line is not None:
             try:
                 self.continuum_fit_line.remove()
@@ -971,9 +1021,10 @@ class SpectraViewer:
         self.fig.canvas.draw_idle()
 
         n_valid = int(np.sum(np.isfinite(self.continuum_model)))
+        anchor_msg = f", placed {anchor_count} anchors (from IsAnchor column)" if has_anchor_col else ""
         print(
             f"Load Continuum: loaded '{os.path.basename(cont_file)}' — "
-            f"{n_valid}/{len(self.wavelength)} pixels covered."
+            f"{n_valid}/{len(self.wavelength)} pixels covered{anchor_msg}."
         )
 
     # ------------------------------------------------------------------
@@ -1213,18 +1264,23 @@ class SpectraViewer:
         cont_fname = f"{base}_cont{ext}" if ext else f"{base}_cont.txt"
         norm_fname = f"{base}_norm{ext}" if ext else f"{base}_norm.txt"
 
+        is_anchor = np.zeros(len(self.wavelength), dtype=int)
+        for ax, ay in self.continuum_anchors:
+            idx = (np.abs(self.wavelength - ax)).argmin()
+            is_anchor[idx] = 1
+
         try:
             np.savetxt(
                 cont_fname,
-                np.column_stack((self.wavelength, self.continuum_model)),
-                header="Wavelength Continuum",
+                np.column_stack((self.wavelength, self.continuum_model, is_anchor)),
+                header="IsContAnchor",
             )
             norm_flux = self.flux / self.continuum_model
             norm_err = self.error / self.continuum_model
             np.savetxt(
                 norm_fname,
-                np.column_stack((self.wavelength, norm_flux, norm_err)),
-                header="Wavelength NormFlux NormError",
+                np.column_stack((self.wavelength, norm_flux, norm_err, is_anchor)),
+                header="Wavelength NormFlux NormError IsAnchor",
             )
             print(f"Saved fit to:\n  {cont_fname}\n  {norm_fname}")
         except Exception as e:

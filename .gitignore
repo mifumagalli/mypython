@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 spectra/0_spec_test_cont.dat
 .gitignore
+spectra/0_spec_test_norm.dat
