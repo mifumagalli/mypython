@@ -32,12 +32,12 @@ warnings.filterwarnings("ignore")
 
 
 class SpectraViewer:
-    def __init__(self, filename):
+    def __init__(self, filename, zoom_line=None, initial_z=0.0):
         self.filename = filename
         self.wavelength, self.flux, self.error = load_spectrum(filename)
         self.linelist = LineList("Strong")
         self.lines_visible = False
-        self.current_z = 0.0
+        self.current_z = initial_z
         self.vlines = []
 
         self.line_ew_state = {}
@@ -98,7 +98,7 @@ class SpectraViewer:
         self.continuum_anchors = []
         self.continuum_plots = []
         self.continuum_fit_line = None
-        self.poly_order = 1
+        self.poly_order = 3
         self.current_poly = None
 
         self.frozen_segments = []
@@ -130,10 +130,10 @@ class SpectraViewer:
         self.btn_spline.on_clicked(self.fit_spline)
 
         # Load Continuum (file dialog)
-        #ax_load_cont = self.fig.add_axes([0.82, 0.30, 0.15, 0.05])
-        #self.btn_load_cont = Button(ax_load_cont, "Load Continuum")
-        #self.btn_load_cont.on_clicked(self.load_continuum)
-        #self.btn_load_cont.label.set_fontsize(8)
+        # ax_load_cont = self.fig.add_axes([0.82, 0.30, 0.15, 0.05])
+        # self.btn_load_cont = Button(ax_load_cont, "Load Continuum")
+        # self.btn_load_cont.on_clicked(self.load_continuum)
+        # self.btn_load_cont.label.set_fontsize(8)
 
         # -----------------------------------------------------------------
         # Auto Continuum button (NEW)
@@ -208,7 +208,66 @@ class SpectraViewer:
         print("  u     : Unfreeze segment at cursor")
         print("  a     : Accept All (freeze remaining fit)")
 
+        # --- Zoom to emission line if requested ---
+        if zoom_line is not None:
+            self._zoom_to_line(zoom_line)
+
         plt.show()
+
+    # ---------------------------------------------------------------
+    # Helper: Zoom to a specific line by name (e.g. "Ly-a", "C IV 1548")
+    # ---------------------------------------------------------------
+    def _zoom_to_line(self, line_name):
+        """Zoom the main axis to a named emission line at current redshift."""
+        # Velocity half-window in km/s → converts to wavelength range
+        WINDOW_KMS = 20000.0
+        C_KMS = 299792.458
+
+        # Try LineList first
+        name_arr = np.array([n.strip() for n in self.linelist.name])
+        match = np.where(name_arr == line_name)[0]
+
+        if len(match) == 0:
+            # Fuzzy: case-insensitive substring
+            match = np.where([line_name.lower() in n.lower() for n in name_arr])[0]
+
+        if len(match) == 0:
+            print(
+                f"Zoom: line '{line_name}' not found in LineList. "
+                f"Available names (sample): {list(name_arr[:20])}"
+            )
+            return
+
+        wrest = float(self.linelist.wrest[match[0]].value)
+        wobs = wrest * (1.0 + self.current_z)
+        dw = wobs * WINDOW_KMS / C_KMS
+
+        xlo, xhi = wobs - dw, wobs + dw
+
+        # Clamp to spectrum range
+        xlo = max(xlo, self.wavelength.min())
+        xhi = min(xhi, self.wavelength.max())
+
+        if xlo >= xhi:
+            print(
+                f"Zoom: line '{line_name}' at {wobs:.1f} Å is outside spectrum range."
+            )
+            return
+
+        self.ax.set_xlim(xlo, xhi)
+        # Auto-scale Y to the visible flux
+        mask = (self.wavelength >= xlo) & (self.wavelength <= xhi)
+        if np.any(mask):
+            f_vis = self.flux[mask]
+            ylo = np.nanpercentile(f_vis, 1)
+            yhi = np.nanpercentile(f_vis, 99)
+            margin = (yhi - ylo) * 0.15
+            self.ax.set_ylim(ylo - margin, yhi + margin)
+
+        print(
+            f"Zoom: '{line_name}' λ_rest={wrest:.1f} → λ_obs={wobs:.1f} Å  "
+            f"[{xlo:.1f}, {xhi:.1f}]"
+        )
 
     # ------------------------------------------------------------------
     # Helpers for Auto Continuum
@@ -987,7 +1046,7 @@ class SpectraViewer:
                 pass
         self.continuum_anchors = []
         self.continuum_plots = []
-        
+
         anchor_count = 0
         has_anchor_col = False
         if data.shape[1] >= 3:
@@ -995,7 +1054,7 @@ class SpectraViewer:
             if set(np.unique(is_anchor)).issubset({0, 1}):
                 is_anchor_sorted = is_anchor[sort_idx]
                 has_anchor_col = True
-                
+
         if has_anchor_col:
             for wave, cont, is_anch in zip(cont_wave, cont_flux, is_anchor_sorted):
                 if is_anch == 1 and np.isfinite(cont):
@@ -1021,7 +1080,11 @@ class SpectraViewer:
         self.fig.canvas.draw_idle()
 
         n_valid = int(np.sum(np.isfinite(self.continuum_model)))
-        anchor_msg = f", placed {anchor_count} anchors (from IsAnchor column)" if has_anchor_col else ""
+        anchor_msg = (
+            f", placed {anchor_count} anchors (from IsAnchor column)"
+            if has_anchor_col
+            else ""
+        )
         print(
             f"Load Continuum: loaded '{os.path.basename(cont_file)}' — "
             f"{n_valid}/{len(self.wavelength)} pixels covered{anchor_msg}."
@@ -1551,9 +1614,25 @@ Saving:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: python spectra_viewer.py <filename>")
-        sys.exit(1)
+    import argparse
 
-    filename = sys.argv[1]
-    viewer = SpectraViewer(filename)
+    parser = argparse.ArgumentParser(description="Spectra Viewer")
+    parser.add_argument("filename", help="Input spectrum file")
+    parser.add_argument(
+        "-e",
+        "--emission",
+        metavar="LINE",
+        help="Zoom to emission line on startup (e.g. CIV, Lya, MgII)",
+    )
+    parser.add_argument(
+        "-z",
+        "--redshift",
+        type=float,
+        default=0.0,
+        help="Initial redshift (default: 0.0)",
+    )
+    args = parser.parse_args()
+
+    viewer = SpectraViewer(
+        args.filename, zoom_line=args.emission, initial_z=args.redshift
+    )
