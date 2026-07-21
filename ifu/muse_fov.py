@@ -6,7 +6,7 @@ Return the MUSE FOV as a patch that can be overplotted on a image
 scale - > need to convert arcsec in pixels for a given image
 
 fov - return the field of view
-sgs - return the slow guiding sytem area
+sgs - return the slow guiding system area
 ao  - return the AO tip-tilt area
 xc,yc - central pixel 
 lwidth - line width
