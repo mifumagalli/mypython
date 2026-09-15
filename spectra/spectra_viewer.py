@@ -32,9 +32,28 @@ warnings.filterwarnings("ignore")
 
 
 class SpectraViewer:
-    def __init__(self, filename, zoom_line=None, initial_z=0.0):
+    def __init__(self, filename, zoom_line=None, initial_z=0.0, continuum_zoom=False):
         self.filename = filename
         self.wavelength, self.flux, self.error = load_spectrum(filename)
+
+        if continuum_zoom:
+            REST_LAMBDA_MIN = 1230.0
+            obs_lambda_min = REST_LAMBDA_MIN * (1.0 + initial_z)
+            mask = self.wavelength > obs_lambda_min
+            if np.any(mask):
+                self.wavelength = self.wavelength[mask]
+                self.flux = self.flux[mask]
+                self.error = self.error[mask]
+                print(
+                    f"Continuum cut: keeping rest λ>{REST_LAMBDA_MIN:.0f} "
+                    f"(obs λ>{obs_lambda_min:.1f})"
+                )
+            else:
+                print(
+                    f"Continuum cut: no data with rest λ>{REST_LAMBDA_MIN:.0f} "
+                    f"(obs λ>{obs_lambda_min:.1f}); keeping full spectrum."
+                )
+
         self.linelist = LineList("Strong")
         self.lines_visible = False
         self.current_z = initial_z
@@ -1631,8 +1650,16 @@ if __name__ == "__main__":
         default=0.0,
         help="Initial redshift (default: 0.0)",
     )
+    parser.add_argument(
+        "--continuum",
+        action="store_true",
+        help="Cut the spectrum to the continuum region (rest-frame lambda > 1230 A)",
+    )
     args = parser.parse_args()
 
     viewer = SpectraViewer(
-        args.filename, zoom_line=args.emission, initial_z=args.redshift
+        args.filename,
+        zoom_line=args.emission,
+        initial_z=args.redshift,
+        continuum_zoom=args.continuum,
     )
